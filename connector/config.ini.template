@@ -1,0 +1,11 @@
+[server]
+tcp_bind = 0.0.0.0:7253
+working_dir = '.'
+log_level = DEBUG
+log_file = ./connector.log
+pid_file = './connector_pid'
+tcp_recvbuf_size = 2048
+tcp_sendbuf_size = 2048
+
+[zookeeper]
+addr = dmq-zk:2181
