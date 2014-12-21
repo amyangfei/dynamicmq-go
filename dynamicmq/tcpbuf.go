@@ -42,3 +42,13 @@ func NewBufioReader(c chan *bufio.Reader, r io.Reader, bufsz int) *bufio.Reader 
 		return bufio.NewReaderSize(r, bufsz)
 	}
 }
+
+// recycle a Reader back to chan, if chan full discard it.
+func RecycleBufioReader(c chan *bufio.Reader, r *bufio.Reader) {
+	r.Reset(nil)
+	select {
+	case c <- r:
+	default:
+		panic("recycle while tcp bufioReader cache is full")
+	}
+}
