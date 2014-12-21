@@ -8,6 +8,7 @@ import (
 	"github.com/rakyll/globalconf"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"syscall"
 )
@@ -57,6 +58,7 @@ func InitConfig(configFile string) error {
 	serverFlagSet.Int("max_proc", 0, "max cpu process")
 	serverFlagSet.Int("tcp_recvbuf_size", 2048, "tcp receive buffer size")
 	serverFlagSet.Int("tcp_sendbuf_size", 2048, "tcp send buffer size")
+	serverFlagSet.Int("tcp_bufio_num", 64, "bufio num for each cache instance")
 
 	zkFlagSet := flag.NewFlagSet("zookeeper", flag.PanicOnError)
 	zkFlagSet.String("addr", "localhost:2181", "zookeeper host")
@@ -79,6 +81,9 @@ func InitConfig(configFile string) error {
 		strconv.Atoi(serverFlagSet.Lookup("tcp_recvbuf_size").Value.String())
 	Config.TCPSendBufSize, err =
 		strconv.Atoi(serverFlagSet.Lookup("tcp_sendbuf_size").Value.String())
+	Config.TCPBufioNum, err =
+		strconv.Atoi(serverFlagSet.Lookup("tcp_bufio_num").Value.String())
+	Config.TCPBufInsNum = runtime.NumCPU()
 
 	Config.ZookeeperAddr = zkFlagSet.Lookup("addr").Value.String()
 

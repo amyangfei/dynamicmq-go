@@ -10,6 +10,8 @@ type SrvConfig struct {
 	PidFile        string
 	TCPRecvBufSize int
 	TCPSendBufSize int
+	TCPBufInsNum   int
+	TCPBufioNum    int
 
 	// zookeeper
 	ZookeeperAddr string

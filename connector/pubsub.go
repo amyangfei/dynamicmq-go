@@ -1,6 +1,7 @@
 package main
 
 import (
+	dmq "../dynamicmq"
 	"bufio"
 	"net"
 )
@@ -32,7 +33,7 @@ func tcpListen(bind string) {
 	}()
 
 	// init reader buffer instance
-	// rb := newtcpBufCache()
+	recvTcpBufCache := dmq.NewTcpBufCache(Config.TCPBufInsNum, Config.TCPBufioNum)
 	for {
 		conn, err := l.AcceptTCP()
 		if err != nil {
@@ -54,16 +55,17 @@ func tcpListen(bind string) {
 			conn.Close()
 			continue
 		}
+		rc := recvTcpBufCache.Get()
 		// one connection one routine
-		go handleTCPConn(conn)
+		go handleTCPConn(conn, rc)
 	}
 }
 
-func handleTCPConn(conn net.Conn) {
+func handleTCPConn(conn net.Conn, rc chan *bufio.Reader) {
 	addr := conn.RemoteAddr().String()
 	log.Debug("handleTcpConn(%s) routine start", addr)
 
-	rd := bufio.NewReaderSize(conn, Config.TCPRecvBufSize)
+	rd := dmq.NewBufioReader(rc, conn, Config.TCPRecvBufSize)
 	for {
 		buf := make([]byte, Config.TCPRecvBufSize)
 		_, err := rd.Read(buf)
