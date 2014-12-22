@@ -7,18 +7,36 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 )
 
+type SubClient struct {
+	id     string
+	expire int64
+	conn   net.Conn
+}
+
 var (
-	// hearbeat
+	// hearbeat reply
 	HeartbeatReply = []byte("+h\r\n")
 
 	// command error reply
-	WrongCmdReply = []byte("-c\r\n")
+	WrongCmdReply = []byte("-command in wrong protocol\r\n")
 )
 
 var (
 	ErrProtocol = errors.New("cmd format error")
+
+	// default expire for a subscribe client 15 min
+	DfltExpire int64 = 15 * 60
+)
+
+var (
+	CmdTable map[string]func(c *SubClient, args []string) = map[string]func(c *SubClient, args []string){
+		"sub":       processSubscribe,
+		"subscribe": processSubscribe,
+		"hb":        processHeartbeat,
+	}
 )
 
 func StartTCP(bind string) error {
@@ -70,27 +88,26 @@ func tcpListen(bind string) {
 			conn.Close()
 			continue
 		}
+		subCli := &SubClient{expire: time.Now().Unix() + DfltExpire, conn: conn}
 		rc := recvTcpBufCache.Get()
 		// one connection one routine
-		go handleTCPConn(conn, rc)
+		go handleTCPConn(subCli, rc)
 	}
 }
 
-func handleTCPConn(conn net.Conn, rc chan *bufio.Reader) {
-	addr := conn.RemoteAddr().String()
+func handleTCPConn(cli *SubClient, rc chan *bufio.Reader) {
+	addr := cli.conn.RemoteAddr().String()
 	log.Debug("handleTcpConn(%s) routine start", addr)
 
 	for {
-		rd := dmq.NewBufioReader(rc, conn, Config.TCPRecvBufSize)
+		rd := dmq.NewBufioReader(rc, cli.conn, Config.TCPRecvBufSize)
 		if args, err := parseCmd(rd); err == nil {
 			// recycle buffer bufio.Reader
 			dmq.RecycleBufioReader(rc, rd)
-			switch args[0] {
-			case "subscribe":
-				subscribeHandle(conn, args[1:])
-				break
-			default:
-				conn.Write(WrongCmdReply)
+			if cmd, ok := CmdTable[args[0]]; ok {
+				cmd(cli, args)
+			} else {
+				cli.conn.Write(WrongCmdReply)
 				log.Warning("addr: %s unknown cmd: %s", addr, args[0])
 			}
 		} else {
@@ -102,16 +119,22 @@ func handleTCPConn(conn net.Conn, rc chan *bufio.Reader) {
 	}
 
 	// close the connection
-	if err := conn.Close(); err != nil {
+	if err := cli.conn.Close(); err != nil {
 		log.Error("addr: %s conn.Close() error(%v)", addr, err)
 	}
 	log.Debug("addr: %s handleTcpConn routine stop", addr)
 }
 
-func subscribeHandle(conn net.Conn, args []string) {
-	log.Debug("subscribeHandle with args: %s", args)
+func processHeartbeat(cli *SubClient, args []string) {
+	log.Debug("receive addr: %s heartbeat", cli.conn.RemoteAddr())
+	cli.conn.Write(HeartbeatReply)
 }
 
+func processSubscribe(cli *SubClient, args []string) {
+	log.Debug("subscribeHandle with argv: %s", args)
+}
+
+// TODO: use client read buffer for better processing
 func parseCmd(rd *bufio.Reader) ([]string, error) {
 	// get argument number
 	argNum, err := parseCmdSize(rd, '*')
