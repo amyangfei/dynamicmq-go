@@ -15,6 +15,8 @@ import (
 
 var Config *SrvConfig
 
+var SubcliTable map[string]*SubClient
+
 var log = logging.MustGetLogger("dynamicmq-connector")
 
 // InitSignal register signals handler.
@@ -50,7 +52,8 @@ func InitConfig(configFile string) error {
 	}
 
 	serverFlagSet := flag.NewFlagSet("server", flag.PanicOnError)
-	serverFlagSet.String("tcp_bind", "localhost:7253", "server bind address")
+	serverFlagSet.String("sub_tcp_bind", "localhost:7253", "bind address for subscriber")
+	serverFlagSet.String("dispatch_tcp_bind", "localhost:7255", "bind address for dispatcher")
 	serverFlagSet.String("working_dir", ".", "working dir")
 	serverFlagSet.String("log_level", "DEBUG", "log level")
 	serverFlagSet.String("log_file", "./connector.log", "log file path")
@@ -70,7 +73,8 @@ func InitConfig(configFile string) error {
 
 	Config = &SrvConfig{}
 
-	Config.TCPBind = serverFlagSet.Lookup("tcp_bind").Value.String()
+	Config.SubTCPBind = serverFlagSet.Lookup("sub_tcp_bind").Value.String()
+	Config.DispatchTCPBind = serverFlagSet.Lookup("dispatch_tcp_bind").Value.String()
 	Config.WorkingDir = serverFlagSet.Lookup("working_dir").Value.String()
 	Config.LogLevel = serverFlagSet.Lookup("log_level").Value.String()
 	Config.LogFile = serverFlagSet.Lookup("log_file").Value.String()
@@ -92,7 +96,7 @@ func InitConfig(configFile string) error {
 
 func InitLog(logFile string) error {
 	var format = logging.MustStringFormatter(
-		"%{time:2006-01-02 15:04:05.000} %{shortfunc} [%{level:.4s}] %{id:03x} %{message}",
+		"%{time:2006-01-02 15:04:05.000} [%{level:.4s}] %{id:03x} [%{shortfunc}] %{message}",
 	)
 
 	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
@@ -103,6 +107,11 @@ func InitLog(logFile string) error {
 	backend1 := logging.NewLogBackend(f, "", 0)
 	backend1Formatter := logging.NewBackendFormatter(backend1, format)
 	logging.SetBackend(backend1Formatter)
+	return nil
+}
+
+func InitServer() error {
+	SubcliTable = make(map[string]*SubClient, 0)
 	return nil
 }
 
@@ -127,7 +136,15 @@ func main() {
 		panic(err)
 	}
 
-	if err := StartSubTCP(Config.TCPBind); err != nil {
+	if err := InitServer(); err != nil {
+		panic(err)
+	}
+
+	if err := StartSubTCP(Config.SubTCPBind); err != nil {
+		panic(err)
+	}
+
+	if err := StartDispatcher(Config.DispatchTCPBind); err != nil {
 		panic(err)
 	}
 

@@ -4,6 +4,7 @@ import (
 	dmq "../dynamicmq"
 	"bufio"
 	"errors"
+	"gopkg.in/mgo.v2/bson"
 	"io"
 	"net"
 	"strconv"
@@ -12,7 +13,8 @@ import (
 )
 
 type SubClient struct {
-	id     string
+	id     string // used as client identity in internal system
+	token  string // used as client identity in external system
 	expire int64
 	conn   net.Conn
 	status int
@@ -102,10 +104,12 @@ func tcpListen(bind string) {
 			continue
 		}
 		subCli := &SubClient{
+			id:     bson.NewObjectId().Hex(),
 			expire: time.Now().Unix() + DfltExpire,
 			conn:   conn,
 			status: IsPending,
 		}
+		SubcliTable[subCli.id] = subCli
 		rc := recvTcpBufCache.Get()
 		// one connection one routine
 		go handleTCPConn(subCli, rc)

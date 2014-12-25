@@ -1,5 +1,6 @@
 [server]
-tcp_bind = 0.0.0.0:7253
+sub_tcp_bind = 0.0.0.0:7253
+dispatch_tcp_bind = 0.0.0.0:7255
 working_dir = '.'
 log_level = DEBUG
 log_file = ./connector.log
