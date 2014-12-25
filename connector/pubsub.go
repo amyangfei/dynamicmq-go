@@ -4,6 +4,7 @@ import (
 	dmq "../dynamicmq"
 	"bufio"
 	"errors"
+	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -14,7 +15,14 @@ type SubClient struct {
 	id     string
 	expire int64
 	conn   net.Conn
+	status int
 }
+
+var (
+	IsPending int = 0x01
+	IsAuthed  int = 0x02
+	IsDisable int = 0x04
+)
 
 var (
 	// hearbeat reply
@@ -29,17 +37,20 @@ var (
 
 	// default expire for a subscribe client 15 min
 	DfltExpire int64 = 15 * 60
+
+	PendingExpire int64 = 10
 )
 
 var (
 	CmdTable map[string]func(c *SubClient, args []string) = map[string]func(c *SubClient, args []string){
+		// TODO: add register command
 		"sub":       processSubscribe,
 		"subscribe": processSubscribe,
 		"hb":        processHeartbeat,
 	}
 )
 
-func StartTCP(bind string) error {
+func StartSubTCP(bind string) error {
 	log.Info("start tcp listening: %s", bind)
 	go tcpListen(bind)
 	return nil
@@ -79,20 +90,36 @@ func tcpListen(bind string) {
 			continue
 		}
 		if err = conn.SetReadBuffer(Config.TCPRecvBufSize); err != nil {
-			log.Error("conn.SetReadBuffer(%d) error(%v)", Config.TCPRecvBufSize, err)
+			log.Error("conn.SetReadBuffer(%d) error(%v)",
+				Config.TCPRecvBufSize, err)
 			conn.Close()
 			continue
 		}
 		if err = conn.SetWriteBuffer(Config.TCPSendBufSize); err != nil {
-			log.Error("conn.SetWriteBuffer(%d) error(%v)", Config.TCPSendBufSize, err)
+			log.Error("conn.SetWriteBuffer(%d) error(%v)",
+				Config.TCPSendBufSize, err)
 			conn.Close()
 			continue
 		}
-		subCli := &SubClient{expire: time.Now().Unix() + DfltExpire, conn: conn}
+		subCli := &SubClient{
+			expire: time.Now().Unix() + DfltExpire,
+			conn:   conn,
+			status: IsPending,
+		}
 		rc := recvTcpBufCache.Get()
 		// one connection one routine
 		go handleTCPConn(subCli, rc)
 	}
+}
+
+func setSubTimeout(cli *SubClient) error {
+	var timeout time.Time = time.Now()
+	if cli.status&IsPending > 0 {
+		timeout = timeout.Add(time.Second * time.Duration(PendingExpire))
+	} else {
+		timeout = timeout.Add(time.Second * time.Duration(DfltExpire))
+	}
+	return cli.conn.SetReadDeadline(timeout)
 }
 
 func handleTCPConn(cli *SubClient, rc chan *bufio.Reader) {
@@ -100,6 +127,10 @@ func handleTCPConn(cli *SubClient, rc chan *bufio.Reader) {
 	log.Debug("handleTcpConn(%s) routine start", addr)
 
 	for {
+		if err := setSubTimeout(cli); err != nil {
+			log.Error("SubClient set timeout error(%v)", err)
+			break
+		}
 		rd := dmq.NewBufioReader(rc, cli.conn, Config.TCPRecvBufSize)
 		if args, err := parseCmd(rd); err == nil {
 			// recycle buffer bufio.Reader
@@ -113,8 +144,13 @@ func handleTCPConn(cli *SubClient, rc chan *bufio.Reader) {
 		} else {
 			// recycle buffer bufio.Reader
 			dmq.RecycleBufioReader(rc, rd)
-			log.Error("addr: %s parseCmd() error(%v)", addr, err)
-			break
+			if err == io.EOF {
+				log.Info("addr: %s close connection", addr)
+				return
+			} else {
+				log.Error("addr: %s parseCmd() error(%v)", addr, err)
+				break
+			}
 		}
 	}
 
@@ -131,6 +167,8 @@ func processHeartbeat(cli *SubClient, args []string) {
 }
 
 func processSubscribe(cli *SubClient, args []string) {
+	// FIXME: should set this status in register process
+	cli.status &= ^IsPending
 	log.Debug("subscribeHandle with argv: %s", args)
 }
 
@@ -139,7 +177,9 @@ func parseCmd(rd *bufio.Reader) ([]string, error) {
 	// get argument number
 	argNum, err := parseCmdSize(rd, '*')
 	if err != nil {
-		log.Error("cmd format error when finding '*' (%v)", err)
+		if err != io.EOF {
+			log.Error("cmd format error when finding '*' (%v)", err)
+		}
 		return nil, err
 	}
 
@@ -172,7 +212,9 @@ func parseCmd(rd *bufio.Reader) ([]string, error) {
 func parseCmdSize(rd *bufio.Reader, prefix uint8) (int, error) {
 	cs, err := rd.ReadBytes('\n')
 	if err != nil {
-		log.Error("rd.ReadBytes('\\n') error(%v)", err)
+		if err != io.EOF {
+			log.Error("rd.ReadBytes('\\n') error(%v)", err)
+		}
 		return 0, err
 	}
 	csl := len(cs)

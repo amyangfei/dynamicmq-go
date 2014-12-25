@@ -127,7 +127,7 @@ func main() {
 		panic(err)
 	}
 
-	if err := StartTCP(Config.TCPBind); err != nil {
+	if err := StartSubTCP(Config.TCPBind); err != nil {
 		panic(err)
 	}
 
