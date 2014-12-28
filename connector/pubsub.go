@@ -21,9 +21,9 @@ type SubClient struct {
 }
 
 var (
-	IsPending int = 0x01
-	IsAuthed  int = 0x02
-	IsDisable int = 0x04
+	SubcliIsPending int = 0x01
+	SubcliIsAuthed  int = 0x02
+	SubcliIsDisable int = 0x04
 )
 
 var (
@@ -44,7 +44,7 @@ var (
 )
 
 var (
-	CmdTable map[string]func(c *SubClient, args []string) = map[string]func(c *SubClient, args []string){
+	CmdTable = map[string]func(c *SubClient, args []string){
 		// TODO: add register command
 		"sub":       processSubscribe,
 		"subscribe": processSubscribe,
@@ -107,7 +107,7 @@ func tcpListen(bind string) {
 			id:     bson.NewObjectId().Hex(),
 			expire: time.Now().Unix() + DfltExpire,
 			conn:   conn,
-			status: IsPending,
+			status: SubcliIsPending,
 		}
 		SubcliTable[subCli.id] = subCli
 		rc := recvTcpBufCache.Get()
@@ -118,7 +118,7 @@ func tcpListen(bind string) {
 
 func setSubTimeout(cli *SubClient) error {
 	var timeout time.Time = time.Now()
-	if cli.status&IsPending > 0 {
+	if cli.status&SubcliIsPending > 0 {
 		timeout = timeout.Add(time.Second * time.Duration(PendingExpire))
 	} else {
 		timeout = timeout.Add(time.Second * time.Duration(DfltExpire))
@@ -172,7 +172,7 @@ func processHeartbeat(cli *SubClient, args []string) {
 
 func processSubscribe(cli *SubClient, args []string) {
 	// FIXME: should set this status in register process
-	cli.status &= ^IsPending
+	cli.status &= ^SubcliIsPending
 	log.Debug("subscribeHandle with argv: %s", args)
 }
 
