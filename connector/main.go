@@ -53,7 +53,7 @@ func InitConfig(configFile string) error {
 
 	serverFlagSet := flag.NewFlagSet("server", flag.PanicOnError)
 	serverFlagSet.String("sub_tcp_bind", "localhost:7253", "bind address for subscriber")
-	serverFlagSet.String("dispatch_tcp_bind", "localhost:7255", "bind address for dispatcher")
+	serverFlagSet.String("router_tcp_bind", "localhost:7255", "bind address for router")
 	serverFlagSet.String("working_dir", ".", "working dir")
 	serverFlagSet.String("log_level", "DEBUG", "log level")
 	serverFlagSet.String("log_file", "./connector.log", "log file path")
@@ -74,7 +74,7 @@ func InitConfig(configFile string) error {
 	Config = &SrvConfig{}
 
 	Config.SubTCPBind = serverFlagSet.Lookup("sub_tcp_bind").Value.String()
-	Config.DispatchTCPBind = serverFlagSet.Lookup("dispatch_tcp_bind").Value.String()
+	Config.RouterTCPBind = serverFlagSet.Lookup("router_tcp_bind").Value.String()
 	Config.WorkingDir = serverFlagSet.Lookup("working_dir").Value.String()
 	Config.LogLevel = serverFlagSet.Lookup("log_level").Value.String()
 	Config.LogFile = serverFlagSet.Lookup("log_file").Value.String()
@@ -144,7 +144,7 @@ func main() {
 		panic(err)
 	}
 
-	if err := StartDispatcher(Config.DispatchTCPBind); err != nil {
+	if err := StartRouter(Config.RouterTCPBind); err != nil {
 		panic(err)
 	}
 

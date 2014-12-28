@@ -22,17 +22,17 @@ type PubMsgFunc struct {
 	process  func(msg *DecodedMsg) error
 }
 
-var DispatcherCmdTable = map[uint8]PubMsgFunc{
+var RouterCmdTable = map[uint8]PubMsgFunc{
 	PubMsgCmdPush: PubMsgFunc{validate: validateMsg, process: processMsg},
 }
 
-func StartDispatcher(bind string) error {
-	log.Info("start dispatcher listening: %s", bind)
-	go dispatcherListen(bind)
+func StartRouter(bind string) error {
+	log.Info("start router listening: %s", bind)
+	go routerListen(bind)
 	return nil
 }
 
-func dispatcherListen(bind string) {
+func routerListen(bind string) {
 	addr, err := net.ResolveTCPAddr("tcp", bind)
 	if err != nil {
 		log.Error("net.ResolveTCPAddr(%s) error", bind)
@@ -77,11 +77,11 @@ func dispatcherListen(bind string) {
 		}
 		rc := recvTcpBufCache.Get()
 		// one connection one routine
-		go handleDispatchConn(conn, rc)
+		go handleRouteConn(conn, rc)
 	}
 }
 
-func handleDispatchConn(conn net.Conn, rc chan *bufio.Reader) {
+func handleRouteConn(conn net.Conn, rc chan *bufio.Reader) {
 	addr := conn.RemoteAddr().String()
 	log.Debug("addr: %s routine start", addr)
 
@@ -90,7 +90,7 @@ func handleDispatchConn(conn net.Conn, rc chan *bufio.Reader) {
 		msg := make([]byte, Config.TCPRecvBufSize)
 		if rlen, err := rd.Read(msg); err == nil {
 			dmq.RecycleBufioReader(rc, rd)
-			// TODO: dispatch message to subscribers here
+			// TODO: route message to subscribers here
 			log.Debug("addr: %s receive: %s", addr,
 				strings.Replace(
 					strings.Replace(string(msg[:rlen]), "\r", " ", -1), "\n", " ", -1))
@@ -127,7 +127,7 @@ func processReadBuffer(conn net.Conn, msg []byte) error {
 			return nil
 		}
 		if remaining <= PubMsgHeaderSize {
-			log.Error("dispatcher recv error msg, invalid msg header length")
+			log.Error("router recv error msg, invalid msg header length")
 			return errors.New("invalid msg header len")
 		}
 
@@ -145,7 +145,7 @@ func processReadBuffer(conn net.Conn, msg []byte) error {
 				log.Error("invalid request")
 				continue
 			}
-			if processFunc, ok := DispatcherCmdTable[cmd]; ok {
+			if processFunc, ok := RouterCmdTable[cmd]; ok {
 				if err := processFunc.validate(decMsg); err != nil {
 					processFunc.process(decMsg)
 				} else {
