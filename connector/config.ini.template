@@ -1,4 +1,5 @@
 [server]
+node_id = 'conn-01-01'
 sub_tcp_bind = 0.0.0.0:7253
 router_tcp_bind = 0.0.0.0:7255
 working_dir = '.'
@@ -8,6 +9,12 @@ pid_file = './connector_pid'
 tcp_recvbuf_size = 2048
 tcp_sendbuf_size = 2048
 tcp_bufio_num = 64
+
+[redis]
+redis_endpoint = tcp@localhost:6379
+max_idle = 50
+max_active = 100
+timeout = 3600
 
 [zookeeper]
 addr = dmq-zk:2181

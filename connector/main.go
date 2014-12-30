@@ -52,6 +52,7 @@ func InitConfig(configFile string) error {
 	}
 
 	serverFlagSet := flag.NewFlagSet("server", flag.PanicOnError)
+	serverFlagSet.String("node_id", "conn-01-01", "server node id")
 	serverFlagSet.String("sub_tcp_bind", "localhost:7253", "bind address for subscriber")
 	serverFlagSet.String("router_tcp_bind", "localhost:7255", "bind address for router")
 	serverFlagSet.String("working_dir", ".", "working dir")
@@ -63,16 +64,24 @@ func InitConfig(configFile string) error {
 	serverFlagSet.Int("tcp_sendbuf_size", 2048, "tcp send buffer size")
 	serverFlagSet.Int("tcp_bufio_num", 64, "bufio num for each cache instance")
 
+	redisFlagSet := flag.NewFlagSet("redis", flag.PanicOnError)
+	redisFlagSet.String("redis_endpoint", "localhost:6379", "redis endpoint")
+	redisFlagSet.String("max_idle", "50", "redis pool max idle clients")
+	redisFlagSet.String("max_active", "100", "redis pool max active clients")
+	redisFlagSet.String("timeout", "3600", "close idle redis client after timeout")
+
 	zkFlagSet := flag.NewFlagSet("zookeeper", flag.PanicOnError)
 	zkFlagSet.String("addr", "localhost:2181", "zookeeper host")
 
 	globalconf.Register("server", serverFlagSet)
+	globalconf.Register("redis", redisFlagSet)
 	globalconf.Register("zookeeper", zkFlagSet)
 
 	conf.ParseAll()
 
 	Config = &SrvConfig{}
 
+	Config.NodeId = serverFlagSet.Lookup("node_id").Value.String()
 	Config.SubTCPBind = serverFlagSet.Lookup("sub_tcp_bind").Value.String()
 	Config.RouterTCPBind = serverFlagSet.Lookup("router_tcp_bind").Value.String()
 	Config.WorkingDir = serverFlagSet.Lookup("working_dir").Value.String()
@@ -88,6 +97,14 @@ func InitConfig(configFile string) error {
 	Config.TCPBufioNum, err =
 		strconv.Atoi(serverFlagSet.Lookup("tcp_bufio_num").Value.String())
 	Config.TCPBufInsNum = runtime.NumCPU()
+
+	Config.RedisEndPoint = redisFlagSet.Lookup("redis_endpoint").Value.String()
+	Config.RedisMaxIdle, err =
+		strconv.Atoi(redisFlagSet.Lookup("max_idle").Value.String())
+	Config.RedisMaxActive, err =
+		strconv.Atoi(redisFlagSet.Lookup("max_active").Value.String())
+	Config.RedisIdleTimeout, err =
+		strconv.Atoi(redisFlagSet.Lookup("timeout").Value.String())
 
 	Config.ZookeeperAddr = zkFlagSet.Lookup("addr").Value.String()
 
@@ -137,6 +154,10 @@ func main() {
 	}
 
 	if err := InitServer(); err != nil {
+		panic(err)
+	}
+
+	if err := InitRawMsgCache(); err != nil {
 		panic(err)
 	}
 
