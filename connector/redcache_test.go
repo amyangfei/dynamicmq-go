@@ -60,3 +60,35 @@ func TestRedisCRUDWithRawMsg(t *testing.T) {
 		t.Errorf("message still exists after deletetion")
 	}
 }
+
+func TestRedisSaveMultiRawMsg(t *testing.T) {
+	var baseTestId string = "507f191e810c19729de86"
+	var testPayload string = "test message xiu"
+	var msgNum = 200
+	rc, err := newCache()
+	if err != nil {
+		t.Errorf("NewRedisCache with error(%v)", err)
+	}
+	rmsg := &RawMsg{
+		Payload: testPayload,
+		Extra:   map[string]string{},
+	}
+	for i := 0; i < msgNum; i++ {
+		rmsg.Id = fmt.Sprintf("%s%.3d", baseTestId, i)
+		rmsg.Extra["data"] = fmt.Sprintf("%d", i)
+		if err := rc.SaveRawMsg(rmsg, 30); err != nil {
+			t.Errorf("SaveRawMsg with error(%v)", err)
+		}
+	}
+	for i := 0; i < msgNum; i++ {
+		msgId := fmt.Sprintf("%s%.3d", baseTestId, i)
+		getMsg, err := rc.GetRawMsg(msgId)
+		if err != nil {
+			t.Errorf("GetRawMsg with error(%v)", err)
+		}
+		if getMsg.Payload != testPayload ||
+			getMsg.Extra["data"] != fmt.Sprintf("%d", i) {
+			t.Errorf("get message(%v) content error", getMsg)
+		}
+	}
+}

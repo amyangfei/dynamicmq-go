@@ -57,6 +57,31 @@ func (rc *RedisCache) SaveRawMsg(rmsg *RawMsg, ttl int) error {
 }
 
 func (rc *RedisCache) SaveMultiRawMsg(rmsgs []*RawMsg, ttl int) error {
+	conn := rc.GetConn()
+	if conn == nil {
+		return RedisNoConnErr
+	}
+	defer conn.Close()
+
+	for _, rmsg := range rmsgs {
+		rmsg.Expire = time.Now().Unix() + int64(ttl)
+		jsonMsg, err := json.Marshal(rmsg)
+		if err != nil {
+			return err
+		}
+		msgKey := GetMsgKeyInCache(rc.connNodeId, rmsg.Id)
+		if err := conn.Send("SETEX", msgKey, ttl, string(jsonMsg)); err != nil {
+			return err
+		}
+	}
+	if err := conn.Flush(); err != nil {
+		return err
+	}
+	for i := 0; i < len(rmsgs); i++ {
+		if _, err := conn.Receive(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
