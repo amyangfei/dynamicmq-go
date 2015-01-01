@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
+	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -136,23 +138,20 @@ func handleTCPConn(cli *SubClient, rc chan *bufio.Reader) {
 			break
 		}
 		rd := dmq.NewBufioReader(rc, cli.conn, Config.TCPRecvBufSize)
-		if args, err := parseCmd(rd); err == nil {
-			// recycle buffer bufio.Reader
-			dmq.RecycleBufioReader(rc, rd)
-			if cmd, ok := CmdTable[args[0]]; ok {
-				cmd(cli, args)
-			} else {
-				cli.conn.Write(WrongCmdReply)
-				log.Warning("addr: %s unknown cmd: %s", addr, args[0])
-			}
-		} else {
-			// recycle buffer bufio.Reader
-			dmq.RecycleBufioReader(rc, rd)
+		msg := make([]byte, Config.TCPRecvBufSize)
+		rlen, err := rd.Read(msg)
+		dmq.RecycleBufioReader(rc, rd)
+		if err != nil {
 			if err == io.EOF {
 				log.Info("addr: %s close connection", addr)
 				return
 			} else {
-				log.Error("addr: %s parseCmd() error(%v)", addr, err)
+				log.Error("addr: %s read with error(%v)", addr, err)
+				break
+			}
+		} else {
+			if err := processReadbuf(cli, msg[:rlen]); err != nil {
+				log.Error("process conn readbuf error(%v)", err)
 				break
 			}
 		}
@@ -176,78 +175,78 @@ func processSubscribe(cli *SubClient, args []string) {
 	log.Debug("subscribeHandle with argv: %s", args)
 }
 
-// TODO: use client read buffer for better processing
-func parseCmd(rd *bufio.Reader) ([]string, error) {
-	// get argument number
-	argNum, err := parseCmdSize(rd, '*')
-	if err != nil {
-		if err != io.EOF {
-			log.Error("cmd format error when finding '*' (%v)", err)
+func processReadbuf(cli *SubClient, msg []byte) error {
+	pos := 0
+	for pos < len(msg) {
+		if args, err := parseCmd(msg, &pos); err != nil {
+			log.Error("%v", err)
+			return ErrProtocol
+		} else {
+			if cmd, ok := CmdTable[args[0]]; !ok {
+				cli.conn.Write(WrongCmdReply)
+				log.Warning("client: %s sent unknown cmd: %s", cli.id, args[0])
+				return ErrProtocol
+			} else {
+				cmd(cli, args)
+			}
 		}
+	}
+	return nil
+}
+
+// TODO: use client read buffer for better processing
+func parseCmd(msg []byte, pos *int) ([]string, error) {
+	argNum, err := parseSize(msg, pos, '*')
+	if err != nil {
 		return nil, err
 	}
-
-	// TODO: argNum validation
 	if argNum < 1 {
-		log.Error("connector subscriber cmd arg number length error")
-		return nil, errors.New("cmd argnum length error")
+		return nil, errors.New("cmd argnum length less than 1")
 	}
 	args := make([]string, 0, argNum)
 	for i := 0; i < argNum; i++ {
-		// get argument length
-		cmdLen, err := parseCmdSize(rd, '$')
+		dataLen, err := parseSize(msg, pos, '$')
 		if err != nil {
-			log.Error("parseCmdSize(rd, '$') error(%v)", err)
-			return nil, err
+			return nil, errors.New(fmt.Sprintf("parseSize error (%v)", err))
 		}
-		// get argument data
-		d, err := parseCmdData(rd, cmdLen)
+		d, err := parseData(msg, pos, dataLen)
 		if err != nil {
-			log.Error("parseCmdData error(%v)", err)
-			return nil, err
+			return nil, errors.New(fmt.Sprintf("parseData error (%v)", err))
 		}
-		// append args
 		args = append(args, strings.ToLower(string(d)))
 	}
 	return args, nil
 }
 
-// Parse request protocol cmd size.
-func parseCmdSize(rd *bufio.Reader, prefix uint8) (int, error) {
-	cs, err := rd.ReadBytes('\n')
-	if err != nil {
-		if err != io.EOF {
-			log.Error("rd.ReadBytes('\\n') error(%v)", err)
+func parseSize(msg []byte, pos *int, prefix uint8) (int, error) {
+	if i := bytes.IndexByte(msg[*pos:], '\n'); i < 0 {
+		return 0, errors.New("\\n not found")
+	} else {
+		// at least '(prefix)[0-9a-zA-Z]+\r\n', length >= 4, i >= 3
+		if i <= 2 || msg[*pos] != prefix || msg[*pos+i-1] != '\r' {
+			return 0, errors.New("cmd header length part error")
 		}
-		return 0, err
+		cmdSize, err := strconv.Atoi(string(msg[*pos+1 : *pos+i-1]))
+		// skip '\r\n'
+		*pos += i + 1
+		if err != nil {
+			return 0, errors.New(fmt.Sprintf("parse cmd size error(%v)", err))
+		}
+		return cmdSize, nil
 	}
-	csl := len(cs)
-	// at least '(prefix)[0-9a-zA-Z]+\r\n', length >= 4
-	if csl <= 3 || cs[0] != prefix || cs[csl-2] != '\r' {
-		log.Error("cmd header length part(%s) error", cs)
-		return 0, ErrProtocol
-	}
-	// skip '\r\n'
-	cmdSize, err := strconv.Atoi(string(cs[1 : csl-2]))
-	if err != nil {
-		log.Error("parse cmd size error(%v)", err)
-		return 0, ErrProtocol
-	}
-	return cmdSize, nil
 }
 
-// Get the sub request protocol cmd data excluding \r\n.
-func parseCmdData(rd *bufio.Reader, cmdLen int) ([]byte, error) {
-	d, err := rd.ReadBytes('\n')
-	if err != nil {
-		log.Error("rd.ReadBytes('\\n') error(%v)", err)
-		return nil, err
+func parseData(msg []byte, pos *int, dataLen int) ([]byte, error) {
+	if i := bytes.IndexByte(msg[*pos:], '\n'); i < 0 {
+		return nil, errors.New("\\n not found in sub protocol")
+	} else {
+		// check last \r\n
+		if i != dataLen+1 || msg[*pos+i-1] != '\r' {
+			return nil, errors.New("data in wrong length or no \\r")
+		} else {
+			// skip data and '\r\n'
+			*pos += dataLen + 2
+			return msg[*pos-dataLen-2 : *pos-2], nil
+		}
 	}
-	dl := len(d)
-	// check last \r\n
-	if dl != cmdLen+2 || d[dl-2] != '\r' {
-		log.Error("%v in wrong length or no \\r", d)
-		return nil, ErrProtocol
-	}
-	return d[0:cmdLen], nil
 }
