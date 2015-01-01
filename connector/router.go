@@ -1,11 +1,11 @@
 package main
 
 import (
-	dmq "../dynamicmq"
 	"bufio"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"io"
 	"net"
 	"strings"

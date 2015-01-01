@@ -1,9 +1,9 @@
 package main
 
 import (
-	dmq "../dynamicmq"
 	"bufio"
 	"errors"
+	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"net"
@@ -28,10 +28,10 @@ var (
 
 var (
 	// hearbeat reply
-	HeartbeatReply = []byte("+h\r\n")
+	HeartbeatReply = []byte("+h" + dmq.Crlf)
 
 	// command error reply
-	WrongCmdReply = []byte("-command in wrong protocol\r\n")
+	WrongCmdReply = []byte("-command in wrong protocol" + dmq.Crlf)
 )
 
 var (

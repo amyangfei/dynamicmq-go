@@ -2,8 +2,8 @@ package main
 
 import (
 	// log "github.com/op/go-logging"
-	dmq "../dynamicmq"
 	"flag"
+	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"github.com/op/go-logging"
 	"github.com/rakyll/globalconf"
 	"os"
