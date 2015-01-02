@@ -53,7 +53,7 @@ func (sub *SubSdk) Connect(dst string) error {
 	if err != nil {
 		return err
 	}
-	if err = conn.SetKeepAlive(true); err != nil {
+	if err := conn.SetKeepAlive(true); err != nil {
 		conn.Close()
 		return err
 	}
@@ -73,7 +73,14 @@ func (sub *SubSdk) Heartbeat() error {
 	if cmd, ok := CmdTable["heartbeat"]; !ok {
 		return errors.New("heartbeat cmd not found")
 	} else {
-		return sub.sendMessage([]string{cmd})
+		if err := sub.sendMessage([]string{cmd}); err != nil {
+			sub.Close()
+			return err
+		} else {
+			resp := make([]byte, 64)
+			sub.conn.Read(resp)
+			return nil
+		}
 	}
 }
 

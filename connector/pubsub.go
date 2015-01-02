@@ -97,13 +97,13 @@ func tcpListen(bind string) {
 			conn.Close()
 			continue
 		}
-		if err = conn.SetReadBuffer(Config.TCPRecvBufSize); err != nil {
+		if err = conn.SetReadBuffer(Config.TCPRecvBufSize * 2); err != nil {
 			log.Error("conn.SetReadBuffer(%d) error(%v)",
 				Config.TCPRecvBufSize, err)
 			conn.Close()
 			continue
 		}
-		if err = conn.SetWriteBuffer(Config.TCPSendBufSize); err != nil {
+		if err = conn.SetWriteBuffer(Config.TCPSendBufSize * 2); err != nil {
 			log.Error("conn.SetWriteBuffer(%d) error(%v)",
 				Config.TCPSendBufSize, err)
 			conn.Close()
