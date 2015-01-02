@@ -32,6 +32,9 @@ func (sub *SubSdk) sendMessage(msgs []string) error {
 		sendMsg = append(sendMsg, fmt.Sprintf("$%d%s", len(msg), dmq.Crlf)...)
 		sendMsg = append(sendMsg, (msg + dmq.Crlf)...)
 	}
+	// add '#len\r\n'
+	sendMsg = append(
+		[]byte(fmt.Sprintf("#%d%s", len(sendMsg), dmq.Crlf)), sendMsg...)
 	sent, err := sub.conn.Write(sendMsg)
 	if sent != len(sendMsg) {
 		return errors.New(

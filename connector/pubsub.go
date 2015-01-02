@@ -15,11 +15,13 @@ import (
 )
 
 type SubClient struct {
-	id     string // used as client identity in internal system
-	token  string // used as client identity in external system
-	expire int64
-	conn   net.Conn
-	status int
+	id         string // used as client identity in internal system
+	token      string // used as client identity in external system
+	expire     int64
+	conn       net.Conn
+	status     int
+	processBuf []byte
+	processEnd int
 }
 
 var (
@@ -38,6 +40,8 @@ var (
 
 var (
 	ErrProtocol = errors.New("cmd format error")
+
+	ProcessLater = errors.New("process Later")
 
 	// default expire for a subscribe client 15 min
 	DfltExpire int64 = 15 * 60
@@ -106,10 +110,12 @@ func tcpListen(bind string) {
 			continue
 		}
 		subCli := &SubClient{
-			id:     bson.NewObjectId().Hex(),
-			expire: time.Now().Unix() + DfltExpire,
-			conn:   conn,
-			status: SubcliIsPending,
+			id:         bson.NewObjectId().Hex(),
+			expire:     time.Now().Unix() + DfltExpire,
+			conn:       conn,
+			status:     SubcliIsPending,
+			processBuf: make([]byte, Config.TCPRecvBufSize*2),
+			processEnd: 0,
 		}
 		SubcliTable[subCli.id] = subCli
 		rc := recvTcpBufCache.Get()
@@ -138,8 +144,7 @@ func handleTCPConn(cli *SubClient, rc chan *bufio.Reader) {
 			break
 		}
 		rd := dmq.NewBufioReader(rc, cli.conn, Config.TCPRecvBufSize)
-		msg := make([]byte, Config.TCPRecvBufSize)
-		rlen, err := rd.Read(msg)
+		rlen, err := rd.Read(cli.processBuf[cli.processEnd:])
 		dmq.RecycleBufioReader(rc, rd)
 		if err != nil {
 			if err == io.EOF {
@@ -150,7 +155,8 @@ func handleTCPConn(cli *SubClient, rc chan *bufio.Reader) {
 				break
 			}
 		} else {
-			if err := processReadbuf(cli, msg[:rlen]); err != nil {
+			err := processReadbuf(cli, cli.processBuf[:cli.processEnd+rlen])
+			if err != nil && err != ProcessLater {
 				log.Error("process conn readbuf error(%v)", err)
 				break
 			}
@@ -179,8 +185,14 @@ func processReadbuf(cli *SubClient, msg []byte) error {
 	pos := 0
 	for pos < len(msg) {
 		if args, err := parseCmd(msg, &pos); err != nil {
-			log.Error("%v", err)
-			return ErrProtocol
+			if err == ProcessLater {
+				cli.processEnd = len(msg) - pos
+				copy(msg[:cli.processEnd], msg[pos:])
+				return ProcessLater
+			} else {
+				log.Error("%v", err)
+				return ErrProtocol
+			}
 		} else {
 			if cmd, ok := CmdTable[args[0]]; !ok {
 				cli.conn.Write(WrongCmdReply)
@@ -191,11 +203,23 @@ func processReadbuf(cli *SubClient, msg []byte) error {
 			}
 		}
 	}
+	cli.processEnd = 0
 	return nil
 }
 
 // TODO: use client read buffer for better processing
 func parseCmd(msg []byte, pos *int) ([]string, error) {
+	packLen, err := parseSize(msg, pos, '#')
+	if err != nil {
+		// including ProcessLater error
+		return nil, err
+	}
+	if packLen > len(msg)-*pos {
+		// pos back of '#', packLen, '\r\n'
+		*pos -= (3 + len(fmt.Sprintf("%d", packLen)))
+		return nil, ProcessLater
+	}
+
 	argNum, err := parseSize(msg, pos, '*')
 	if err != nil {
 		return nil, err
@@ -219,6 +243,11 @@ func parseCmd(msg []byte, pos *int) ([]string, error) {
 }
 
 func parseSize(msg []byte, pos *int, prefix uint8) (int, error) {
+	// msg may be in different bufio buffer, process later
+	// at most #[0-9]{4}\r\n, length=7
+	if prefix == '#' && len(msg)-*pos < 7 {
+		return 0, ProcessLater
+	}
 	if i := bytes.IndexByte(msg[*pos:], '\n'); i < 0 {
 		return 0, errors.New("\\n not found")
 	} else {
