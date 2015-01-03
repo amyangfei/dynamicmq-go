@@ -5,7 +5,7 @@ import (
 )
 
 func main() {
-	cli := sdk.SubSdk{Token: "testtoken"}
+	cli := sdk.SubSdk{}
 	cli.Connect("localhost:7253")
 	for i := 0; i < 100000; i++ {
 		cli.Heartbeat()

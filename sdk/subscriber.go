@@ -8,7 +8,11 @@ import (
 )
 
 type SubSdk struct {
-	Token string
+	// cliId is a 12-byte hex string as identity used in external system, among
+	// clients using sdk. The system doesn't care about how it is generated. It
+	// is reserved for external interface.
+	cliId string
+	token string
 	conn  net.Conn
 }
 

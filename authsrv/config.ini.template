@@ -1,0 +1,9 @@
+[server]
+node_id = 'auth-01-01'
+sub_auth_tcp_bind = 0.0.0.0:9000
+pub_auth_tcp_bind = 0.0.0.0:9100
+working_dir = '.'
+log_level = DEBUG
+log_file = ./authsrv.log
+pid_file = './authsrv.pid'
+sign_key = 'a random salt'
