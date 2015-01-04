@@ -3,12 +3,16 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"gopkg.in/mgo.v2/bson"
 	"io"
+	"io/ioutil"
 	"net"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +38,9 @@ var (
 	// hearbeat reply
 	HeartbeatReply = []byte("+h" + dmq.Crlf)
 
+	// auth success reply
+	AuthSuccessReply = []byte("+authsuccess" + dmq.Crlf)
+
 	// command error reply
 	WrongCmdReply = []byte("-command in wrong protocol" + dmq.Crlf)
 )
@@ -50,11 +57,11 @@ var (
 )
 
 var (
-	CmdTable = map[string]func(c *SubClient, args []string){
+	CmdTable = map[string]func(c *SubClient, args []string) error{
 		// TODO: add register command
-		"sub":       processSubscribe,
-		"subscribe": processSubscribe,
-		"hb":        processHeartbeat,
+		"auth": processAuth,
+		"sub":  processSubscribe,
+		"hb":   processHeartbeat,
 	}
 )
 
@@ -163,6 +170,7 @@ func handleTCPConn(cli *SubClient, rc chan *bufio.Reader) {
 		}
 	}
 
+	// TODO: other clean work
 	// close the connection
 	if err := cli.conn.Close(); err != nil {
 		log.Error("addr: %s conn.Close() error(%v)", addr, err)
@@ -170,15 +178,85 @@ func handleTCPConn(cli *SubClient, rc chan *bufio.Reader) {
 	log.Debug("addr: %s handleTcpConn routine stop", addr)
 }
 
-func processHeartbeat(cli *SubClient, args []string) {
-	log.Debug("receive addr: %s heartbeat", cli.conn.RemoteAddr())
-	cli.conn.Write(HeartbeatReply)
+func processAuth(cli *SubClient, args []string) error {
+	commonErr := errors.New("processAuth error")
+	if len(args) < 2 {
+		log.Error("error auth cmd length: %d", len(args))
+		return commonErr
+	}
+	authData := map[string]string{}
+	if err := json.Unmarshal([]byte(args[1]), &authData); err != nil {
+		log.Error("unmarshal auth info error(%v)", err)
+		return commonErr
+	}
+
+	client_id, ok := authData["client_id"]
+	if !ok {
+		log.Error("client_id not found")
+		return commonErr
+	}
+	timestamp, ok := authData["timestamp"]
+	if !ok {
+		log.Error("timestamp not found")
+		return commonErr
+	}
+	token, ok := authData["token"]
+	if !ok {
+		log.Error("token not found")
+		return commonErr
+	}
+	authHost, err := GetAuthSrvHost()
+	if err != nil {
+		log.Error("failed to get auth server host")
+		return commonErr
+	}
+
+	authUrl := fmt.Sprintf("http://%s/conn/sub/auth", authHost)
+	postData := url.Values{}
+	postData.Add("client_id", client_id)
+	postData.Add("timestamp", timestamp)
+	postData.Add("token", token)
+
+	client := &http.Client{}
+	r, _ := http.NewRequest("POST", authUrl, bytes.NewBufferString(postData.Encode()))
+	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	r.Header.Add("Content-Length", strconv.Itoa(len(postData.Encode())))
+
+	resp, err := client.Do(r)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	parsed := map[string]string{}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return err
+	}
+	if status, ok := parsed["status"]; !ok {
+		return fmt.Errorf("status field not in auth response")
+	} else if status != "ok" {
+		log.Info("client %s auth failed", cli.id)
+		return fmt.Errorf("auth failed")
+	}
+	log.Info("sub client %s auth successfully", cli.id)
+	cli.conn.Write(AuthSuccessReply)
+	return nil
 }
 
-func processSubscribe(cli *SubClient, args []string) {
+func processHeartbeat(cli *SubClient, args []string) error {
+	log.Debug("receive addr: %s heartbeat", cli.conn.RemoteAddr())
+	cli.conn.Write(HeartbeatReply)
+	return nil
+}
+
+func processSubscribe(cli *SubClient, args []string) error {
 	// FIXME: should set this status in register process
 	cli.status &= ^SubcliIsPending
 	log.Debug("subscribeHandle with argv: %s", args)
+	return nil
 }
 
 func processReadbuf(cli *SubClient, msg []byte) error {
@@ -199,7 +277,9 @@ func processReadbuf(cli *SubClient, msg []byte) error {
 				log.Warning("client: %s sent unknown cmd: %s", cli.id, args[0])
 				return ErrProtocol
 			} else {
-				cmd(cli, args)
+				if err := cmd(cli, args); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -231,11 +311,11 @@ func parseCmd(msg []byte, pos *int) ([]string, error) {
 	for i := 0; i < argNum; i++ {
 		dataLen, err := parseSize(msg, pos, '$')
 		if err != nil {
-			return nil, errors.New(fmt.Sprintf("parseSize error (%v)", err))
+			return nil, fmt.Errorf("parseSize error (%v)", err)
 		}
 		d, err := parseData(msg, pos, dataLen)
 		if err != nil {
-			return nil, errors.New(fmt.Sprintf("parseData error (%v)", err))
+			return nil, fmt.Errorf("parseData error (%v)", err)
 		}
 		args = append(args, strings.ToLower(string(d)))
 	}
@@ -259,7 +339,7 @@ func parseSize(msg []byte, pos *int, prefix uint8) (int, error) {
 		// skip '\r\n'
 		*pos += i + 1
 		if err != nil {
-			return 0, errors.New(fmt.Sprintf("parse cmd size error(%v)", err))
+			return 0, fmt.Errorf("parse cmd size error(%v)", err)
 		}
 		return cmdSize, nil
 	}

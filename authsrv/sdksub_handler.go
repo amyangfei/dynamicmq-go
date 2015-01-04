@@ -6,7 +6,8 @@ import (
 	"time"
 )
 
-func requestToken(handler Handler) {
+// allocate connector, generate token for subscriber
+func prepareAuth(handler Handler) {
 	ret := make(map[string]string)
 	cliId := strings.ToLower(handler.Request.FormValue("client_id"))
 	if !ValidSubClientId(cliId) {
@@ -17,10 +18,13 @@ func requestToken(handler Handler) {
 	} else {
 		timestamp := fmt.Sprintf("%d", time.Now().Unix())
 		token := SignClientId(cliId, timestamp, Config.SignKey)
+		// TODO: get connector from global config service like etcd
+		connector := "localhost:7253"
 		ret = map[string]string{
 			"status":    "ok",
 			"timestamp": timestamp,
 			"token":     token,
+			"connector": connector,
 		}
 	}
 	RenderJson(handler, ret)

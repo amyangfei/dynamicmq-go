@@ -21,7 +21,7 @@ type Route struct {
 
 var (
 	routes = []Route{
-		{"/sdk/sub/token", Everyone, requestToken},
+		{"/sdk/sub/preauth", Everyone, prepareAuth},
 
 		{"/conn/sub/auth", Everyone, authSubCli},
 	}
