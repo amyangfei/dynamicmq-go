@@ -19,12 +19,17 @@ func prepareAuth(handler Handler) {
 		timestamp := fmt.Sprintf("%d", time.Now().Unix())
 		token := SignClientId(cliId, timestamp, Config.SignKey)
 		// TODO: get connector from global config service like etcd
-		connector := "localhost:7253"
-		ret = map[string]string{
-			"status":    "ok",
-			"timestamp": timestamp,
-			"token":     token,
-			"connector": connector,
+		if connector, err := GetConnector(Config.EtcdMachiens); err != nil {
+			ret = map[string]string{
+				"status": "error",
+			}
+		} else {
+			ret = map[string]string{
+				"status":    "ok",
+				"timestamp": timestamp,
+				"token":     token,
+				"connector": connector,
+			}
 		}
 	}
 	RenderJson(handler, ret)

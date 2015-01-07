@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 )
 
@@ -33,6 +34,7 @@ func HandleSignal(c chan os.Signal) {
 		log.Info("get a signal %s", s.String())
 		switch s {
 		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGSTOP, syscall.SIGINT:
+			ShutdownServer()
 			return
 		case syscall.SIGHUP:
 			// TODO reload
@@ -52,6 +54,7 @@ func InitConfig(configFile string) error {
 
 	serverFlagSet := flag.NewFlagSet("server", flag.PanicOnError)
 	serverFlagSet.String("node_id", "conn-01-01", "server node id")
+	serverFlagSet.String("bind_ip", "localhost", "server bind id")
 	serverFlagSet.String("sub_tcp_bind", "localhost:7253", "bind address for subscriber")
 	serverFlagSet.String("router_tcp_bind", "localhost:7255", "bind address for router")
 	serverFlagSet.String("working_dir", ".", "working dir")
@@ -62,6 +65,7 @@ func InitConfig(configFile string) error {
 	serverFlagSet.Int("tcp_recvbuf_size", 2048, "tcp receive buffer size")
 	serverFlagSet.Int("tcp_sendbuf_size", 2048, "tcp send buffer size")
 	serverFlagSet.Int("tcp_bufio_num", 64, "bufio num for each cache instance")
+	serverFlagSet.Int("capacity", 100000, "subscriber capacity of this connector")
 
 	redisFlagSet := flag.NewFlagSet("redis", flag.PanicOnError)
 	redisFlagSet.String("redis_endpoint", "localhost:6379", "redis endpoint")
@@ -69,18 +73,19 @@ func InitConfig(configFile string) error {
 	redisFlagSet.String("max_active", "100", "redis pool max active clients")
 	redisFlagSet.String("timeout", "3600", "close idle redis client after timeout")
 
-	zkFlagSet := flag.NewFlagSet("zookeeper", flag.PanicOnError)
-	zkFlagSet.String("addr", "localhost:2181", "zookeeper host")
+	etcdFlagSet := flag.NewFlagSet("etcd", flag.PanicOnError)
+	etcdFlagSet.String("machines", "http://localhost:4001", "etcd machines")
 
 	globalconf.Register("server", serverFlagSet)
 	globalconf.Register("redis", redisFlagSet)
-	globalconf.Register("zookeeper", zkFlagSet)
+	globalconf.Register("etcd", etcdFlagSet)
 
 	conf.ParseAll()
 
 	Config = &SrvConfig{}
 
 	Config.NodeId = serverFlagSet.Lookup("node_id").Value.String()
+	Config.BindIp = serverFlagSet.Lookup("bind_ip").Value.String()
 	Config.SubTCPBind = serverFlagSet.Lookup("sub_tcp_bind").Value.String()
 	Config.RouterTCPBind = serverFlagSet.Lookup("router_tcp_bind").Value.String()
 	Config.WorkingDir = serverFlagSet.Lookup("working_dir").Value.String()
@@ -96,6 +101,8 @@ func InitConfig(configFile string) error {
 	Config.TCPBufioNum, err =
 		strconv.Atoi(serverFlagSet.Lookup("tcp_bufio_num").Value.String())
 	Config.TCPBufInsNum = runtime.NumCPU()
+	Config.Capacity, err =
+		strconv.Atoi(serverFlagSet.Lookup("capacity").Value.String())
 
 	Config.RedisEndPoint = redisFlagSet.Lookup("redis_endpoint").Value.String()
 	Config.RedisMaxIdle, err =
@@ -105,7 +112,8 @@ func InitConfig(configFile string) error {
 	Config.RedisIdleTimeout, err =
 		strconv.Atoi(redisFlagSet.Lookup("timeout").Value.String())
 
-	Config.ZookeeperAddr = zkFlagSet.Lookup("addr").Value.String()
+	machines := etcdFlagSet.Lookup("machines").Value.String()
+	Config.EtcdMachiens = strings.Split(machines, ";")
 
 	return nil
 }
@@ -129,6 +137,10 @@ func InitLog(logFile string) error {
 func InitServer() error {
 	SubcliTable = make(map[string]*SubClient, 0)
 	return nil
+}
+
+func ShutdownServer() {
+	UnregisterEtcd(Config)
 }
 
 func main() {
@@ -165,6 +177,10 @@ func main() {
 	}
 
 	if err := StartRouter(Config.RouterTCPBind); err != nil {
+		panic(err)
+	}
+
+	if err := RegisterEtcd(Config); err != nil {
 		panic(err)
 	}
 

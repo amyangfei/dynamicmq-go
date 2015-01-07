@@ -3,3 +3,5 @@ config.ini
 tags
 
 connector/connector
+authsrv/authsrv
+cmd/subscriber/subscriber

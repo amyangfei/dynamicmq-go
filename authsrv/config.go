@@ -11,5 +11,6 @@ type SrvConfig struct {
 	PidFile        string
 	SignKey        string
 
-	// TODO: persistent storage config
+	// etcd config
+	EtcdMachiens []string
 }

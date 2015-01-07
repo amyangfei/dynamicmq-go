@@ -241,6 +241,8 @@ func processAuth(cli *SubClient, args []string) error {
 		log.Info("client %s auth failed", cli.id)
 		return fmt.Errorf("auth failed")
 	}
+	cli.status &= ^SubcliIsPending
+	cli.status |= SubcliIsAuthed
 	log.Info("sub client %s auth successfully", cli.id)
 	cli.conn.Write(AuthSuccessReply)
 	return nil

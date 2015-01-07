@@ -3,6 +3,10 @@ package main
 import (
 	sdk "github.com/amyangfei/dynamicmq-go/sdk"
 	"gopkg.in/mgo.v2/bson"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
 func main() {
@@ -14,8 +18,16 @@ func main() {
 		panic(err)
 	}
 
-	for i := 0; i < 100000; i++ {
-		cli.Heartbeat()
-	}
+	go func(interval int) {
+		for {
+			time.Sleep(time.Second * time.Duration(interval))
+			cli.Heartbeat()
+		}
+	}(5)
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM,
+		syscall.SIGINT, syscall.SIGSTOP)
+	<-c
 	cli.Close()
 }

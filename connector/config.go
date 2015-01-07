@@ -3,6 +3,7 @@ package main
 type SrvConfig struct {
 	// server config
 	NodeId         string
+	BindIp         string
 	SubTCPBind     string
 	RouterTCPBind  string
 	MaxProc        int
@@ -14,6 +15,7 @@ type SrvConfig struct {
 	TCPSendBufSize int
 	TCPBufInsNum   int
 	TCPBufioNum    int
+	Capacity       int
 
 	// redis for message cache
 	RedisEndPoint    string
@@ -21,6 +23,6 @@ type SrvConfig struct {
 	RedisMaxIdle     int
 	RedisMaxActive   int
 
-	// zookeeper
-	ZookeeperAddr string
+	// etcd
+	EtcdMachiens []string
 }

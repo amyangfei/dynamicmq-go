@@ -5,9 +5,12 @@ import (
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"github.com/op/go-logging"
 	"github.com/rakyll/globalconf"
+	"math/rand"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 )
 
 var Config *SrvConfig
@@ -55,7 +58,12 @@ func InitConfig(configFile string) error {
 	serverFlagSet.String("log_file", "./authsrv.log", "log file path")
 	serverFlagSet.String("pid_file", "./authsrv.pid", "pid file")
 	serverFlagSet.String("sign_key", "a random signature salt", "signature salt")
+
+	etcdFlagSet := flag.NewFlagSet("etcd", flag.PanicOnError)
+	etcdFlagSet.String("machines", "http://localhost:4001", "etcd machines")
+
 	globalconf.Register("server", serverFlagSet)
+	globalconf.Register("etcd", etcdFlagSet)
 
 	conf.ParseAll()
 
@@ -68,6 +76,9 @@ func InitConfig(configFile string) error {
 	Config.LogFile = serverFlagSet.Lookup("log_file").Value.String()
 	Config.PidFile = serverFlagSet.Lookup("pid_file").Value.String()
 	Config.SignKey = serverFlagSet.Lookup("sign_key").Value.String()
+
+	machines := etcdFlagSet.Lookup("machines").Value.String()
+	Config.EtcdMachiens = strings.Split(machines, ";")
 
 	return nil
 }
@@ -89,6 +100,7 @@ func InitLog(logFile string) error {
 }
 
 func InitServer() error {
+	rand.Seed(time.Now().UnixNano())
 	return nil
 }
 

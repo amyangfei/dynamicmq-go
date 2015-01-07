@@ -7,3 +7,6 @@ log_level = DEBUG
 log_file = ./authsrv.log
 pid_file = './authsrv.pid'
 sign_key = 'a random salt'
+
+[etcd]
+machines = http://localhost:4001
