@@ -1,12 +1,13 @@
 [server]
-node_id = 'conn-01-01'
-bind_ip = 'localhost'
+node_id = conn-01-01
+bind_ip = localhost
 sub_tcp_bind = 0.0.0.0:7253
 router_tcp_bind = 0.0.0.0:7353
+auth_srv_addr = localhost:9000
 working_dir = '.'
 log_level = DEBUG
 log_file = ./connector.log
-pid_file = './connector.pid'
+pid_file = ./connector.pid
 tcp_recvbuf_size = 2048
 tcp_sendbuf_size = 2048
 tcp_bufio_num = 64

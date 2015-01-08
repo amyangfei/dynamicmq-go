@@ -205,13 +205,8 @@ func processAuth(cli *SubClient, args []string) error {
 		log.Error("token not found")
 		return commonErr
 	}
-	authHost, err := GetAuthSrvHost()
-	if err != nil {
-		log.Error("failed to get auth server host")
-		return commonErr
-	}
 
-	authUrl := fmt.Sprintf("http://%s/conn/sub/auth", authHost)
+	authUrl := fmt.Sprintf("http://%s/conn/sub/auth", Config.AuthSrvAddr)
 	postData := url.Values{}
 	postData.Add("client_id", client_id)
 	postData.Add("timestamp", timestamp)

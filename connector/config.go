@@ -6,6 +6,7 @@ type SrvConfig struct {
 	BindIp         string
 	SubTCPBind     string
 	RouterTCPBind  string
+	AuthSrvAddr    string
 	MaxProc        int
 	WorkingDir     string
 	LogLevel       string

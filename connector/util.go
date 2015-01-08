@@ -26,9 +26,3 @@ func addReplyBulklen(target *[]byte, cnt string) {
 func addReply(target *[]byte, cnt string) {
 	*target = append(*target, []byte(cnt)...)
 }
-
-// TODO: get preauth addr from global config service like etcd
-func GetAuthSrvHost() (string, error) {
-	AuthSrvHost := "localhost:9000"
-	return AuthSrvHost, nil
-}
