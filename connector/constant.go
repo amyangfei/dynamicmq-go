@@ -1,6 +1,6 @@
 package main
 
-// Message received by inner dispathcer header size
+// Message received by inner router header size
 var (
 	PubMsgCmdSize        uint16 = 1
 	PubMsgBodySize       uint16 = 2
@@ -30,6 +30,6 @@ var (
 )
 
 var (
-	PubMsgItemMsgidSize  uint16 = 24
+	PubMsgItemMsgidSize  uint16 = 12
 	PubMsgItemMaxPayload uint16 = 256
 )

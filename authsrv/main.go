@@ -50,7 +50,7 @@ func InitConfig(configFile string) error {
 	}
 
 	serverFlagSet := flag.NewFlagSet("server", flag.PanicOnError)
-	serverFlagSet.String("node_id", "authsrv-01-01", "server node id")
+	serverFlagSet.String("node_id", "auth0101", "server node id")
 	serverFlagSet.String("sub_auth_tcp_bind", "localhost:9000", "bind address for subscriber auth")
 	serverFlagSet.String("pub_auth_tcp_bind", "localhost:9100", "bind address for publisher auth")
 	serverFlagSet.String("working_dir", ".", "working dir")
@@ -78,7 +78,7 @@ func InitConfig(configFile string) error {
 	Config.SignKey = serverFlagSet.Lookup("sign_key").Value.String()
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
-	Config.EtcdMachiens = strings.Split(machines, ";")
+	Config.EtcdMachiens = strings.Split(machines, ",")
 
 	return nil
 }

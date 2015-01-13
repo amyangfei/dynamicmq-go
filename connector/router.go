@@ -132,14 +132,14 @@ func processReadBuffer(conn net.Conn, msg []byte) error {
 		}
 
 		start := uint16(len(msg)) - remaining
-		var cmd uint8 = msg[0]
+		var cmd uint8 = msg[start]
 		var bodyLen uint16 = binary.BigEndian.Uint16(msg[start+PubMsgCmdSize:])
 		if bodyLen > PubMsgMaxBodyLen {
 			log.Error("invalid request, invalid body length: %d", bodyLen)
 			return errors.New("invalid msg body len")
 		}
 		if remaining >= PubMsgHeaderSize+bodyLen {
-			decMsg, err := binaryMsgDecode(msg[start:], bodyLen)
+			decMsg, err := binaryMsgDecode(msg[start+PubMsgHeaderSize:], bodyLen)
 			remaining -= (PubMsgHeaderSize + bodyLen)
 			if err != nil {
 				log.Error("invalid request")

@@ -1,5 +1,5 @@
 [server]
-node_id = 'auth-01-01'
+node_id = 'auth0101'
 sub_auth_tcp_bind = 0.0.0.0:9000
 pub_auth_tcp_bind = 0.0.0.0:9100
 working_dir = '.'

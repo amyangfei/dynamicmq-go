@@ -10,7 +10,7 @@ import (
 
 func fakeSrvConfig() *SrvConfig {
 	cfg := &SrvConfig{
-		NodeId:        "conn-01-01",
+		NodeId:        "conn0101",
 		SubTCPBind:    "localhost:7253",
 		RouterTCPBind: "localhost:7255",
 		Capacity:      12345,
@@ -35,11 +35,15 @@ func TestRegisterEtcd(t *testing.T) {
 				key := splitKey[len(splitKey)-1]
 				switch key {
 				case dmq.ConnSubAddr:
-					if node.Value != cfg.SubTCPBind {
+					bind := strings.Split(cfg.SubTCPBind, ":")
+					subPort := bind[len(bind)-1]
+					if node.Value != fmt.Sprintf("%s:%s", cfg.BindIp, subPort) {
 						t.Errorf("value error %s != %s", node.Value, cfg.SubTCPBind)
 					}
 				case dmq.ConnRouteAddr:
-					if node.Value != cfg.RouterTCPBind {
+					bind := strings.Split(cfg.RouterTCPBind, ":")
+					routePort := bind[len(bind)-1]
+					if node.Value != fmt.Sprintf("%s:%s", cfg.BindIp, routePort) {
 						t.Errorf("value error %s != %s", node.Value, cfg.RouterTCPBind)
 					}
 				case dmq.ConnCapacity:

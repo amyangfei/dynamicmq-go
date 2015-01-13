@@ -18,6 +18,7 @@ func RegisterEtcd(cfg *SrvConfig) error {
 		return err
 	}
 
+	// register single connector information
 	subs := strings.Split(cfg.SubTCPBind, ":")
 	subPort := subs[len(subs)-1]
 	routes := strings.Split(cfg.RouterTCPBind, ":")
@@ -38,16 +39,27 @@ func RegisterEtcd(cfg *SrvConfig) error {
 		}
 	}
 
+	// register to connector waiting list
+	if err := dmq.RegisterConnToWaiting(c, cfg.NodeId); err != nil {
+		c.Delete(baseKey, true)
+		return err
+	}
+
 	return nil
 }
 
 func UnregisterEtcd(cfg *SrvConfig) error {
-	infoKey := dmq.GetInfoKey(dmq.EtcdConnectorType, cfg.NodeId)
 	c, err := GetEtcdClient(cfg)
 	if err != nil {
 		return err
 	}
+
+	infoKey := dmq.GetInfoKey(dmq.EtcdConnectorType, cfg.NodeId)
 	c.Delete(infoKey, true)
+
+	// unregister connector from waiting list
+	dmq.UnregisterConnToWaiting(c, cfg.NodeId)
+
 	return nil
 }
 

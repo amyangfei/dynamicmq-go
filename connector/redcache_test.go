@@ -8,7 +8,7 @@ import (
 func newCache() (*RedisCache, error) {
 	cfg := MsgCacheConfig{
 		Data: map[string]interface{}{
-			"ConnNodeId": "conn-01-01",
+			"ConnNodeId": "conn0101",
 			"Endpoint":   "tcp@localhost:6379",
 			"MaxIdle":    50,
 			"MaxActive":  100,

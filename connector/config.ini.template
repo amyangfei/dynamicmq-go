@@ -1,5 +1,5 @@
 [server]
-node_id = conn-01-01
+node_id = conn0101
 bind_ip = localhost
 sub_tcp_bind = 0.0.0.0:7253
 router_tcp_bind = 0.0.0.0:7353

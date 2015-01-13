@@ -5,7 +5,6 @@ import (
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"github.com/op/go-logging"
 	"github.com/rakyll/globalconf"
-	"gopkg.in/mgo.v2/bson"
 	"os"
 	"os/signal"
 	"runtime"
@@ -16,9 +15,7 @@ import (
 
 var Config *SrvConfig
 
-var SubcliTable map[bson.ObjectId]*SubClient
-
-var log = logging.MustGetLogger("dynamicmq-connector")
+var log = logging.MustGetLogger("dynamicmq-dispatcher")
 
 // InitSignal register signals handler.
 func InitSignal() chan os.Signal {
@@ -54,32 +51,21 @@ func InitConfig(configFile string) error {
 	}
 
 	serverFlagSet := flag.NewFlagSet("server", flag.PanicOnError)
-	serverFlagSet.String("node_id", "conn0101", "server node id")
-	serverFlagSet.String("bind_ip", "localhost", "server bind id")
-	serverFlagSet.String("sub_tcp_bind", "localhost:7253", "bind address for subscriber")
-	serverFlagSet.String("router_tcp_bind", "localhost:7255", "bind address for router")
-	serverFlagSet.String("auth_srv_addr", "localhost:9000", "auth server address")
+	serverFlagSet.String("node_id", "disp0101", "server node id")
+	serverFlagSet.String("match_tcp_bind", "localhost:6500", "bind address for matcher")
+	serverFlagSet.String("conn_tcp_bind", "localhost:6000", "bind address for connector")
 	serverFlagSet.String("working_dir", ".", "working dir")
 	serverFlagSet.String("log_level", "DEBUG", "log level")
-	serverFlagSet.String("log_file", "./connector.log", "log file path")
-	serverFlagSet.String("pid_file", "./connector_pid", "pid file")
-	serverFlagSet.Int("max_proc", 0, "max cpu process")
+	serverFlagSet.String("log_file", "./dispatcher.log", "log file path")
+	serverFlagSet.String("pid_file", "./dispatcher_pid", "pid file")
 	serverFlagSet.Int("tcp_recvbuf_size", 2048, "tcp receive buffer size")
 	serverFlagSet.Int("tcp_sendbuf_size", 2048, "tcp send buffer size")
 	serverFlagSet.Int("tcp_bufio_num", 64, "bufio num for each cache instance")
-	serverFlagSet.Int("capacity", 100000, "subscriber capacity of this connector")
-
-	redisFlagSet := flag.NewFlagSet("redis", flag.PanicOnError)
-	redisFlagSet.String("redis_endpoint", "localhost:6379", "redis endpoint")
-	redisFlagSet.String("max_idle", "50", "redis pool max idle clients")
-	redisFlagSet.String("max_active", "100", "redis pool max active clients")
-	redisFlagSet.String("timeout", "3600", "close idle redis client after timeout")
 
 	etcdFlagSet := flag.NewFlagSet("etcd", flag.PanicOnError)
 	etcdFlagSet.String("machines", "http://localhost:4001", "etcd machines")
 
 	globalconf.Register("server", serverFlagSet)
-	globalconf.Register("redis", redisFlagSet)
 	globalconf.Register("etcd", etcdFlagSet)
 
 	conf.ParseAll()
@@ -87,16 +73,12 @@ func InitConfig(configFile string) error {
 	Config = &SrvConfig{}
 
 	Config.NodeId = serverFlagSet.Lookup("node_id").Value.String()
-	Config.BindIp = serverFlagSet.Lookup("bind_ip").Value.String()
-	Config.SubTCPBind = serverFlagSet.Lookup("sub_tcp_bind").Value.String()
-	Config.RouterTCPBind = serverFlagSet.Lookup("router_tcp_bind").Value.String()
-	Config.AuthSrvAddr = serverFlagSet.Lookup("auth_srv_addr").Value.String()
+	Config.MatchTCPBind = serverFlagSet.Lookup("match_tcp_bind").Value.String()
+	Config.ConnTCPBind = serverFlagSet.Lookup("conn_tcp_bind").Value.String()
 	Config.WorkingDir = serverFlagSet.Lookup("working_dir").Value.String()
 	Config.LogLevel = serverFlagSet.Lookup("log_level").Value.String()
 	Config.LogFile = serverFlagSet.Lookup("log_file").Value.String()
 	Config.PidFile = serverFlagSet.Lookup("pid_file").Value.String()
-	Config.MaxProc, err =
-		strconv.Atoi(serverFlagSet.Lookup("max_proc").Value.String())
 	Config.TCPRecvBufSize, err =
 		strconv.Atoi(serverFlagSet.Lookup("tcp_recvbuf_size").Value.String())
 	Config.TCPSendBufSize, err =
@@ -104,16 +86,6 @@ func InitConfig(configFile string) error {
 	Config.TCPBufioNum, err =
 		strconv.Atoi(serverFlagSet.Lookup("tcp_bufio_num").Value.String())
 	Config.TCPBufInsNum = runtime.NumCPU()
-	Config.Capacity, err =
-		strconv.Atoi(serverFlagSet.Lookup("capacity").Value.String())
-
-	Config.RedisEndPoint = redisFlagSet.Lookup("redis_endpoint").Value.String()
-	Config.RedisMaxIdle, err =
-		strconv.Atoi(redisFlagSet.Lookup("max_idle").Value.String())
-	Config.RedisMaxActive, err =
-		strconv.Atoi(redisFlagSet.Lookup("max_active").Value.String())
-	Config.RedisIdleTimeout, err =
-		strconv.Atoi(redisFlagSet.Lookup("timeout").Value.String())
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
 	Config.EtcdMachiens = strings.Split(machines, ",")
@@ -138,12 +110,10 @@ func InitLog(logFile string) error {
 }
 
 func InitServer() error {
-	SubcliTable = make(map[bson.ObjectId]*SubClient, 0)
 	return nil
 }
 
 func ShutdownServer() {
-	UnregisterEtcd(Config)
 }
 
 func main() {
@@ -171,19 +141,7 @@ func main() {
 		panic(err)
 	}
 
-	if err := InitRawMsgCache(); err != nil {
-		panic(err)
-	}
-
-	if err := StartSubTCP(Config.SubTCPBind); err != nil {
-		panic(err)
-	}
-
-	if err := StartRouter(Config.RouterTCPBind); err != nil {
-		panic(err)
-	}
-
-	if err := RegisterEtcd(Config); err != nil {
+	if err := StartMatchTCP(Config.MatchTCPBind); err != nil {
 		panic(err)
 	}
 

@@ -1,0 +1,13 @@
+[server]
+node_id = disp0101
+match_tcp_bind = 0.0.0.0:6000
+working_dir = '.'
+log_level = DEBUG
+log_file = ./dispatcher.log
+pid_file = ./dispatcher.pid
+tcp_recvbuf_size = 2048
+tcp_sendbuf_size = 2048
+tcp_bufio_num = 64
+
+[etcd]
+machines = http://localhost:4001

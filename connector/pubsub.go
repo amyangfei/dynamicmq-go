@@ -19,8 +19,8 @@ import (
 )
 
 type SubClient struct {
-	id         string // used as client identity in internal system
-	token      string // used as client identity in external system
+	id         bson.ObjectId // used as client identity in internal system
+	token      bson.ObjectId // used as client identity in external system
 	expire     int64
 	conn       net.Conn
 	status     int
@@ -117,7 +117,7 @@ func tcpListen(bind string) {
 			continue
 		}
 		subCli := &SubClient{
-			id:         bson.NewObjectId().Hex(),
+			id:         bson.NewObjectId(),
 			expire:     time.Now().Unix() + DfltExpire,
 			conn:       conn,
 			status:     SubcliIsPending,
@@ -233,12 +233,12 @@ func processAuth(cli *SubClient, args []string) error {
 	if status, ok := parsed["status"]; !ok {
 		return fmt.Errorf("status field not in auth response")
 	} else if status != "ok" {
-		log.Info("client %s auth failed", cli.id)
+		log.Info("client %s auth failed", cli.id.Hex())
 		return fmt.Errorf("auth failed")
 	}
 	cli.status &= ^SubcliIsPending
 	cli.status |= SubcliIsAuthed
-	log.Info("sub client %s auth successfully", cli.id)
+	log.Info("sub client %s auth successfully", cli.id.Hex())
 	cli.conn.Write(AuthSuccessReply)
 	return nil
 }
