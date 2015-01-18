@@ -13,12 +13,13 @@ import (
 )
 
 type DispClient struct {
-	id         bson.ObjectId // Dispatcher nodeid
-	expire     int64         // in seconds
-	conn       net.Conn
-	status     int
-	processBuf []byte
-	processEnd int
+	id          bson.ObjectId // Dispatcher nodeid
+	expire      int64         // in seconds
+	conn        net.Conn
+	status      int
+	processBuf  []byte
+	processEnd  int
+	processWait int
 }
 
 type DecodedMsg struct {
@@ -36,6 +37,10 @@ var RouterCmdTable = map[uint8]PubMsgFunc{
 	dmq.DRMsgCmdPushMsg:   PubMsgFunc{validate: validateMsg, process: processMsg},
 	dmq.DRMsgCmdHeartbeat: PubMsgFunc{validate: validateHbMsg, process: processHbMsg},
 }
+
+var (
+	processWaitMax = 2
+)
 
 func StartRouter(bind string) error {
 	log.Info("start router listening: %s", bind)
@@ -76,22 +81,23 @@ func routerListen(bind string) {
 			conn.Close()
 			continue
 		}
-		if err = conn.SetReadBuffer(Config.TCPRecvBufSize); err != nil {
+		if err = conn.SetReadBuffer(Config.TCPRecvBufSize * 2); err != nil {
 			log.Error("SetReadBuffer(%d) error(%v)", Config.TCPRecvBufSize, err)
 			conn.Close()
 			continue
 		}
-		if err = conn.SetWriteBuffer(Config.TCPSendBufSize); err != nil {
+		if err = conn.SetWriteBuffer(Config.TCPSendBufSize * 2); err != nil {
 			log.Error("SetWriteBuffer(%d) error(%v)", Config.TCPSendBufSize, err)
 			conn.Close()
 			continue
 		}
 		rc := recvTcpBufCache.Get()
 		dispCli := &DispClient{
-			conn:       conn,
-			processBuf: make([]byte, Config.TCPRecvBufSize*2),
-			processEnd: 0,
-			expire:     time.Now().Unix() + int64(Config.DispKeepalive),
+			conn:        conn,
+			processBuf:  make([]byte, Config.TCPRecvBufSize*2),
+			processEnd:  0,
+			expire:      time.Now().Unix() + int64(Config.DispKeepalive),
+			processWait: 0,
 		}
 		// one connection one routine
 		go handleRouteConn(dispCli, rc)
@@ -117,22 +123,30 @@ func handleRouteConn(cli *DispClient, rc chan *bufio.Reader) {
 			break
 		}
 		rd := dmq.NewBufioReader(rc, cli.conn, Config.TCPRecvBufSize)
-		msg := make([]byte, Config.TCPRecvBufSize)
-		if rlen, err := rd.Read(msg); err == nil {
-			dmq.RecycleBufioReader(rc, rd)
-			// TODO: route message to subscribers here
-			processReadBuffer(cli, msg[:rlen])
-		} else {
-			dmq.RecycleBufioReader(rc, rd)
+		rlen, err := rd.Read(cli.processBuf[cli.processEnd:])
+		dmq.RecycleBufioReader(rc, rd)
+		if err != nil {
 			if err == io.EOF {
 				log.Info("addr: %s close connection", addr)
 				if err := RegisterWaiting(nil, Config); err != nil {
-					log.Error("failed to re-register to waiting list error(%v)", err)
+					log.Error("failed re-register etcd waiting error(%v)", err)
 				}
 				return
 			}
 			log.Error("addr: %s socket read error(%v)", addr, err)
 			break
+		} else if rlen == 0 {
+			log.Error("router recv error msg, invalid msg size %d", rlen)
+			break
+		} else {
+			// TODO: route message to subscribers here
+			err := processReadBuffer(cli, cli.processBuf[:cli.processEnd+rlen])
+			if err != nil {
+				if err != ProcessLater {
+					log.Error("process conn readbuf error(%v)", err)
+					break
+				}
+			}
 		}
 	}
 
@@ -150,11 +164,19 @@ func processReadBuffer(cli *DispClient, msg []byte) error {
 	var remaining uint16 = uint16(len(msg))
 	for {
 		if remaining == 0 {
+			cli.processEnd = 0
 			return nil
 		}
 		if remaining <= dmq.DRMsgHeaderSize {
-			log.Error("router recv error msg, invalid msg header length")
-			return errors.New("invalid msg header len")
+			if cli.processWait >= processWaitMax {
+				log.Error("router recv error msg, invalid msg header length %d", remaining)
+				return errors.New("invalid msg header len")
+			} else {
+				cli.processWait += 1
+				cli.processEnd = int(remaining)
+				copy(msg[:cli.processEnd], msg[len(msg)-int(remaining):])
+				return ProcessLater
+			}
 		}
 
 		start := uint16(len(msg)) - remaining
@@ -164,22 +186,35 @@ func processReadBuffer(cli *DispClient, msg []byte) error {
 			log.Error("invalid request, invalid body length: %d", bodyLen)
 			return errors.New("invalid msg body len")
 		}
-		if remaining >= dmq.DRMsgHeaderSize+bodyLen {
-			decMsg, err := binaryMsgDecode(msg[start:], bodyLen)
-			remaining -= (dmq.DRMsgHeaderSize + bodyLen)
-			if err != nil {
-				log.Error("invalid request error(%v)", err)
-				continue
-			}
-			if processFunc, ok := RouterCmdTable[cmd]; ok {
-				if err := processFunc.validate(decMsg, cli); err != nil {
-					log.Error("invalid request error(%v)", err)
-				} else {
-					processFunc.process(decMsg, cli)
-				}
+		if remaining < dmq.DRMsgHeaderSize+bodyLen {
+			if cli.processWait >= processWaitMax {
+				return errors.New("bad request body")
 			} else {
-				log.Error("cmd %d not found", cmd)
+				cli.processWait += 1
+				cli.processEnd = int(remaining)
+				copy(msg[:cli.processEnd], msg[len(msg)-int(remaining):])
+				return ProcessLater
 			}
+		}
+		decMsg, err := binaryMsgDecode(msg[start:], bodyLen)
+		remaining -= (dmq.DRMsgHeaderSize + bodyLen)
+		if err != nil {
+			log.Error("invalid request error(%v)", err)
+			continue
+		}
+		if processFunc, ok := RouterCmdTable[cmd]; ok {
+			if err := processFunc.validate(decMsg, cli); err != nil {
+				log.Error("invalid request error(%v)", err)
+			} else {
+				processFunc.process(decMsg, cli)
+			}
+		} else {
+			log.Error("cmd %d not found", cmd)
+		}
+
+		// reset processWait
+		if cli.processWait > 0 {
+			cli.processWait = 0
 		}
 	}
 }

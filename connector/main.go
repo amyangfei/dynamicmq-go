@@ -193,7 +193,6 @@ func main() {
 		panic(err)
 	}
 
-	log.Debug("_---------_ %d %d", Config.SubKeepalive, Config.DispKeepalive)
 	signalChan := InitSignal()
 	HandleSignal(signalChan)
 

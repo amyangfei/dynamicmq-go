@@ -58,7 +58,8 @@ var (
 	MDMsgSubInfoSep = ","
 )
 
-// Message protocol from Dispatcher to Connector-Router
+// Message protocol from Dispatcher to Connector-Router or
+// from Dispatcher to Dispatcher
 var (
 	DRMsgCmdSize        uint16 = 1
 	DRMsgBodySize       uint16 = 2

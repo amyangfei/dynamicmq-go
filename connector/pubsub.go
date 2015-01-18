@@ -48,8 +48,6 @@ var (
 var (
 	ErrProtocol = errors.New("cmd format error")
 
-	ProcessLater = errors.New("process Later")
-
 	// default expire for a subscribe client 15 min
 	DfltExpire int64 = 15 * 60
 
