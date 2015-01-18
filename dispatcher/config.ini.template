@@ -8,6 +8,7 @@ pid_file = ./dispatcher.pid
 tcp_recvbuf_size = 2048
 tcp_sendbuf_size = 2048
 tcp_bufio_num = 64
+heartbeat_interval = 300
 
 [etcd]
 machines = http://localhost:4001

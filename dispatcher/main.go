@@ -15,6 +15,8 @@ import (
 
 var Config *SrvConfig
 
+var RouterMgr *RouterManager
+
 var log = logging.MustGetLogger("dynamicmq-dispatcher")
 
 // InitSignal register signals handler.
@@ -61,6 +63,7 @@ func InitConfig(configFile string) error {
 	serverFlagSet.Int("tcp_recvbuf_size", 2048, "tcp receive buffer size")
 	serverFlagSet.Int("tcp_sendbuf_size", 2048, "tcp send buffer size")
 	serverFlagSet.Int("tcp_bufio_num", 64, "bufio num for each cache instance")
+	serverFlagSet.Int("heartbeat_interval", 300, "heartbeat interval to connector-router")
 
 	etcdFlagSet := flag.NewFlagSet("etcd", flag.PanicOnError)
 	etcdFlagSet.String("machines", "http://localhost:4001", "etcd machines")
@@ -86,6 +89,8 @@ func InitConfig(configFile string) error {
 	Config.TCPBufioNum, err =
 		strconv.Atoi(serverFlagSet.Lookup("tcp_bufio_num").Value.String())
 	Config.TCPBufInsNum = runtime.NumCPU()
+	Config.HeartbeatIval, err =
+		strconv.Atoi(serverFlagSet.Lookup("heartbeat_interval").Value.String())
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
 	Config.EtcdMachiens = strings.Split(machines, ",")
@@ -114,6 +119,7 @@ func InitServer() error {
 }
 
 func ShutdownServer() {
+	UnregisterEtcd(Config)
 }
 
 func main() {
@@ -142,6 +148,10 @@ func main() {
 	}
 
 	if err := StartMatchTCP(Config.MatchTCPBind); err != nil {
+		panic(err)
+	}
+
+	if err := RegisterEtcd(Config); err != nil {
 		panic(err)
 	}
 

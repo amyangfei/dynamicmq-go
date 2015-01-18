@@ -67,6 +67,8 @@ func InitConfig(configFile string) error {
 	serverFlagSet.Int("tcp_recvbuf_size", 2048, "tcp receive buffer size")
 	serverFlagSet.Int("tcp_sendbuf_size", 2048, "tcp send buffer size")
 	serverFlagSet.Int("tcp_bufio_num", 64, "bufio num for each cache instance")
+	serverFlagSet.Int("sub_keepalive", 900, "keepalive timeout for subscriber")
+	serverFlagSet.Int("disp_keepalive", 900, "keepalive timeout for dispatcher")
 	serverFlagSet.Int("capacity", 100000, "subscriber capacity of this connector")
 
 	redisFlagSet := flag.NewFlagSet("redis", flag.PanicOnError)
@@ -104,6 +106,10 @@ func InitConfig(configFile string) error {
 	Config.TCPBufioNum, err =
 		strconv.Atoi(serverFlagSet.Lookup("tcp_bufio_num").Value.String())
 	Config.TCPBufInsNum = runtime.NumCPU()
+	Config.SubKeepalive, err =
+		strconv.Atoi(serverFlagSet.Lookup("sub_keepalive").Value.String())
+	Config.DispKeepalive, err =
+		strconv.Atoi(serverFlagSet.Lookup("disp_keepalive").Value.String())
 	Config.Capacity, err =
 		strconv.Atoi(serverFlagSet.Lookup("capacity").Value.String())
 
@@ -187,6 +193,7 @@ func main() {
 		panic(err)
 	}
 
+	log.Debug("_---------_ %d %d", Config.SubKeepalive, Config.DispKeepalive)
 	signalChan := InitSignal()
 	HandleSignal(signalChan)
 

@@ -6,10 +6,20 @@ import (
 	"errors"
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
+	"gopkg.in/mgo.v2/bson"
 	"io"
 	"net"
-	"strings"
+	"time"
 )
+
+type DispClient struct {
+	id         bson.ObjectId // Dispatcher nodeid
+	expire     int64         // in seconds
+	conn       net.Conn
+	status     int
+	processBuf []byte
+	processEnd int
+}
 
 type DecodedMsg struct {
 	extra   uint8
@@ -18,12 +28,13 @@ type DecodedMsg struct {
 }
 
 type PubMsgFunc struct {
-	validate func(msg *DecodedMsg) error
-	process  func(msg *DecodedMsg) error
+	validate func(msg *DecodedMsg, cli *DispClient) error
+	process  func(msg *DecodedMsg, cli *DispClient) error
 }
 
 var RouterCmdTable = map[uint8]PubMsgFunc{
-	PubMsgCmdPush: PubMsgFunc{validate: validateMsg, process: processMsg},
+	dmq.DRMsgCmdPushMsg:   PubMsgFunc{validate: validateMsg, process: processMsg},
+	dmq.DRMsgCmdHeartbeat: PubMsgFunc{validate: validateHbMsg, process: processHbMsg},
 }
 
 func StartRouter(bind string) error {
@@ -76,36 +87,48 @@ func routerListen(bind string) {
 			continue
 		}
 		rc := recvTcpBufCache.Get()
+		dispCli := &DispClient{
+			conn:       conn,
+			processBuf: make([]byte, Config.TCPRecvBufSize*2),
+			processEnd: 0,
+			expire:     time.Now().Unix() + int64(Config.DispKeepalive),
+		}
 		// one connection one routine
-		go handleRouteConn(conn, rc)
+		go handleRouteConn(dispCli, rc)
 	}
 }
 
-func handleRouteConn(conn net.Conn, rc chan *bufio.Reader) {
-	addr := conn.RemoteAddr().String()
+func setDispTimeout(cli *DispClient) error {
+	now := time.Now().Unix()
+	if now > cli.expire {
+		return errors.New("Dispatcher client already timeout")
+	}
+	return cli.conn.SetReadDeadline(
+		time.Now().Add(time.Second * time.Duration(cli.expire-now)))
+}
+
+func handleRouteConn(cli *DispClient, rc chan *bufio.Reader) {
+	addr := cli.conn.RemoteAddr().String()
 	log.Debug("addr: %s routine start", addr)
 
 	for {
-		rd := dmq.NewBufioReader(rc, conn, Config.TCPRecvBufSize)
+		if err := setDispTimeout(cli); err != nil {
+			log.Error("router connection set timeout error(%v)", err)
+			break
+		}
+		rd := dmq.NewBufioReader(rc, cli.conn, Config.TCPRecvBufSize)
 		msg := make([]byte, Config.TCPRecvBufSize)
 		if rlen, err := rd.Read(msg); err == nil {
 			dmq.RecycleBufioReader(rc, rd)
 			// TODO: route message to subscribers here
-			log.Debug("addr: %s receive: %s", addr,
-				strings.Replace(
-					strings.Replace(string(msg[:rlen]), "\r", " ", -1), "\n", " ", -1))
-			processReadBuffer(conn, msg)
-			/* for redis-cli test code
-			sendMsg := make([]byte, 0)
-			AddReplyBulk(&sendMsg, string(msg[:rlen]))
-			for _, cli := range SubcliTable {
-				cli.conn.Write(sendMsg)
-			}
-			*/
+			processReadBuffer(cli, msg[:rlen])
 		} else {
 			dmq.RecycleBufioReader(rc, rd)
 			if err == io.EOF {
 				log.Info("addr: %s close connection", addr)
+				if err := RegisterWaiting(nil, Config); err != nil {
+					log.Error("failed to re-register to waiting list error(%v)", err)
+				}
 				return
 			}
 			log.Error("addr: %s socket read error(%v)", addr, err)
@@ -114,85 +137,90 @@ func handleRouteConn(conn net.Conn, rc chan *bufio.Reader) {
 	}
 
 	// close the connection
-	if err := conn.Close(); err != nil {
+	if err := cli.conn.Close(); err != nil {
 		log.Error("addr: %s conn.Close() error(%v)", addr, err)
 	}
 	log.Debug("addr: %s routine stop", addr)
+	if err := RegisterWaiting(nil, Config); err != nil {
+		log.Error("failed to re-register to waiting list error(%v)", err)
+	}
 }
 
-func processReadBuffer(conn net.Conn, msg []byte) error {
+func processReadBuffer(cli *DispClient, msg []byte) error {
 	var remaining uint16 = uint16(len(msg))
 	for {
 		if remaining == 0 {
 			return nil
 		}
-		if remaining <= PubMsgHeaderSize {
+		if remaining <= dmq.DRMsgHeaderSize {
 			log.Error("router recv error msg, invalid msg header length")
 			return errors.New("invalid msg header len")
 		}
 
 		start := uint16(len(msg)) - remaining
 		var cmd uint8 = msg[start]
-		var bodyLen uint16 = binary.BigEndian.Uint16(msg[start+PubMsgCmdSize:])
-		if bodyLen > PubMsgMaxBodyLen {
+		var bodyLen uint16 = binary.BigEndian.Uint16(msg[start+dmq.DRMsgCmdSize:])
+		if bodyLen > dmq.DRMsgMaxBodyLen {
 			log.Error("invalid request, invalid body length: %d", bodyLen)
 			return errors.New("invalid msg body len")
 		}
-		if remaining >= PubMsgHeaderSize+bodyLen {
-			decMsg, err := binaryMsgDecode(msg[start+PubMsgHeaderSize:], bodyLen)
-			remaining -= (PubMsgHeaderSize + bodyLen)
+		if remaining >= dmq.DRMsgHeaderSize+bodyLen {
+			decMsg, err := binaryMsgDecode(msg[start:], bodyLen)
+			remaining -= (dmq.DRMsgHeaderSize + bodyLen)
 			if err != nil {
-				log.Error("invalid request")
+				log.Error("invalid request error(%v)", err)
 				continue
 			}
 			if processFunc, ok := RouterCmdTable[cmd]; ok {
-				if err := processFunc.validate(decMsg); err != nil {
-					processFunc.process(decMsg)
+				if err := processFunc.validate(decMsg, cli); err != nil {
+					log.Error("invalid request error(%v)", err)
 				} else {
-					// TODO: error handling
+					processFunc.process(decMsg, cli)
 				}
+			} else {
+				log.Error("cmd %d not found", cmd)
 			}
 		}
 	}
 }
 
 func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
-	var extra uint8 = msg[PubMsgCmdSize+PubMsgBodySize]
+	var extra uint8 = msg[dmq.DRMsgCmdSize+dmq.DRMsgBodySize]
 	decMsg := DecodedMsg{
 		extra: extra, bodyLen: bodyLen, items: make(map[uint8]string, 0)}
 
-	totalLen := PubMsgHeaderSize + bodyLen
-	offset := PubMsgHeaderSize
+	totalLen := dmq.DRMsgHeaderSize + bodyLen
+	offset := dmq.DRMsgHeaderSize
 	for offset < totalLen {
-		if offset+PubMsgItemHeaderSize > totalLen {
+		if offset+dmq.DRMsgItemHeaderSize > totalLen {
 			return nil, errors.New("invalid item header length")
 		}
-		itemLen := binary.BigEndian.Uint16(msg[offset+PubMsgItemIdSize:])
-		if itemLen+PubMsgItemHeaderSize+offset > totalLen {
+		itemLen := binary.BigEndian.Uint16(msg[offset+dmq.DRMsgItemIdSize:])
+		if itemLen+dmq.DRMsgItemHeaderSize+offset > totalLen {
 			return nil, errors.New("invalid item body length")
 		}
 		var itemId uint8 = msg[offset]
 		decMsg.items[itemId] = string(
-			msg[offset+PubMsgItemHeaderSize : offset+PubMsgItemHeaderSize+itemLen])
-		offset += PubMsgItemHeaderSize + itemLen
+			msg[offset+dmq.DRMsgItemHeaderSize : offset+dmq.DRMsgItemHeaderSize+itemLen])
+		offset += dmq.DRMsgItemHeaderSize + itemLen
 	}
 
 	return &decMsg, nil
 }
 
-func validateMsg(msg *DecodedMsg) error {
+func validateMsg(msg *DecodedMsg, cli *DispClient) error {
 	switch msg.extra {
-	case PubMsgExtraSendSingle, PubMsgExtraSendMulHead:
-		if payload, ok := msg.items[PubMsgItemPayloadId]; !ok {
+	case dmq.DRMsgExtraSendSingle, dmq.DRMsgExtraSendMulHead:
+		if payload, ok := msg.items[dmq.DRMsgItemPayloadId]; !ok {
 			return errors.New("msg payload item not found")
-		} else if uint16(len(payload)) > PubMsgItemMaxPayload {
+		} else if uint16(len(payload)) > dmq.DRMsgItemMaxPayload {
 			return errors.New(
 				fmt.Sprintf("msg payload too large: %d", len(payload)))
 		}
 	}
 
-	if msgId, ok := msg.items[PubMsgItemMsgidId]; ok {
-		if uint16(len(msgId)) != PubMsgItemMsgidSize {
+	if msgId, ok := msg.items[dmq.DRMsgItemMsgidId]; ok {
+		if uint16(len(msgId)) != dmq.DRMsgItemMsgidSize {
 			return errors.New("msgid item not found")
 		}
 	} else {
@@ -202,6 +230,25 @@ func validateMsg(msg *DecodedMsg) error {
 	return nil
 }
 
-func processMsg(msg *DecodedMsg) error {
+func processMsg(msg *DecodedMsg, cli *DispClient) error {
+	return nil
+}
+
+func validateHbMsg(msg *DecodedMsg, cli *DispClient) error {
+	if ts, ok := msg.items[dmq.DRMsgItemTimestampId]; !ok {
+		return errors.New("timestamp not in message")
+	} else if uint16(len(ts)) != dmq.DRMsgItemTsSize {
+		return errors.New("invalid timestamp size")
+	}
+	return nil
+}
+
+func processHbMsg(msg *DecodedMsg, cli *DispClient) error {
+	ts := int64(binary.BigEndian.Uint64([]byte(msg.items[dmq.DRMsgItemTimestampId])))
+	log.Debug("recv heartbeat from dispatcher")
+	expire := ts + int64(Config.DispKeepalive)
+	if expire > cli.expire {
+		cli.expire = expire
+	}
 	return nil
 }

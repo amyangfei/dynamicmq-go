@@ -61,7 +61,7 @@ func RegisterEtcd(cfg *SrvConfig) error {
 		}
 
 		// connect to connector
-		if err := ConnToConnRouter(routeAddr); err != nil {
+		if err := ConnToConnRouter(routeAddr, connNodeId); err != nil {
 			return err
 		}
 
@@ -96,21 +96,10 @@ func UnregisterEtcd(cfg *SrvConfig) error {
 		return err
 	}
 
-	l := dmq.GetWaitingLockMgr(cfg.EtcdMachiens, cfg.NodeId)
-	if _, err := l.Acquire(true); err != nil {
-		return err
-	}
-
-	defer l.Release()
+	// Here we don't re-register connector to etcd waiting list
+	// and leaves this job to the connector
 
 	infoKey := dmq.GetInfoKey(dmq.EtcdDispatcherType, cfg.NodeId)
-	dispCidKey := fmt.Sprintf("%s/%s", infoKey, dmq.DispConnId)
-	// re-register connector id to waiting list
-	if resp, err := c.Get(dispCidKey, false, false); err == nil {
-		connId := resp.Node.Value
-		dmq.RegisterConnToWaiting(c, connId)
-	}
-
 	// delete this dispatcher information from etcd
 	c.Delete(infoKey, true)
 

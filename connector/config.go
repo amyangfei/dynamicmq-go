@@ -16,6 +16,8 @@ type SrvConfig struct {
 	TCPSendBufSize int
 	TCPBufInsNum   int
 	TCPBufioNum    int
+	SubKeepalive   int
+	DispKeepalive  int
 	Capacity       int
 
 	// redis for message cache

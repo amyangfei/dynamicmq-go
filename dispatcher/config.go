@@ -14,6 +14,7 @@ type SrvConfig struct {
 	TCPSendBufSize int
 	TCPBufInsNum   int
 	TCPBufioNum    int
+	HeartbeatIval  int
 
 	// etcd
 	EtcdMachiens []string

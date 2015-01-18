@@ -35,7 +35,7 @@ type HandleMsgFunc struct {
 }
 
 var DispCmdTable = map[uint8]HandleMsgFunc{
-	dmq.MDMsgCmdPush: HandleMsgFunc{validate: validateMsg, process: processMsg},
+	dmq.MDMsgCmdPushMsg: HandleMsgFunc{validate: validateMsg, process: processMsg},
 }
 
 func StartMatchTCP(bind string) error {

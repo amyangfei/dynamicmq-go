@@ -8,6 +8,7 @@ import (
 )
 
 func GetEtcdClient(cfg *SrvConfig) (*etcd.Client, error) {
+	// TODO: client buffer
 	c := etcd.NewClient(cfg.EtcdMachiens)
 	return c, nil
 }
@@ -39,8 +40,7 @@ func RegisterEtcd(cfg *SrvConfig) error {
 		}
 	}
 
-	// register to connector waiting list
-	if err := dmq.RegisterConnToWaiting(c, cfg.NodeId); err != nil {
+	if err := RegisterWaiting(c, cfg); err != nil {
 		c.Delete(baseKey, true)
 		return err
 	}
@@ -57,9 +57,52 @@ func UnregisterEtcd(cfg *SrvConfig) error {
 	infoKey := dmq.GetInfoKey(dmq.EtcdConnectorType, cfg.NodeId)
 	c.Delete(infoKey, true)
 
-	// unregister connector from waiting list
-	dmq.UnregisterConnToWaiting(c, cfg.NodeId)
+	if err := UnregisterWaiting(c, cfg); err != nil {
+		return err
+	}
 
+	return nil
+}
+
+func RegisterWaiting(c *etcd.Client, cfg *SrvConfig) error {
+	if c == nil {
+		var err error
+		c, err = GetEtcdClient(cfg)
+		if err != nil {
+			return err
+		}
+	}
+	l := dmq.GetWaitingLockMgr(cfg.EtcdMachiens, cfg.NodeId)
+	_, err := l.Acquire(true)
+	defer l.Release()
+	if err != nil {
+		return err
+	} else {
+		// register connector to etcd connector waiting list
+		if err := dmq.RegisterConnToWaiting(c, cfg.NodeId); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func UnregisterWaiting(c *etcd.Client, cfg *SrvConfig) error {
+	if c == nil {
+		var err error
+		c, err = GetEtcdClient(cfg)
+		if err != nil {
+			return err
+		}
+	}
+	l := dmq.GetWaitingLockMgr(cfg.EtcdMachiens, cfg.NodeId)
+	_, err := l.Acquire(true)
+	defer l.Release()
+	if err != nil {
+		return err
+	} else {
+		// unregister connector from waiting list
+		dmq.UnregisterConnToWaiting(c, cfg.NodeId)
+	}
 	return nil
 }
 

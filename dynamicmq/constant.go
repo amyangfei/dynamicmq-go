@@ -38,7 +38,7 @@ var (
 	MDMsgMaxBodyLen     uint16 = 2000
 
 	// command
-	MDMsgCmdPush uint8 = 1
+	MDMsgCmdPushMsg uint8 = 1
 
 	// Extra Field
 	MDMsgExtraSendSingle  uint8 = 0x01
@@ -56,4 +56,40 @@ var (
 	MDMsgItemMaxPayload uint16 = 256
 
 	MDMsgSubInfoSep = ","
+)
+
+// Message protocol from Dispatcher to Connector-Router
+var (
+	DRMsgCmdSize        uint16 = 1
+	DRMsgBodySize       uint16 = 2
+	DRMsgExtraSize      uint16 = 1
+	DRMsgHeaderSize     uint16 = DRMsgCmdSize + DRMsgBodySize + DRMsgExtraSize
+	DRMsgItemIdSize     uint16 = 1
+	DRMsgItemBodySize   uint16 = 2
+	DRMsgItemHeaderSize uint16 = DRMsgItemIdSize + DRMsgItemBodySize
+	DRMsgMaxBodyLen     uint16 = 2000
+
+	// command
+	DRMsgCmdPushMsg   uint8 = 1
+	DRMsgCmdHeartbeat uint8 = 2
+
+	// Extra Field
+	DRMsgExtraNone        uint8 = 0x00
+	DRMsgExtraSendSingle  uint8 = 0x01
+	DRMsgExtraSendMulHead uint8 = 0x02
+	DRMsgExtraSendMulMid  uint8 = 0x04
+	DRMsgExtraSendMulTail uint8 = 0x08
+
+	// Message body item id
+	DRMsgItemMsgidId     uint8 = 1
+	DRMsgItemPayloadId   uint8 = 2
+	DRMsgItemSubListId   uint8 = 3
+	DRMsgItemTimestampId uint8 = 4
+
+	// Message body item size restriction
+	DRMsgItemMsgidSize  uint16 = 12
+	DRMsgItemMaxPayload uint16 = 256
+	DRMsgItemTsSize     uint16 = 8
+
+	DRMsgSubInfoSep = ","
 )
