@@ -1,7 +1,9 @@
 *.log
 config.ini
 tags
+dump.rdb
 
 connector/connector
 authsrv/authsrv
+dispatcher/dispatcher
 cmd/subscriber/subscriber
