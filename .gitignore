@@ -1,4 +1,5 @@
 *.log
+*.pid
 config.ini
 tags
 dump.rdb

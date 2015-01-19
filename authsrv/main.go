@@ -121,6 +121,11 @@ func main() {
 	if err := InitConfig(configFile); err != nil {
 		panic(err)
 	}
+
+	if err := dmq.ProcessInit(Config.WorkingDir, Config.PidFile); err != nil {
+		panic(err)
+	}
+
 	if err := InitLog(Config.LogFile); err != nil {
 		panic(err)
 	}
