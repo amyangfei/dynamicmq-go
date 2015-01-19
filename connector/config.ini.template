@@ -11,8 +11,8 @@ pid_file = ./connector.pid
 tcp_recvbuf_size = 2048
 tcp_sendbuf_size = 2048
 tcp_bufio_num = 64
-sub_keepalive = 15 * 60
-disp_keepalive = 15 * 60
+sub_keepalive = 900
+disp_keepalive = 900
 capacity = 100000
 
 [redis]

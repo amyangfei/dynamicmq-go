@@ -3,6 +3,7 @@
 config.ini
 tags
 dump.rdb
+build/
 
 connector/connector
 authsrv/authsrv
