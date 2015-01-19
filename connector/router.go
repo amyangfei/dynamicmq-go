@@ -6,15 +6,14 @@ import (
 	"errors"
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
-	"gopkg.in/mgo.v2/bson"
 	"io"
 	"net"
 	"time"
 )
 
 type DispClient struct {
-	id          bson.ObjectId // Dispatcher nodeid
-	expire      int64         // in seconds
+	id          string // Dispatcher nodeid
+	expire      int64  // in seconds
 	conn        net.Conn
 	status      int
 	processBuf  []byte
@@ -34,8 +33,9 @@ type PubMsgFunc struct {
 }
 
 var RouterCmdTable = map[uint8]PubMsgFunc{
-	dmq.DRMsgCmdPushMsg:   PubMsgFunc{validate: validateMsg, process: processMsg},
+	dmq.DRMsgCmdHandshake: PubMsgFunc{validate: validateHsMsg, process: processHsMsg},
 	dmq.DRMsgCmdHeartbeat: PubMsgFunc{validate: validateHbMsg, process: processHbMsg},
+	dmq.DRMsgCmdPushMsg:   PubMsgFunc{validate: validateMsg, process: processMsg},
 }
 
 var (
@@ -280,10 +280,27 @@ func validateHbMsg(msg *DecodedMsg, cli *DispClient) error {
 
 func processHbMsg(msg *DecodedMsg, cli *DispClient) error {
 	ts := int64(binary.BigEndian.Uint64([]byte(msg.items[dmq.DRMsgItemTimestampId])))
-	log.Debug("recv heartbeat from dispatcher")
+	log.Debug("recv heartbeat from dispatcher %s", cli.id)
 	expire := ts + int64(Config.DispKeepalive)
 	if expire > cli.expire {
 		cli.expire = expire
 	}
+	return nil
+}
+
+// validate handshake message
+func validateHsMsg(msg *DecodedMsg, cli *DispClient) error {
+	if nodeid, ok := msg.items[dmq.DRMsgItemDispidId]; !ok {
+		return errors.New("dispatcher id not in message")
+	} else if uint16(len(nodeid)) != dmq.DRMsgItemDispIdSize {
+		return errors.New("invalid dispatcher id size")
+	}
+	return nil
+}
+
+func processHsMsg(msg *DecodedMsg, cli *DispClient) error {
+	dispId := msg.items[dmq.DRMsgItemDispidId]
+	log.Debug("recv handshake from dispatcher %s", dispId)
+	cli.id = dispId
 	return nil
 }

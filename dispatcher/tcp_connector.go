@@ -12,6 +12,11 @@ type RouterManager struct {
 	conn net.Conn
 }
 
+func (rmgr *RouterManager) SendData(msg []byte) error {
+	_, err := rmgr.conn.Write(msg)
+	return err
+}
+
 func ConnToConnRouter(addr, cid string) error {
 	log.Info("start tcp connection to router: %s", addr)
 	raddr, err := net.ResolveTCPAddr("tcp", addr)
@@ -26,8 +31,15 @@ func ConnToConnRouter(addr, cid string) error {
 		conn: conn,
 		cid:  cid,
 	}
+	go RmHandShake2Conn(RouterMgr)
 	go RmHeartbeat2Conn(RouterMgr)
 	return nil
+}
+
+func RmHandShake2Conn(rmgr *RouterManager) {
+	HandshakeMsg.items[dmq.DRMsgItemDispidId] = Config.NodeId
+	bmsg := binaryMsgEncode(HandshakeMsg)
+	rmgr.SendData(bmsg)
 }
 
 func RmHeartbeat2Conn(rmgr *RouterManager) {
@@ -38,9 +50,8 @@ func RmHeartbeat2Conn(rmgr *RouterManager) {
 		now := time.Now().Unix()
 		binary.BigEndian.PutUint64(b, uint64(now))
 		HeartbeatMsg.items[dmq.DRMsgItemTimestampId] = string(b)
-		HeartbeatMsg.items[dmq.DRMsgItemPayloadId] = "dynamic message queue"
 		bmsg := binaryMsgEncode(HeartbeatMsg)
-		rmgr.conn.Write(bmsg)
+		rmgr.SendData(bmsg)
 		log.Debug("send heartbeat to connector %s %s", rmgr.cid, bmsg)
 	}
 }

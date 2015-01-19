@@ -19,6 +19,13 @@ var HeartbeatMsg = &BasicMsg{
 	items:   map[uint8]string{},
 }
 
+var HandshakeMsg = &BasicMsg{
+	cmdType: dmq.DRMsgCmdHandshake,
+	bodyLen: 0,
+	extra:   dmq.DRMsgExtraNone,
+	items:   map[uint8]string{},
+}
+
 func binaryMsgEncode(msg *BasicMsg) []byte {
 	bmsg := make([]byte, dmq.DRMsgHeaderSize)
 	bmsg[0] = msg.cmdType

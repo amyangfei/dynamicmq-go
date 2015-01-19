@@ -50,6 +50,7 @@
 3. Message from Dispatcher to Connector
     * same as 2
     * command type
-        * push message = 1
+        * handshake    = 1 # used for exchanging node information
         * heartbeat    = 2
+        * push message = 3
 

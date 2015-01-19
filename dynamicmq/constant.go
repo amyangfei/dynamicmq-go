@@ -22,8 +22,9 @@ var (
 )
 
 var (
-	ConnectorNodeIdSize = 8
-	SubClientIdSize     = 12
+	ConnectorNodeIdSize  = 8
+	DispatcherNodeIdSize = 8
+	SubClientIdSize      = 12
 )
 
 // Message protocol from Matcher to Dispatcher
@@ -71,8 +72,9 @@ var (
 	DRMsgMaxBodyLen     uint16 = 2000
 
 	// command
-	DRMsgCmdPushMsg   uint8 = 1
+	DRMsgCmdHandshake uint8 = 1
 	DRMsgCmdHeartbeat uint8 = 2
+	DRMsgCmdPushMsg   uint8 = 3
 
 	// Extra Field
 	DRMsgExtraNone        uint8 = 0x00
@@ -86,11 +88,13 @@ var (
 	DRMsgItemPayloadId   uint8 = 2
 	DRMsgItemSubListId   uint8 = 3
 	DRMsgItemTimestampId uint8 = 4
+	DRMsgItemDispidId    uint8 = 5
 
 	// Message body item size restriction
 	DRMsgItemMsgidSize  uint16 = 12
 	DRMsgItemMaxPayload uint16 = 256
 	DRMsgItemTsSize     uint16 = 8
+	DRMsgItemDispIdSize uint16 = uint16(DispatcherNodeIdSize)
 
 	DRMsgSubInfoSep = ","
 )
