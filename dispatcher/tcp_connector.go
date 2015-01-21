@@ -52,6 +52,6 @@ func RmHeartbeat2Conn(rmgr *RouterManager) {
 		HeartbeatMsg.items[dmq.DRMsgItemTimestampId] = string(b)
 		bmsg := binaryMsgEncode(HeartbeatMsg)
 		rmgr.SendData(bmsg)
-		log.Debug("send heartbeat to connector %s %s", rmgr.cid, bmsg)
+		log.Debug("send heartbeat to connector %s", rmgr.cid)
 	}
 }

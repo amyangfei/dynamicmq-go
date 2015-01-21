@@ -9,3 +9,4 @@ connector/connector
 authsrv/authsrv
 dispatcher/dispatcher
 cmd/subscriber/subscriber
+pusher/pusher

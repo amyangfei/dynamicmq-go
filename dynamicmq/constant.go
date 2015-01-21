@@ -43,6 +43,7 @@ var (
 	MDMsgCmdPushMsg uint8 = 1
 
 	// Extra Field
+	MDMsgExtraNone        uint8 = 0x00
 	MDMsgExtraSendSingle  uint8 = 0x01
 	MDMsgExtraSendMulHead uint8 = 0x02
 	MDMsgExtraSendMulMid  uint8 = 0x04

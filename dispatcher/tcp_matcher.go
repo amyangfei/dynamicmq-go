@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
@@ -35,7 +36,7 @@ type HandleMsgFunc struct {
 }
 
 var DispCmdTable = map[uint8]HandleMsgFunc{
-	dmq.MDMsgCmdPushMsg: HandleMsgFunc{validate: validateMsg, process: processMsg},
+	dmq.MDMsgCmdPushMsg: HandleMsgFunc{validate: validatePushMsg, process: processPushMsg},
 }
 
 func StartMatchTCP(bind string) error {
@@ -151,17 +152,17 @@ func processReadbuf(cli *MatchClient, buf []byte) error {
 		}
 		if remaining >= dmq.MDMsgHeaderSize+bodyLen {
 			decMsg, err :=
-				binaryMsgDecode(buf[start+dmq.MDMsgHeaderSize:], bodyLen)
+				binaryMsgDecode(buf[start:], bodyLen)
 			remaining -= (dmq.MDMsgHeaderSize + bodyLen)
 			if err != nil {
-				log.Error("invalid request")
+				log.Error("invalid request error(%v)", err)
 				continue
 			}
 			if processFunc, ok := DispCmdTable[cmd]; ok {
 				if err := processFunc.validate(decMsg); err != nil {
-					processFunc.process(decMsg)
-				} else {
 					log.Error("request valid error(%v)", err)
+				} else {
+					processFunc.process(decMsg)
 				}
 			} else {
 				log.Error("cmd: %d not support", cmd)
@@ -186,7 +187,7 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 			return nil, errors.New("invalid item header length")
 		}
 		itemLen := binary.BigEndian.Uint16(msg[offset+dmq.MDMsgItemIdSize:])
-		if itemLen+dmq.MDMsgHeaderSize+offset > totalLen {
+		if itemLen+dmq.MDMsgItemHeaderSize+offset > totalLen {
 			return nil, errors.New("invalid item body length")
 		}
 		var itemId uint8 = msg[offset]
@@ -198,7 +199,7 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 	return &decMsg, nil
 }
 
-func validateMsg(msg *DecodedMsg) error {
+func validatePushMsg(msg *DecodedMsg) error {
 	if payload, ok := msg.items[dmq.MDMsgItemPayloadId]; !ok {
 		return errors.New("msg payload item not found")
 	} else if uint16(len(payload)) > dmq.MDMsgItemMaxPayload {
@@ -208,7 +209,7 @@ func validateMsg(msg *DecodedMsg) error {
 	if msgId, ok := msg.items[dmq.MDMsgItemMsgidId]; !ok {
 		return errors.New("msgid item not found")
 	} else {
-		if uint16(len(msgId)) != dmq.MDMsgItemIdSize {
+		if uint16(len(msgId)) != dmq.MDMsgItemMsgidSize {
 			return errors.New("msgid item not found")
 		}
 	}
@@ -220,23 +221,34 @@ func validateMsg(msg *DecodedMsg) error {
 	return nil
 }
 
-func processMsg(msg *DecodedMsg) error {
+func processPushMsg(msg *DecodedMsg) error {
 	// Message must have been validated before processing
+	msgId, _ := msg.items[dmq.MDMsgItemMsgidId]
+	hexMsgId := hex.EncodeToString([]byte(msgId))
+	msgPayload, _ := msg.items[dmq.MDMsgItemPayloadId]
+
 	cliGroup := map[string][]string{}
-	// msgId, _ := msg.items[dmq.MDMsgItemMsgidId]
-	// msgPayload, _ := msg.items[dmq.MDMsgItemPayloadId]
 	subInfoList, _ := msg.items[dmq.MDMsgItemSubListId]
 	subInfos := strings.Split(subInfoList, dmq.MDMsgSubInfoSep)
 	for _, subInfo := range subInfos {
 		if len(subInfo) != dmq.SubClientIdSize+dmq.ConnectorNodeIdSize {
-			log.Warning("invalid subclient info %s", subInfo)
+			log.Warning("invalid subclient info length %d", len(subInfo))
 		} else {
 			subId := subInfo[:dmq.SubClientIdSize]
 			connId := subInfo[dmq.SubClientIdSize:]
 			cliGroup[connId] = append(cliGroup[connId], subId)
 		}
 	}
+
 	// TODO: pack msg and send to connector or redirect to other dispatcher
+	log.Debug("msgId: %s, msgPayload: %s", hexMsgId, msgPayload)
+	for cid, subids := range cliGroup {
+		tmp := []string{}
+		for _, subid := range subids {
+			tmp = append(tmp, hex.EncodeToString([]byte(subid)))
+		}
+		log.Debug("connid: %s, subids: %v", cid, tmp)
+	}
 
 	return nil
 }
