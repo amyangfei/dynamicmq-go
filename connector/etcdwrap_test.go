@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
+	"gopkg.in/mgo.v2/bson"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -95,4 +98,73 @@ func TestUpdateEtcd(t *testing.T) {
 	if err := UnregisterEtcd(cfg); err != nil {
 		t.Errorf("UnregisterEtcd error(%v)", err)
 	}
+}
+
+func TestUpdateAttr(t *testing.T) {
+	cfg := fakeSrvConfig()
+	cli := &SubClient{
+		id: bson.NewObjectId(),
+	}
+	attr := &Attribute{
+		use:    byte(AttrUseField["strval"]),
+		strval: "test app",
+	}
+	attrKey := dmq.GetSubAttrBase(cli.id.Hex())
+
+	if err := UpdateSubAttr(cli, attr, cfg); err != nil {
+		t.Errorf("Failed to update subscriber attribute: %v", attr)
+	}
+	if resp, err := GetSubAttr(cli, cfg); err != nil {
+		t.Errorf("Failed to get subscriber attribute: %s", attrKey)
+	} else {
+		jsonData := make(map[string]interface{})
+		if err := json.Unmarshal([]byte(resp), &jsonData); err != nil {
+			t.Errorf("Failed to Unmarshal: %s", resp)
+		}
+
+		if use, ok := jsonData["use"].(float64); !ok {
+			t.Errorf("use field with error type: %v", reflect.TypeOf(jsonData["use"]))
+		} else {
+			if FloatCompare(use, float64(attr.use)) != 0 {
+				t.Errorf("use field doesn't equal to original: %f", use)
+			}
+		}
+
+		if jsonData["strval"] != attr.strval {
+			t.Errorf("strval field doesn't equal to original: %s", jsonData["strval"])
+		}
+	}
+
+	attr = &Attribute{
+		use:  byte(AttrUseField["range"]),
+		low:  12.3,
+		high: 21.7,
+	}
+	if err := UpdateSubAttr(cli, attr, cfg); err != nil {
+		t.Errorf("Failed to update subscriber attribute: %v", attr)
+	}
+	if resp, err := GetSubAttr(cli, cfg); err != nil {
+		t.Errorf("Failed to get subscriber attribute: %s", attrKey)
+	} else {
+		jsonData := make(map[string]interface{})
+		if err := json.Unmarshal([]byte(resp), &jsonData); err != nil {
+			t.Errorf("Failed to Unmarshal: %s", resp)
+		}
+
+		if use, ok := jsonData["use"].(float64); !ok {
+			t.Errorf("use field with error type: %v", reflect.TypeOf(jsonData["use"]))
+		} else {
+			if FloatCompare(use, float64(attr.use)) != 0 {
+				t.Errorf("use field doesn't equal to original: %f", use)
+			}
+		}
+
+		if low, ok := jsonData["low"].(float64); !ok {
+			t.Errorf("low field with error type: %v", reflect.TypeOf(jsonData["low"]))
+		} else if FloatCompare(low, attr.low) != 0 {
+			t.Errorf("low field doesn't equal to original: %f", low)
+		}
+	}
+
+	RemoveSub(cli, cfg)
 }

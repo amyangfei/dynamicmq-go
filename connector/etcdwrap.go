@@ -114,3 +114,54 @@ func GetConnInfo(cfg *SrvConfig) (*etcd.Response, error) {
 	}
 	return c.Get(infoKey, false, true)
 }
+
+func UpdateSubAttr(cli *SubClient, attr *Attribute, cfg *SrvConfig) error {
+	key := dmq.GetSubAttrBase(cli.id.Hex())
+	jsonStr, err := AttrMarshal(attr)
+	if err != nil {
+		return err
+	}
+	c, err := GetEtcdClient(cfg)
+	if err != nil {
+		return err
+	}
+	_, err = c.Set(key, string(jsonStr), 0)
+	return err
+}
+
+func GetSubAttr(cli *SubClient, cfg *SrvConfig) (string, error) {
+	key := dmq.GetSubAttrBase(cli.id.Hex())
+	c, err := GetEtcdClient(cfg)
+	if err != nil {
+		return "", err
+	}
+	if resp, err := c.Get(key, false, false); err != nil {
+		return "", err
+	} else {
+		return resp.Node.Value, nil
+	}
+}
+
+func RemoveSubAttr(cli *SubClient, cfg *SrvConfig) error {
+	key := dmq.GetSubAttrBase(cli.id.Hex())
+	c, err := GetEtcdClient(cfg)
+	if err != nil {
+		return err
+	}
+	if _, err := c.Delete(key, true); err != nil {
+		return err
+	}
+	return nil
+}
+
+func RemoveSub(cli *SubClient, cfg *SrvConfig) error {
+	key := dmq.GetInfoKey(dmq.EtcdSubscriberType, cli.id.Hex())
+	c, err := GetEtcdClient(cfg)
+	if err != nil {
+		return err
+	}
+	if _, err := c.Delete(key, true); err != nil {
+		return err
+	}
+	return nil
+}

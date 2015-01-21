@@ -18,6 +18,14 @@ import (
 	"time"
 )
 
+type Attribute struct {
+	use    byte
+	strval string
+	low    float64
+	high   float64
+	extra  string
+}
+
 type SubClient struct {
 	id         bson.ObjectId // used as client identity in internal system
 	token      bson.ObjectId // used as client identity in external system
@@ -26,6 +34,7 @@ type SubClient struct {
 	status     int
 	processBuf []byte
 	processEnd int
+	attrs      map[string]*Attribute
 }
 
 var (
@@ -121,6 +130,7 @@ func tcpListen(bind string) {
 			status:     SubcliIsPending,
 			processBuf: make([]byte, Config.TCPRecvBufSize*2),
 			processEnd: 0,
+			attrs:      make(map[string]*Attribute, 0),
 		}
 		SubcliTable[subCli.id] = subCli
 		rc := recvTcpBufCache.Get()
@@ -248,8 +258,71 @@ func processHeartbeat(cli *SubClient, args []string) error {
 }
 
 func processSubscribe(cli *SubClient, args []string) error {
-	// FIXME: should set this status in register process
-	cli.status &= ^SubcliIsPending
+	if len(args)/2 != 0 {
+		return errors.New("subscribe command with wrong elements")
+	}
+	for i := 0; i < len(args); i += 2 {
+		name := args[i]
+		dataStr := args[i+1]
+		data := make(map[string]interface{})
+		if err := json.Unmarshal([]byte(dataStr), &data); err != nil {
+			return err
+		}
+
+		if _, ok := cli.attrs[name]; !ok {
+			cli.attrs[name] = &Attribute{
+				use: 0,
+			}
+		}
+
+		use, ok := data["use"]
+		if !ok {
+			return errors.New("invalid sub command, use field not found")
+		}
+		var update bool = false
+		switch use {
+		case AttrUseField["strval"]:
+			if strval, ok := data["strval"].(string); !ok {
+				return errors.New("invalid sub command, strval not found")
+			} else {
+				if strval != cli.attrs[name].strval {
+					cli.attrs[name].strval = strval
+					update = true
+				}
+			}
+		case AttrUseField["range"]:
+			low, ok := data["low"].(float64)
+			if !ok {
+				return errors.New("invalid sub command, low not found")
+			}
+			high, ok := data["high"].(float64)
+			if !ok {
+				return errors.New("invalid sub command, high not found")
+			}
+			if low != cli.attrs[name].low {
+				cli.attrs[name].low = low
+				update = true
+			}
+			if high != cli.attrs[name].high {
+				cli.attrs[name].high = high
+				update = true
+			}
+		case AttrUseField["extra"]:
+			if extra, ok := data["extra"].(string); !ok {
+				return errors.New("invalid sub command, extra not found")
+			} else {
+				if extra != cli.attrs[name].extra {
+					cli.attrs[name].extra = extra
+					update = true
+				}
+			}
+		}
+		if update {
+			if err := UpdateSubAttr(cli, cli.attrs[name], Config); err != nil {
+				log.Error("update sub attr with error(%v)", err)
+			}
+		}
+	}
 	log.Debug("subscribeHandle with argv: %s", args)
 	return nil
 }

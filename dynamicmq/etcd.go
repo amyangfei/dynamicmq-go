@@ -18,6 +18,10 @@ func GetWaitingBase(nodeType string) string {
 	return fmt.Sprintf("/%s/waiting", nodeType)
 }
 
+func GetSubAttrBase(clientId string) string {
+	return fmt.Sprintf("/%s/info/%s/attribute", EtcdSubscriberType, clientId)
+}
+
 func GetWaitingLockMgr(machines []string, owner string) *sherlock.EtcdLock {
 	client := etcd.NewClient(machines)
 	l := sherlock.NewEtcdLock("WaitingConnector", client)

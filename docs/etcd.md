@@ -17,3 +17,9 @@
         * /dispatcher/info/<node-id>/status
         * /dispatcher/info/<node-id>/conn_id
         * /dispatcher/info/<node-id>/match_addr
+
+## subscriber(sdk) information
+    * single subscriber information
+        * /sub/info/<client-id>/conn_id
+        * /sub/info/<client-id>/attribute/<attribute-name>/<description-json-string>
+        * more properties ...

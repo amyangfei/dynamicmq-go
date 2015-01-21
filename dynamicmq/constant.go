@@ -8,6 +8,7 @@ var (
 	EtcdConnectorType  = "connector"
 	EtcdAuthServerType = "authsrv"
 	EtcdDispatcherType = "dispatcher"
+	EtcdSubscriberType = "sub"
 )
 
 // Etcd name mapping
