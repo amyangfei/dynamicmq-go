@@ -21,5 +21,5 @@
 ## subscriber(sdk) information
     * single subscriber information
         * /sub/info/<client-id>/conn_id
-        * /sub/info/<client-id>/attribute/<attribute-name>/<description-json-string>
-        * more properties ...
+        * key:/sub/info/<client-id>/attribute/<attribute-name> value:<description-json-string>
+        * more attributes ...

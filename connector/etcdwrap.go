@@ -115,6 +115,18 @@ func GetConnInfo(cfg *SrvConfig) (*etcd.Response, error) {
 	return c.Get(infoKey, false, true)
 }
 
+func RegisterSub(cli *SubClient, cfg *SrvConfig) error {
+	c, err := GetEtcdClient(cfg)
+	if err != nil {
+		return err
+	}
+	subConnKey := dmq.GetSubConnKey(cli.id.Hex())
+	if _, err := c.Set(subConnKey, cfg.NodeId, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
 func UpdateSubAttr(cli *SubClient, attr *Attribute, cfg *SrvConfig) error {
 	key := dmq.GetSubAttrBase(cli.id.Hex())
 	jsonStr, err := AttrMarshal(attr)

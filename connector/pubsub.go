@@ -164,6 +164,9 @@ func handleTCPConn(cli *SubClient, rc chan *bufio.Reader) {
 		if err != nil {
 			if err == io.EOF {
 				log.Info("addr: %s close connection", addr)
+				if err := cleanSubCli(cli); err != nil {
+					log.Error("clear subcli with error(%v)", err)
+				}
 				return
 			} else {
 				log.Error("addr: %s read with error(%v)", addr, err)
@@ -178,10 +181,12 @@ func handleTCPConn(cli *SubClient, rc chan *bufio.Reader) {
 		}
 	}
 
-	// TODO: other clean work
 	// close the connection
 	if err := cli.conn.Close(); err != nil {
 		log.Error("addr: %s conn.Close() error(%v)", addr, err)
+	}
+	if err := cleanSubCli(cli); err != nil {
+		log.Error("clear subcli with error(%v)", err)
 	}
 	log.Debug("addr: %s handleTcpConn routine stop", addr)
 }
@@ -225,6 +230,7 @@ func processAuth(cli *SubClient, args []string) error {
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	r.Header.Add("Content-Length", strconv.Itoa(len(postData.Encode())))
 
+	// send http request to authsrv to do real auth
 	resp, err := client.Do(r)
 	if err != nil {
 		return err
@@ -234,6 +240,7 @@ func processAuth(cli *SubClient, args []string) error {
 	if err != nil {
 		return err
 	}
+
 	parsed := map[string]string{}
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		return err
@@ -244,10 +251,17 @@ func processAuth(cli *SubClient, args []string) error {
 		log.Info("client %s auth failed", cli.id.Hex())
 		return fmt.Errorf("auth failed")
 	}
+
+	if err := RegisterSub(cli, Config); err != nil {
+		return err
+	}
+
 	cli.status &= ^SubcliIsPending
 	cli.status |= SubcliIsAuthed
 	log.Info("sub client %s auth successfully", cli.id.Hex())
+
 	cli.conn.Write(AuthSuccessReply)
+
 	return nil
 }
 
@@ -426,4 +440,12 @@ func parseData(msg []byte, pos *int, dataLen int) ([]byte, error) {
 			return msg[*pos-dataLen-2 : *pos-2], nil
 		}
 	}
+}
+
+// TODO: other clean work
+func cleanSubCli(cli *SubClient) error {
+	if err := RemoveSub(cli, Config); err != nil {
+		return err
+	}
+	return nil
 }
