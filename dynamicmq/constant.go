@@ -5,9 +5,9 @@ var (
 )
 
 var (
-	EtcdConnectorType  = "connector"
-	EtcdAuthServerType = "authsrv"
-	EtcdDispatcherType = "dispatcher"
+	EtcdConnectorType  = "conn"
+	EtcdAuthServerType = "auth"
+	EtcdDispatcherType = "disp"
 	EtcdSubscriberType = "sub"
 )
 

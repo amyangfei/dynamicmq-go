@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"net"
 	"time"
@@ -28,13 +29,14 @@ func ConnToConnRouter(addr, cid string, rmgr *RouterManager, cfg *SrvConfig) err
 	if err != nil {
 		return err
 	}
-	rmgr = &RouterManager{
-		conn:   conn,
-		cid:    cid,
-		status: RmStatusOk,
-	}
+
+	rmgr.cid = cid
+	rmgr.conn = conn
+	rmgr.status = RmStatusOk
+
 	go RmHandShake2Conn(rmgr, cfg)
 	go RmHeartbeat2Conn(rmgr, cfg)
+
 	return nil
 }
 
@@ -58,4 +60,15 @@ func RmHeartbeat2Conn(rmgr *RouterManager, cfg *SrvConfig) {
 		rmgr.SendData(bmsg)
 		log.Debug("send heartbeat to connector %s", rmgr.cid)
 	}
+}
+
+func RmSendMsg2Conn(rmgr *RouterManager, msg []byte) error {
+	wlen, err := rmgr.conn.Write(msg)
+	if err != nil {
+		return err
+	}
+	if wlen != len(msg) {
+		return fmt.Errorf("rm send msg with length %d should be %d", wlen, len(msg))
+	}
+	return nil
 }

@@ -227,7 +227,7 @@ func processPushMsg(msg *DecodedMsg) error {
 	hexMsgId := hex.EncodeToString([]byte(msgId))
 	msgPayload, _ := msg.items[dmq.MDMsgItemPayloadId]
 
-	cliGroup := map[string][]string{}
+	cliGroup := map[string][]byte{}
 	subInfoList, _ := msg.items[dmq.MDMsgItemSubListId]
 	subInfos := strings.Split(subInfoList, dmq.MDMsgSubInfoSep)
 	for _, subInfo := range subInfos {
@@ -236,18 +236,37 @@ func processPushMsg(msg *DecodedMsg) error {
 		} else {
 			subId := subInfo[:dmq.SubClientIdSize]
 			connId := subInfo[dmq.SubClientIdSize:]
-			cliGroup[connId] = append(cliGroup[connId], subId)
+			cliGroup[connId] = append(cliGroup[connId], []byte(subId)...)
+			cliGroup[connId] = append(cliGroup[connId], dmq.DRMsgSubInfoSep[0])
 		}
 	}
 
-	// TODO: pack msg and send to connector or redirect to other dispatcher
 	log.Debug("msgId: %s, msgPayload: %s", hexMsgId, msgPayload)
-	for cid, subids := range cliGroup {
-		tmp := []string{}
-		for _, subid := range subids {
-			tmp = append(tmp, hex.EncodeToString([]byte(subid)))
+	for cid, subIds := range cliGroup {
+		if len(subIds) > 0 && subIds[len(subIds)-1] == dmq.DRMsgSubInfoSep[0] {
+			subIds = subIds[:len(subIds)-1]
 		}
-		log.Debug("connid: %s, subids: %v", cid, tmp)
+		log.Debug("connid: %s, subids: %v", cid, hex.EncodeToString(subIds))
+
+		msg := &BasicMsg{
+			bodyLen: 0,
+			extra:   dmq.DRMsgExtraNone,
+			items: map[uint8]string{
+				dmq.DRMsgItemMsgidId:   msgId,
+				dmq.DRMsgItemPayloadId: msgPayload,
+				dmq.DRMsgItemSubListId: string(subIds),
+			},
+		}
+
+		if cid == RouterMgr.cid {
+			msg.cmdType = dmq.DRMsgCmdPushMsg
+			bmsg := binaryMsgEncode(msg)
+			if err := RmSendMsg2Conn(RouterMgr, bmsg); err != nil {
+				log.Error("send msg to connector error(%v)", err)
+			}
+		} else {
+			// TODO: pack msg and redirect to other dispatcher
+		}
 	}
 
 	return nil

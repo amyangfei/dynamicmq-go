@@ -124,6 +124,10 @@ func RegisterSub(cli *SubClient, cfg *SrvConfig) error {
 	if _, err := c.Set(subConnKey, cfg.NodeId, 0); err != nil {
 		return err
 	}
+	connSubKey := dmq.GetConnSubKey(cfg.NodeId, cli.id.Hex())
+	if _, err := c.SetDir(connSubKey, 0); err != nil {
+		return err
+	}
 	return nil
 }
 

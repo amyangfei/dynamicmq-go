@@ -15,7 +15,7 @@ import (
 
 var Config *SrvConfig
 
-var RouterMgr *RouterManager
+var RouterMgr *RouterManager = &RouterManager{}
 
 var log = logging.MustGetLogger("dynamicmq-dispatcher")
 

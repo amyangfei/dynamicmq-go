@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
@@ -35,7 +36,7 @@ type PubMsgFunc struct {
 var RouterCmdTable = map[uint8]PubMsgFunc{
 	dmq.DRMsgCmdHandshake: PubMsgFunc{validate: validateHsMsg, process: processHsMsg},
 	dmq.DRMsgCmdHeartbeat: PubMsgFunc{validate: validateHbMsg, process: processHbMsg},
-	dmq.DRMsgCmdPushMsg:   PubMsgFunc{validate: validateMsg, process: processMsg},
+	dmq.DRMsgCmdPushMsg:   PubMsgFunc{validate: validatePushMsg, process: processPushMsg},
 }
 
 var (
@@ -243,7 +244,7 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 	return &decMsg, nil
 }
 
-func validateMsg(msg *DecodedMsg, cli *DispClient) error {
+func validatePushMsg(msg *DecodedMsg, cli *DispClient) error {
 	switch msg.extra {
 	case dmq.DRMsgExtraSendSingle, dmq.DRMsgExtraSendMulHead:
 		if payload, ok := msg.items[dmq.DRMsgItemPayloadId]; !ok {
@@ -265,7 +266,15 @@ func validateMsg(msg *DecodedMsg, cli *DispClient) error {
 	return nil
 }
 
-func processMsg(msg *DecodedMsg, cli *DispClient) error {
+func processPushMsg(msg *DecodedMsg, cli *DispClient) error {
+	log.Debug("extra: %d, bodyLen: %d", msg.extra, msg.bodyLen)
+	for itemid, item := range msg.items {
+		if itemid == dmq.DRMsgItemSubListId || itemid == dmq.DRMsgItemMsgidId {
+			log.Debug("id: %d, item: %s", itemid, hex.EncodeToString([]byte(item)))
+		} else {
+			log.Debug("id: %d, item: %s", itemid, item)
+		}
+	}
 	return nil
 }
 
