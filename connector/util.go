@@ -9,6 +9,18 @@ import (
 
 var FloatMinDiff = 0.00001
 
+func MsgPack(msg map[string]interface{}) ([]byte, error) {
+	bmsg, err := json.Marshal(msg)
+	if err != nil {
+		return nil, err
+	}
+	dlen := len(bmsg) + 2
+	header := fmt.Sprintf("#%d%s", dlen, dmq.Crlf)
+	bmsg = append([]byte(header), bmsg...)
+	bmsg = append(bmsg, []byte(dmq.Crlf)...)
+	return bmsg, nil
+}
+
 func AddReplyMultiBulk(target *[]byte, cnts []string) {
 	addReply(target, fmt.Sprintf("*%d%s", len(cnts), dmq.Crlf))
 	for _, cnt := range cnts {

@@ -102,7 +102,7 @@ func SendOneMsg(conn net.Conn) {
 	}
 
 	msgid := bson.NewObjectId()
-	payload := "test msg payload"
+	payload := "test msg payload 中文，二进制"
 	msg := &BasicMsg{
 		cmdType: dmq.MDMsgCmdPushMsg,
 		bodyLen: 0,

@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 )
 
 func main() {
@@ -17,17 +16,13 @@ func main() {
 	if err := cli.Auth(); err != nil {
 		panic(err)
 	}
+	defer cli.Close()
 
-	go func(interval int) {
-		for {
-			time.Sleep(time.Second * time.Duration(interval))
-			cli.Heartbeat()
-		}
-	}(30)
+	go cli.HeartbeatRoutine(5)
+	go cli.RecvMsgRoutine()
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM,
 		syscall.SIGINT, syscall.SIGSTOP)
 	<-c
-	cli.Close()
 }

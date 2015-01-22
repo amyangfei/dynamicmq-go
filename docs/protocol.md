@@ -57,7 +57,7 @@
 
 * Basic message structure
 
-        #<message lenght> CR LF
+        #<subsequence message lenght(number of bytes)> CR LF
         *<number of elements> CR LF
         $<number of bytes of element-1> CR LF
         <element-1 data> CR LF
@@ -78,4 +78,16 @@
             * "strval": single string value
             * "low","high": both low and high are float, attribute ranges from low to high
             * "extra": a json string for attribute extending
+
+* message from connector to adk
+    * Heartbeat reply
+        * +h CR LF
+    * auth success reply
+        * +authsuccess CR LF
+    * command error reply
+        * -command error CR LF
+    * push message
+
+            #<subsequence message length(number of bytes)> CR LF
+            <message content json string> CR LF
 

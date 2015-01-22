@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
+	"gopkg.in/mgo.v2/bson"
 	"io"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -245,36 +247,73 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 }
 
 func validatePushMsg(msg *DecodedMsg, cli *DispClient) error {
-	switch msg.extra {
-	case dmq.DRMsgExtraSendSingle, dmq.DRMsgExtraSendMulHead:
-		if payload, ok := msg.items[dmq.DRMsgItemPayloadId]; !ok {
-			return errors.New("msg payload item not found")
-		} else if uint16(len(payload)) > dmq.DRMsgItemMaxPayload {
-			return errors.New(
-				fmt.Sprintf("msg payload too large: %d", len(payload)))
+	/*
+		switch msg.extra {
+		case dmq.DRMsgExtraSendSingle, dmq.DRMsgExtraSendMulHead:
+			if payload, ok := msg.items[dmq.DRMsgItemPayloadId]; !ok {
+				return errors.New("msg payload item not found")
+			} else if uint16(len(payload)) > dmq.DRMsgItemMaxPayload {
+				return errors.New(
+					fmt.Sprintf("msg payload too large: %d", len(payload)))
+			}
 		}
+	*/
+
+	// We don't use local message cache currently, so each message packet from
+	// dispatcher contains the message payload
+	if payload, ok := msg.items[dmq.DRMsgItemPayloadId]; !ok {
+		return errors.New("msg payload item not found")
+	} else if uint16(len(payload)) > dmq.DRMsgItemMaxPayload {
+		return errors.New(
+			fmt.Sprintf("msg payload too large: %d", len(payload)))
 	}
 
-	if msgId, ok := msg.items[dmq.DRMsgItemMsgidId]; ok {
-		if uint16(len(msgId)) != dmq.DRMsgItemMsgidSize {
-			return errors.New("msgid item not found")
-		}
-	} else {
+	if msgId, ok := msg.items[dmq.DRMsgItemMsgidId]; !ok {
 		return errors.New("msgid item not found")
+	} else if uint16(len(msgId)) != dmq.DRMsgItemMsgidSize {
+		return errors.New("msgid item not found")
+	}
+
+	if _, ok := msg.items[dmq.DRMsgItemSubListId]; !ok {
+		return errors.New("sub list item not found")
 	}
 
 	return nil
 }
 
 func processPushMsg(msg *DecodedMsg, cli *DispClient) error {
-	log.Debug("extra: %d, bodyLen: %d", msg.extra, msg.bodyLen)
-	for itemid, item := range msg.items {
-		if itemid == dmq.DRMsgItemSubListId || itemid == dmq.DRMsgItemMsgidId {
-			log.Debug("id: %d, item: %s", itemid, hex.EncodeToString([]byte(item)))
+	// message has been validated
+	msgId, _ := msg.items[dmq.DRMsgItemMsgidId]
+	payload, _ := msg.items[dmq.DRMsgItemPayloadId]
+	subListStr, _ := msg.items[dmq.DRMsgItemSubListId]
+	subIds := strings.Split(subListStr, dmq.DRMsgSubInfoSep)
+
+	log.Debug("process msg id: %s extra: %d, bodyLen: %d",
+		hex.EncodeToString([]byte(msgId)), msg.extra, msg.bodyLen)
+
+	m := map[string]interface{}{
+		"type":    PushMsg,
+		"payload": payload,
+	}
+	bmsg, err := MsgPack(m)
+	if err != nil {
+		return err
+	}
+
+	for _, subId := range subIds {
+		if len(subId) != dmq.SubClientIdSize {
+			log.Error("error sub client id size %d", len(subId))
+			continue
+		}
+		oid := bson.ObjectId(subId)
+		if cli, ok := SubcliTable[oid]; !ok {
+			log.Error("subclient with id %s not found", oid.Hex())
 		} else {
-			log.Debug("id: %d, item: %s", itemid, item)
+			log.Debug("send msg to sub cli %s", cli.id.Hex())
+			cli.SendMsg(bmsg)
 		}
 	}
+
 	return nil
 }
 

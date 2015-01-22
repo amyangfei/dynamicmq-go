@@ -15,3 +15,8 @@ var (
 		"extra":  3,
 	}
 )
+
+// message type
+const (
+	PushMsg = iota + 1
+)

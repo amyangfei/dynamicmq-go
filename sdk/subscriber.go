@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"regexp"
+	"time"
 )
 
 type SubSdk struct {
@@ -184,6 +185,42 @@ func (sub *SubSdk) Heartbeat() error {
 			resp := make([]byte, 64)
 			sub.conn.Read(resp)
 			return nil
+		}
+	}
+}
+
+func (sub *SubSdk) HeartbeatRoutine(interval int) {
+	ticker := time.NewTicker(time.Second * time.Duration(interval))
+	for {
+		<-ticker.C
+		sub.Heartbeat()
+	}
+}
+
+func (sub *SubSdk) RecvMsgRoutine() {
+	dataChan := make(chan []byte)
+	errChan := make(chan error)
+	go sub.recvMsg(dataChan, errChan)
+	for {
+		select {
+		case data := <-dataChan:
+			fmt.Printf("receive: %s", data)
+		case err := <-errChan:
+			fmt.Printf("receive error: %v", err)
+			break
+		}
+	}
+}
+
+func (sub *SubSdk) recvMsg(dataChan chan []byte, errChan chan error) {
+	for {
+		buf := make([]byte, 2048)
+		rlen, err := sub.conn.Read(buf)
+		if err != nil {
+			errChan <- err
+			break
+		} else {
+			dataChan <- buf[:rlen]
 		}
 	}
 }

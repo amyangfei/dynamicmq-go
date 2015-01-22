@@ -51,7 +51,7 @@ var (
 	AuthSuccessReply = []byte("+authsuccess" + dmq.Crlf)
 
 	// command error reply
-	WrongCmdReply = []byte("-command in wrong protocol" + dmq.Crlf)
+	WrongCmdReply = []byte("-command error" + dmq.Crlf)
 )
 
 var (
@@ -446,6 +446,17 @@ func parseData(msg []byte, pos *int, dataLen int) ([]byte, error) {
 func cleanSubCli(cli *SubClient) error {
 	if err := RemoveSub(cli, Config); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (cli *SubClient) SendMsg(msg []byte) error {
+	wlen, err := cli.conn.Write(msg)
+	if err != nil {
+		return err
+	}
+	if wlen != len(msg) {
+		return fmt.Errorf("send msg with length %d should be %d", wlen, len(msg))
 	}
 	return nil
 }
