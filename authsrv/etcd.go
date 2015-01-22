@@ -13,7 +13,7 @@ func getEtcdClient(machines []string) (*etcd.Client, error) {
 	return c, nil
 }
 
-func GetConnector(machines []string) (string, error) {
+func AllocateConnector(machines []string) (string, error) {
 	rand.Seed(time.Now().UnixNano())
 	c, err := getEtcdClient(machines)
 	if err != nil {

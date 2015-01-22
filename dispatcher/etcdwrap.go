@@ -13,7 +13,7 @@ func GetEtcdClient(cfg *SrvConfig) (*etcd.Client, error) {
 	return c, nil
 }
 
-func RegisterEtcd(cfg *SrvConfig) error {
+func RegisterEtcd(rmgr *RouterManager, cfg *SrvConfig) error {
 	c, err := GetEtcdClient(cfg)
 	if err != nil {
 		return err
@@ -61,7 +61,7 @@ func RegisterEtcd(cfg *SrvConfig) error {
 		}
 
 		// connect to connector
-		if err := ConnToConnRouter(routeAddr, connNodeId); err != nil {
+		if err := ConnToConnRouter(routeAddr, connNodeId, rmgr, cfg); err != nil {
 			return err
 		}
 

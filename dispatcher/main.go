@@ -156,7 +156,7 @@ func main() {
 		panic(err)
 	}
 
-	if err := RegisterEtcd(Config); err != nil {
+	if err := RegisterEtcd(RouterMgr, Config); err != nil {
 		panic(err)
 	}
 

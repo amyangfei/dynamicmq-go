@@ -12,18 +12,25 @@ type BasicMsg struct {
 	items   map[uint8]string
 }
 
-var HeartbeatMsg = &BasicMsg{
-	cmdType: dmq.DRMsgCmdHeartbeat,
-	bodyLen: 0,
-	extra:   dmq.DRMsgExtraNone,
-	items:   map[uint8]string{},
+func BasicHeartbeatMsg() *BasicMsg {
+	// FIXME: here if we use a global variable, go test will faile
+	HeartbeatMsg := &BasicMsg{
+		cmdType: dmq.DRMsgCmdHeartbeat,
+		bodyLen: 0,
+		extra:   dmq.DRMsgExtraNone,
+		items:   map[uint8]string{},
+	}
+	return HeartbeatMsg
 }
 
-var HandshakeMsg = &BasicMsg{
-	cmdType: dmq.DRMsgCmdHandshake,
-	bodyLen: 0,
-	extra:   dmq.DRMsgExtraNone,
-	items:   map[uint8]string{},
+func BasicHandshakeMsg() *BasicMsg {
+	HandshakeMsg := &BasicMsg{
+		cmdType: dmq.DRMsgCmdHandshake,
+		bodyLen: 0,
+		extra:   dmq.DRMsgExtraNone,
+		items:   map[uint8]string{},
+	}
+	return HandshakeMsg
 }
 
 func binaryMsgEncode(msg *BasicMsg) []byte {
