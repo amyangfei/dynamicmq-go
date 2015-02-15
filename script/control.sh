@@ -3,10 +3,10 @@
 cuser=$(whoami)
 # directory of script itself
 cur=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-wdir=$cur/build
+wdir=$cur/../build
 src=$cur/..
-etcd=/home/$cuser/work/opensrc/etcd-base/etcd/etcd
-redis=/usr/local/bin/redis-server
+etcd_bin="etcd"
+redis_bin="redis-server"
 machine="01"
 sep="----------------------------------------------------"
 red='\e[0;31m'
@@ -15,13 +15,15 @@ NC='\e[0m' # No Color
 start_etcd() {
     cd $wdir
     echo "starting etcd..."
-    $etcd &
+    $etcd_bin >>etcd.log 2>&1 &
+    echo $! > etcd.pid
 }
 
 start_redis() {
     cd $wdir
     echo "starting redis..."
-    $redis &
+    $redis_bin >>redis.log 2>&1 &
+    echo $! > redis.pid
 }
 
 start_authsrv() {
@@ -101,21 +103,17 @@ start_dispatcher() {
 }
 
 stop_etcd() {
-    echo "stopping etcd..."
-    etcd_pid=$(ps aux|grep '[/]etcd'|awk '{print $2}')
-    for pid in $etcd_pid; do
-        echo "killing etcd with pid ${pid}"
-        kill $pid
-    done
+    echo "stopping Etcd..."
+    etcd_pid=$(cat "${wdir}/etcd.pid")
+    echo "killing etcd with pid ${etcd_pid}"
+    kill $etcd_pid
 }
 
 stop_redis() {
-    echo "stopping redis..."
-    redis_pid=$(ps aux|grep '[r]edis-server'|awk '{print $2}')
-    for pid in $redis_pid; do
-        echo "killing redis-server with pid ${pid}"
-        kill $pid
-    done
+    echo "stopping Redis..."
+    redis_pid=$(cat "${wdir}/redis.pid")
+    echo "killing redis-server with pid ${redis_pid}"
+    kill $redis_pid
 }
 
 stop_authsrv() {
@@ -179,6 +177,10 @@ singlestart() {
 start() {
     cd $cur
     mkdir -p $wdir
+    re='^[0-9]+$'
+    if ! [[ $1 =~ $re ]] ; then
+        echo "error: parameter '$1' not a number" >&2; exit 1
+    fi
     # start_etcd
     # start_redis
     start_authsrv $*
@@ -201,7 +203,7 @@ stop() {
 }
 
 status() {
-    ps aux|grep '[/]etcd'
+    ps aux|grep '[e]tcd'
     ps aux|grep '[r]edis-server'
     ps aux|grep '[/]authsrv'
     ps aux|grep '[/]connector'
@@ -226,6 +228,11 @@ show_help() {
     echo "$0 singlestart etcd redis"
     echo ""
 
+    echo -e "${red}build${NC} all or specific sub project:"
+    echo "$0 build all"
+    echo "$0 build authsrv connector dispatcher"
+    echo ""
+
     echo ${sep}
     exit 1
 }
@@ -240,6 +247,10 @@ fi
 
 if [ $# -lt 2 ]; then
     show_help $*
+fi
+
+if [ ! -d "$wdir" ]; then
+    mkdir -p $wdir
 fi
 
 case "$1" in

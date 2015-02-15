@@ -19,6 +19,7 @@ install_remote_dep() {
     go get -u -v github.com/gorilla/mux
     go get -u -v github.com/garyburd/redigo/redis
     go get -u -v gopkg.in/mgo.v2
+    go get -u -v github.com/amyangfei/sherlock-go
 }
 
 install_local_dep() {
