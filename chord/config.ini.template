@@ -1,0 +1,11 @@
+[node]
+workdir = .
+bind_addr = 0.0.0.0:5000
+rpc_addr = 127.0.0.1:5500
+
+[serf]
+node_name = serf0101
+bind_addr = 0.0.0.0:7946
+rpc_addr = 127.0.0.1:7373
+# Ensure event_handler file and workdir are the same directory
+event_handler = './serfev_handler.py'

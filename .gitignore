@@ -1,6 +1,6 @@
 *.log
 *.pid
-config.ini
+*.ini
 tags
 dump.rdb
 build/

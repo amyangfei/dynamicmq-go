@@ -9,10 +9,13 @@ import (
 	"time"
 )
 
+var serfLogFile = "./serfagent.log"
+
 func fastConf() *NodeConfig {
-	conf := DefaultConfig("test")
+	conf := DefaultConfig("localhost", "serf0101")
+	conf.WorkDir = "."
 	conf.serf.BinPath = "/usr/local/bin/serf"
-	conf.serf.Args = []string{"-log-level=debug"}
+	conf.serf.Args = []string{"-log-level=info"}
 	return conf
 }
 
@@ -75,7 +78,12 @@ func fakeSerfLeave(c chan Notification) {
 func TestCreateShutdown(t *testing.T) {
 	conf := fastConf()
 	c := make(chan Notification)
-	n, err := Create(conf, c)
+	logger, err := os.OpenFile(serfLogFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+	if err != nil {
+		t.Errorf("failed to open file %s with error: %v", serfLogFile, err)
+		return
+	}
+	n, err := Create(conf, c, logger)
 	if err != nil {
 		t.Errorf("failed to create node %v", err)
 	}
@@ -100,10 +108,15 @@ func TestCreateShutdown(t *testing.T) {
 	}
 }
 
-func TestJoin(t *testing.T) {
+func TestLifeCycle(t *testing.T) {
 	conf := fastConf()
 	c := make(chan Notification)
-	n, err := Create(conf, c)
+	logger, err := os.OpenFile(serfLogFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+	if err != nil {
+		t.Errorf("failed to open file %s with error: %v", serfLogFile, err)
+		return
+	}
+	n, err := Create(conf, c, logger)
 	if err != nil {
 		t.Errorf("failed to create node %v", err)
 	}
@@ -124,6 +137,9 @@ func TestJoin(t *testing.T) {
 	if err := n.serfJoin(fakeSerfBind); err != nil {
 		t.Errorf("serf join error: %v", err)
 	}
+
+	n.serfUserEvent("nodeinfo", "testpayload", false, c)
+	time.Sleep(time.Millisecond * time.Duration(100))
 
 	if n != nil {
 		err := n.Shutdown()
