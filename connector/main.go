@@ -149,7 +149,9 @@ func InitServer() error {
 }
 
 func ShutdownServer() {
-	UnregisterEtcd(Config)
+	if err := UnregisterEtcd(Config); err != nil {
+		panic(err)
+	}
 }
 
 func main() {

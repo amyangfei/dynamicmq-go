@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 var Config *SrvConfig
@@ -156,8 +157,15 @@ func main() {
 		panic(err)
 	}
 
+	// Errors may occur if this procedure acquires the waiting lock before the
+	// expected connector registering to etcd. So try another time when error
+	// occurs. We should ensure the RegisterEtcd can be called idempotently.
 	if err := RegisterEtcd(RouterMgr, Config); err != nil {
-		panic(err)
+		log.Error("first time register to etcd with error: %v", err)
+		time.Sleep(time.Second * time.Duration(1))
+		if err2 := RegisterEtcd(RouterMgr, Config); err2 != nil {
+			panic(err2)
+		}
 	}
 
 	signalChan := InitSignal()
