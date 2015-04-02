@@ -8,6 +8,8 @@ import (
 type Tree interface {
 	Push(xmin, ymin, xmax, ymax int) // Push new interval to tree
 
+	Count(x, y float64) int // Query the count of intervals that covers the given point
+
 	Query(x, y float64) []*Interval // Query intervals that covers the given point
 
 	Print() // Print the tree structure to stdout
@@ -161,6 +163,21 @@ func (t *stree) Push(xmin, xmax, ymin, ymax int) {
 
 	t.base = append(t.base, new_interval)
 	insertInterval(t.root, new_interval)
+}
+
+func (t *stree) Count(x, y float64) int {
+	return countSingle(t.root, x, y)
+}
+
+func countSingle(node *node, x, y float64) int {
+	count := 0
+	if node.segment.CoverPoint(x, y) {
+		count = len(node.overlap)
+		for _, child := range node.ChildrenNotNil() {
+			count += countSingle(child, x, y)
+		}
+	}
+	return count
 }
 
 func (t *stree) Query(x, y float64) []*Interval {
