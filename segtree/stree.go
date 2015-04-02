@@ -8,7 +8,7 @@ import (
 type Tree interface {
 	Push(xmin, ymin, xmax, ymax int) // Push new interval to tree
 
-	Query(x, y int) // Query interval that covers the given point
+	Query(x, y float64) []*Interval // Query intervals that covers the given point
 
 	Print() // Print the tree structure to stdout
 
@@ -28,8 +28,7 @@ const (
 	// Relationships of two segments
 	EQUAL = iota
 	SUBSET
-	SUPERSET
-	INTERSECT
+	INTERSECT_OR_SUPERSET
 	DISJOINT
 )
 
@@ -46,17 +45,41 @@ func (s *SquareSegment) CompareTo(other *SquareSegment) int {
 		other.ymin <= s.ymin && other.ymax >= s.ymax {
 		return SUBSET
 	}
-	if other.xmin >= s.xmin && other.xmax <= s.xmax &&
-		other.ymin >= s.ymin && other.ymax <= s.ymax {
-		return SUPERSET
+	return INTERSECT_OR_SUPERSET
+}
+
+// return true if the segment covers the point
+func (s *SquareSegment) CoverPoint(x, y float64) bool {
+	if float64(s.xmin) <= x && float64(s.xmax) >= x &&
+		float64(s.ymin) <= y && float64(s.ymax) >= y {
+		return true
 	}
-	return INTERSECT
+	return false
+}
+
+func (s *SquareSegment) ToString() string {
+	return fmt.Sprintf("(%d %d %d %d)", s.xmin, s.xmax, s.ymin, s.ymax)
 }
 
 // Interval represents elements pushed into stree
 type Interval struct {
 	Id int // unique
 	SquareSegment
+}
+
+func (ival *Interval) SegmentEqual(other *Interval) bool {
+	return ival.SquareSegment.CompareTo(&other.SquareSegment) == EQUAL
+}
+
+func (ival *Interval) Print() {
+	fmt.Printf("(%d: %d %d %d %d)",
+		ival.Id,
+		ival.SquareSegment.xmin, ival.SquareSegment.xmax,
+		ival.SquareSegment.ymin, ival.SquareSegment.ymax)
+}
+
+func (ival *Interval) ToString() string {
+	return fmt.Sprintf("%d:%s", ival.Id, ival.SquareSegment.ToString())
 }
 
 type node struct {
@@ -98,6 +121,7 @@ func (n *node) ChildrenNotNil() []*node {
 func (n *node) Print() {
 	var termGreen string = "\x1b[32;1m"
 	var termNoColor string = "\x1b[0m"
+	// print segment
 	if n.IsLeaf() {
 		fmt.Printf("%s(%d %d %d %d)%s",
 			termGreen,
@@ -107,6 +131,11 @@ func (n *node) Print() {
 		fmt.Printf("(%d %d %d %d)",
 			n.segment.xmin, n.segment.xmax, n.segment.ymin, n.segment.ymax)
 	}
+	fmt.Printf("{")
+	for _, interval := range n.overlap {
+		interval.Print()
+	}
+	fmt.Printf("}")
 }
 
 func (n *node) IsLeaf() bool {
@@ -125,10 +154,35 @@ type stree struct {
 	ymax int // Max value of the second dimension of all intervals
 }
 
-func (t *stree) Push(x1, y1, x2, y2 int) {
+func (t *stree) Push(xmin, xmax, ymin, ymax int) {
+	new_interval := &Interval{t.count,
+		SquareSegment{xmin: xmin, xmax: xmax, ymin: ymin, ymax: ymax}}
+	t.count++
+
+	t.base = append(t.base, new_interval)
+	insertInterval(t.root, new_interval)
 }
 
-func (t *stree) Query(x, y int) {
+func (t *stree) Query(x, y float64) []*Interval {
+	result := make(map[int]*Interval)
+	querySingle(t.root, x, y, &result)
+
+	sl := make([]*Interval, 0, len(result))
+	for _, interval := range result {
+		sl = append(sl, interval)
+	}
+	return sl
+}
+
+func querySingle(node *node, x, y float64, result *map[int]*Interval) {
+	if node.segment.CoverPoint(x, y) {
+		for _, interval := range node.overlap {
+			(*result)[(*interval).Id] = interval
+		}
+		for _, child := range node.ChildrenNotNil() {
+			querySingle(child, x, y, result)
+		}
+	}
 }
 
 func (t *stree) SegmentArray() []*SquareSegment {
@@ -242,4 +296,17 @@ func NewTree(xmin, xmax, ymin, ymax int) Tree {
 	t.root = insertNodes(xmin, xmax, ymin, ymax, 0, nil)
 
 	return t
+}
+
+func insertInterval(node *node, interval *Interval) {
+	switch node.segment.CompareTo(&interval.SquareSegment) {
+	case EQUAL, SUBSET:
+		node.overlap = append(node.overlap, interval)
+	case INTERSECT_OR_SUPERSET:
+		for _, child := range node.ChildrenNotNil() {
+			insertInterval(child, interval)
+		}
+	case DISJOINT:
+		// do nothing
+	}
 }
