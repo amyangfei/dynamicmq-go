@@ -173,3 +173,20 @@ func TestPushAndQuery(t *testing.T) {
 		t.Errorf("error query count result %d for (5, 5), expected %d", count, len(expected))
 	}
 }
+
+func TestDelete(t *testing.T) {
+	tree := NewTree(0, 4, 0, 4)
+	intervals := make([]*Interval, 0)
+	intervals = append(intervals, tree.Push(0, 1, 0, 1))
+	intervals = append(intervals, tree.Push(1, 2, 1, 2))
+	intervals = append(intervals, tree.Push(1, 3, 1, 3))
+	intervals = append(intervals, tree.Push(0, 2, 0, 2))
+	intervals = append(intervals, tree.Push(2, 4, 2, 4))
+	intervals = append(intervals, tree.Push(2, 4, 1, 4))
+	intervals = append(intervals, tree.Push(0, 3, 0, 2))
+	tree.Print()
+	for _, interval := range intervals {
+		tree.Delete(interval)
+		tree.Print()
+	}
+}

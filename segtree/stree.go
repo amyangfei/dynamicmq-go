@@ -6,7 +6,9 @@ import (
 
 // Main interface to access the segment tree
 type Tree interface {
-	Push(xmin, ymin, xmax, ymax int) // Push new interval to tree
+	Push(xmin, ymin, xmax, ymax int) *Interval // Push new interval to tree
+
+	Delete(interval *Interval) // Delete specific Interval from tree
 
 	Count(x, y float64) int // Query the count of intervals that covers the given point
 
@@ -156,13 +158,40 @@ type stree struct {
 	ymax int // Max value of the second dimension of all intervals
 }
 
-func (t *stree) Push(xmin, xmax, ymin, ymax int) {
+func (t *stree) Push(xmin, xmax, ymin, ymax int) *Interval {
 	new_interval := &Interval{t.count,
 		SquareSegment{xmin: xmin, xmax: xmax, ymin: ymin, ymax: ymax}}
 	t.count++
 
 	t.base = append(t.base, new_interval)
 	insertInterval(t.root, new_interval)
+
+	return new_interval
+}
+
+func (t *stree) Delete(interval *Interval) {
+	deleteInterval(t.root, interval)
+}
+
+func deleteInterval(node *node, interval *Interval) {
+	switch node.segment.CompareTo(&interval.SquareSegment) {
+	case EQUAL, SUBSET:
+		// TODO: Time Complexity O(n), should be better
+		var idx int
+		for idx = 0; idx < len(node.overlap); idx++ {
+			if node.overlap[idx] == interval {
+				break
+			}
+		}
+		node.overlap[len(node.overlap)-1], node.overlap =
+			nil, append(node.overlap[:idx], node.overlap[idx+1:]...)
+	case INTERSECT_OR_SUPERSET:
+		for _, child := range node.ChildrenNotNil() {
+			deleteInterval(child, interval)
+		}
+	case DISJOINT:
+		// do nothing
+	}
 }
 
 func (t *stree) Count(x, y float64) int {
