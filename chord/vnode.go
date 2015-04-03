@@ -1,21 +1,23 @@
 package chord
 
 import (
-	"encoding/binary"
+	"math/big"
 )
 
-func (lvn *localVnode) init(idx int) {
-	lvn.genId(uint16(idx))
-	cfg := lvn.node.config
-	lvn.Host = cfg.Hostname
-	lvn.successors = make([]*Vnode, cfg.NumSuccessors)
+func (lvn *localVnode) init(curHash []byte) {
+	// lvn.Id = make([]byte, len(curHash))
+	lvn.Id = curHash[:]
+	lvn.Host = lvn.node.config.Hostname
+	lvn.successors = make([]*Vnode, lvn.node.config.NumSuccessors)
 }
 
-func (lvn *localVnode) genId(idx uint16) {
-	conf := lvn.node.config
-	hash := conf.HashFunc()
-	hash.Write([]byte(conf.Hostname))
-	binary.Write(hash, binary.BigEndian, idx)
+func HashJump(start []byte, step, maxhash *big.Int) []byte {
+	bi := big.NewInt(0)
+	bi.SetBytes(start)
+	bi.Add(bi, step)
 
-	lvn.Id = hash.Sum(nil)
+	if bi.Cmp(maxhash) > 0 {
+		bi.Sub(bi, maxhash)
+	}
+	return bi.Bytes()
 }

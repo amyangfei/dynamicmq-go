@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"sort"
 )
 
 func chgWorkdir(path string) error {
@@ -36,24 +35,29 @@ func createSerfevHelper(conf *NodeConfig) error {
 	return nil
 }
 
-func (n *Node) init(conf *NodeConfig) {
-	n.config = conf
-	n.vnodes = make([]*localVnode, conf.NumVnodes)
+func CreateNode(conf *NodeConfig) *Node {
+	node := &Node{config: conf}
+	node.init()
+	return node
+}
+
+func (n *Node) init() {
+	n.vnodes = make([]*localVnode, n.config.NumVnodes)
 
 	// change working dir
 	chgWorkdir(n.config.WorkDir)
 
-	createSerfevHelper(conf)
+	createSerfevHelper(n.config)
 
-	for i := 0; i < conf.NumVnodes; i++ {
+	curHash := n.config.startHash[:]
+	for i := 0; i < n.config.NumVnodes; i++ {
 		lvn := &localVnode{
 			node: n,
 		}
 		n.vnodes[i] = lvn
-		lvn.init(i)
+		lvn.init(curHash)
+		curHash = HashJump(curHash, step, maxhash)
 	}
-
-	sort.Sort(n)
 }
 
 // Len is the number of vnodes
@@ -189,7 +193,8 @@ func (n *Node) Shutdown() error {
 // Let serf agent join the serf cluster,
 // then broadcast local information to cluster
 func (n *Node) schdule() error {
-	if err := n.serfJoin(fakeSerfBind); err != nil {
+	var serfBind string = "127.0.0.1:7497"
+	if err := n.serfJoin(serfBind); err != nil {
 		return err
 	}
 	return nil

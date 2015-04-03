@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"hash"
 	"io"
+	"math/big"
 )
 
 type Notification struct {
@@ -31,6 +32,9 @@ type NodeConfig struct {
 	NumSuccessors int              // Number of successors to maintain
 	HashFunc      func() hash.Hash // Hash function to use
 	hashBits      int              // Bit size of hash function
+	startHash     []byte           // start hash value in hash ring
+	maxhash       *big.Int         // max hash value in hash ring
+	step          *big.Int         // hash interval for virtual node
 }
 
 // Represents an Vnode
@@ -44,13 +48,15 @@ type RTable struct {
 	vnodes []*Vnode
 }
 
+// Contains a virtual node
 type localVnode struct {
 	Vnode
-	node        *Node
-	successors  []*Vnode
-	predecessor *Vnode
+	node       *Node
+	successors []*Vnode
+	// predecessor *Vnode
 }
 
+// Node represents a physical node. It has NumVnodes of vnodes.
 type Node struct {
 	config *NodeConfig
 	vnodes []*localVnode
@@ -68,17 +74,33 @@ func DefaultConfig(hostname, serfname string) *NodeConfig {
 		Hostname:      hostname,
 		BindAddr:      "0.0.0.0:5000",
 		RPCAddr:       "127.0.0.1:5500",
-		NumVnodes:     8,
+		NumVnodes:     16,
 		NumSuccessors: 3,
 		HashFunc:      sha1.New,
 		hashBits:      160,
+		startHash:     make([]byte, 20),
 	}
+}
+
+func initHashConstant(conf *NodeConfig) {
+	maxHashBytes := make([]byte, conf.hashBits/8+1)
+	maxHashBytes[0] = 1
+	maxhash = big.NewInt(0)
+	maxhash.SetBytes(maxHashBytes)
+
+	minusBi := big.NewInt(int64(conf.NumVnodes))
+	step = big.NewInt(0)
+	step.SetBytes(maxhash.Bytes())
+	step.Div(step, minusBi)
+
+	conf.maxhash = maxhash
+	conf.step = step
 }
 
 // Create a new Chord node
 func Create(conf *NodeConfig, c chan Notification, logger io.Writer) (*Node, error) {
-	node := &Node{}
-	node.init(conf)
+	initHashConstant(conf)
+	node := CreateNode(conf)
 	// TODO: start routine running with serf agent
 	node.serfStart(c, logger)
 	return node, nil
