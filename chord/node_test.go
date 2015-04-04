@@ -10,7 +10,7 @@ var conf *NodeConfig
 func init() {
 	conf = DefaultConfig("localhost", "serf0101")
 
-	maxHashBytes := make([]byte, conf.hashBits/8+1)
+	maxHashBytes := make([]byte, conf.HashBits/8+1)
 	maxHashBytes[0] = 1
 	maxhash = big.NewInt(0)
 	maxhash.SetBytes(maxHashBytes)
@@ -26,7 +26,7 @@ func init() {
 
 func TestNodeCreate(t *testing.T) {
 	node := CreateNode(conf)
-	for _, vnode := range node.vnodes {
+	for _, vnode := range node.Vnodes {
 		t.Logf("%v", vnode.Id)
 	}
 }

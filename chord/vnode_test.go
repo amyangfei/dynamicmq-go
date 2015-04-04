@@ -30,7 +30,7 @@ func makeVnode() *localVnode {
 
 func TestVnodeInit(t *testing.T) {
 	vn := makeVnode()
-	vn.init(vn.node.config.startHash)
+	vn.init(vn.node.config.StartHash)
 	if len(vn.Id) != sha1.New().Size() {
 		t.Errorf("wrong virtual node id %v", vn.Id)
 	}

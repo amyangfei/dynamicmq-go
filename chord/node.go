@@ -22,7 +22,7 @@ func chgWorkdir(path string) error {
 }
 
 func createSerfevHelper(conf *NodeConfig) error {
-	fname := fmt.Sprintf("%s.evhelper.ini", conf.serf.NodeName)
+	fname := fmt.Sprintf("%s.evhelper.ini", conf.Serf.NodeName)
 	f, err := os.OpenFile(fname, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
@@ -42,63 +42,63 @@ func CreateNode(conf *NodeConfig) *Node {
 }
 
 func (n *Node) init() {
-	n.vnodes = make([]*localVnode, n.config.NumVnodes)
+	n.Vnodes = make([]*localVnode, n.config.NumVnodes)
 
 	// change working dir
 	chgWorkdir(n.config.WorkDir)
 
 	createSerfevHelper(n.config)
 
-	curHash := n.config.startHash[:]
+	curHash := n.config.StartHash[:]
 	for i := 0; i < n.config.NumVnodes; i++ {
 		lvn := &localVnode{
 			node: n,
 		}
-		n.vnodes[i] = lvn
+		n.Vnodes[i] = lvn
 		lvn.init(curHash)
-		curHash = HashJump(curHash, step, maxhash)
+		curHash = HashJump(curHash, n.config.step, n.config.maxhash)
 	}
 }
 
 // Len is the number of vnodes
 func (n *Node) Len() int {
-	return len(n.vnodes)
+	return len(n.Vnodes)
 }
 
 // Less returns whether the vnode with index i should sort
 // before the vnode with index j.
 func (n *Node) Less(i, j int) bool {
-	return bytes.Compare(n.vnodes[i].Id, n.vnodes[j].Id) == -1
+	return bytes.Compare(n.Vnodes[i].Id, n.Vnodes[j].Id) == -1
 }
 
 // Swap swaps the vnodes with indexes i and j.
 func (n *Node) Swap(i, j int) {
-	n.vnodes[i], n.vnodes[j] = n.vnodes[j], n.vnodes[i]
+	n.Vnodes[i], n.Vnodes[j] = n.Vnodes[j], n.Vnodes[i]
 }
 
 func (n *Node) serfStart(c chan Notification, logger io.Writer) {
 	args := make([]string, 0)
 	args = append(args, "agent")
-	if n.config.serf.NodeName != "" {
-		args = append(args, fmt.Sprintf("-node=%s", n.config.serf.NodeName))
+	if n.config.Serf.NodeName != "" {
+		args = append(args, fmt.Sprintf("-node=%s", n.config.Serf.NodeName))
 	}
-	if n.config.serf.BindAddr != "" {
-		args = append(args, fmt.Sprintf("-bind=%s", n.config.serf.BindAddr))
+	if n.config.Serf.BindAddr != "" {
+		args = append(args, fmt.Sprintf("-bind=%s", n.config.Serf.BindAddr))
 	}
-	if n.config.serf.RPCAddr != "" {
-		args = append(args, fmt.Sprintf("-rpc-addr=%s", n.config.serf.RPCAddr))
+	if n.config.Serf.RPCAddr != "" {
+		args = append(args, fmt.Sprintf("-rpc-addr=%s", n.config.Serf.RPCAddr))
 	}
-	if n.config.serf.EvHandler != "" {
-		args = append(args, fmt.Sprintf("-event-handler=%s", n.config.serf.EvHandler))
+	if n.config.Serf.EvHandler != "" {
+		args = append(args, fmt.Sprintf("-event-handler=%s", n.config.Serf.EvHandler))
 	}
-	if n.config.serf.ConfigFile != "" {
-		args = append(args, fmt.Sprintf("-config-file=%s", n.config.serf.ConfigFile))
+	if n.config.Serf.ConfigFile != "" {
+		args = append(args, fmt.Sprintf("-config-file=%s", n.config.Serf.ConfigFile))
 	}
-	if len(n.config.serf.Args) > 0 {
-		args = append(args, n.config.serf.Args...)
+	if len(n.config.Serf.Args) > 0 {
+		args = append(args, n.config.Serf.Args...)
 	}
 
-	cmd := exec.Command(n.config.serf.BinPath, args...)
+	cmd := exec.Command(n.config.Serf.BinPath, args...)
 	cmd.Env = os.Environ()[:]
 	var out bytes.Buffer
 	cmd.Stdout = logger
@@ -106,7 +106,7 @@ func (n *Node) serfStart(c chan Notification, logger io.Writer) {
 
 	go func() {
 		if err := cmd.Run(); err != nil {
-			c <- Notification{err: err, msg: out.String()}
+			c <- Notification{Err: err, Msg: out.String()}
 		}
 	}()
 }
@@ -114,11 +114,11 @@ func (n *Node) serfStart(c chan Notification, logger io.Writer) {
 func (n *Node) serfStop() error {
 	args := make([]string, 0)
 	args = append(args, "leave")
-	if n.config.serf.RPCAddr != "" {
-		args = append(args, fmt.Sprintf("-rpc-addr=%s", n.config.serf.RPCAddr))
+	if n.config.Serf.RPCAddr != "" {
+		args = append(args, fmt.Sprintf("-rpc-addr=%s", n.config.Serf.RPCAddr))
 	}
 
-	cmd := exec.Command(n.config.serf.BinPath, args...)
+	cmd := exec.Command(n.config.Serf.BinPath, args...)
 	cmd.Env = os.Environ()[:]
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -138,12 +138,12 @@ func (n *Node) serfStop() error {
 func (n *Node) serfJoin(addr string) error {
 	args := make([]string, 0)
 	args = append(args, "join")
-	if n.config.serf.RPCAddr != "" {
-		args = append(args, fmt.Sprintf("-rpc-addr=%s", n.config.serf.RPCAddr))
+	if n.config.Serf.RPCAddr != "" {
+		args = append(args, fmt.Sprintf("-rpc-addr=%s", n.config.Serf.RPCAddr))
 	}
 	args = append(args, addr)
 
-	cmd := exec.Command(n.config.serf.BinPath, args...)
+	cmd := exec.Command(n.config.Serf.BinPath, args...)
 	cmd.Env = os.Environ()[:]
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -157,22 +157,25 @@ func (n *Node) serfJoin(addr string) error {
 }
 
 // Call This function to send serf user event to serf cluster
-// Event Type:
-//	nodeinfo: information of chord physical node
-//	vnodeinfo: information of all vnodes that belongs to one chord physical node
+// evname, represents for event type, including:
+// 	 nodeinfo: information of chord physical node
+// 	 vnodeinfo: information of all vnodes that belongs to one chord physical node
+// coalesce:
+//   If coalesce is true, if many events of the same name are received within a
+//   short amount of time, the event handler is only invoked once.
 func (n *Node) serfUserEvent(evname, payload string, coalesce bool, c chan Notification) {
 	args := make([]string, 0)
 	args = append(args, "event")
 	if !coalesce {
 		args = append(args, "-coalesce=false")
 	}
-	if n.config.serf.RPCAddr != "" {
-		args = append(args, fmt.Sprintf("-rpc-addr=%s", n.config.serf.RPCAddr))
+	if n.config.Serf.RPCAddr != "" {
+		args = append(args, fmt.Sprintf("-rpc-addr=%s", n.config.Serf.RPCAddr))
 	}
 	args = append(args, evname)
 	args = append(args, payload)
 
-	cmd := exec.Command(n.config.serf.BinPath, args...)
+	cmd := exec.Command(n.config.Serf.BinPath, args...)
 	cmd.Env = os.Environ()[:]
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -180,7 +183,7 @@ func (n *Node) serfUserEvent(evname, payload string, coalesce bool, c chan Notif
 
 	if err := cmd.Run(); err != nil {
 		go func() {
-			c <- Notification{err: err, msg: out.String()}
+			c <- Notification{Err: err, Msg: out.String()}
 		}()
 	}
 }

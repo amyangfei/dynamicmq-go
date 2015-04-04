@@ -29,6 +29,7 @@ install_local_dep() {
     else
         go get -u -v github.com/amyangfei/dynamicmq-go/dynamicmq
         go get -u -v github.com/amyangfei/dynamicmq-go/sdk
+        go get -u -v github.com/amyangfei/dynamicmq-go/chord
     fi
 }
 

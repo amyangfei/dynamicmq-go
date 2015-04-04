@@ -8,22 +8,22 @@ import (
 )
 
 type Notification struct {
-	err error
-	msg string
+	Err error
+	Msg string
 }
 
 type SerfConfig struct {
 	BinPath    string   // Path of serf binary
 	NodeName   string   // Serf agent node name
 	BindAddr   string   // Serf agent bind address and port
-	RPCAddr    string   // Serf  RPC communications address and port
+	RPCAddr    string   // Serf RPC communications address and port
 	Args       []string // some other args
 	EvHandler  string   //event handler
 	ConfigFile string   // Path of configuration file that serf agent will load
 }
 
 type NodeConfig struct {
-	serf          *SerfConfig
+	Serf          *SerfConfig
 	Hostname      string           // Local host name
 	BindAddr      string           // Addr for message dispatching
 	WorkDir       string           // working dir
@@ -31,10 +31,11 @@ type NodeConfig struct {
 	NumVnodes     int              // Number of vnodes per physical node
 	NumSuccessors int              // Number of successors to maintain
 	HashFunc      func() hash.Hash // Hash function to use
-	hashBits      int              // Bit size of hash function
-	startHash     []byte           // start hash value in hash ring
+	HashBits      int              // Bit size of hash function
+	StartHash     []byte           // start hash value in hash ring
 	maxhash       *big.Int         // max hash value in hash ring
 	step          *big.Int         // hash interval for virtual node
+	Entrypoint    string           // arbitrary BindAddr of other node in cluseter, empty for the first launched node
 }
 
 // Represents an Vnode
@@ -59,12 +60,13 @@ type localVnode struct {
 // Node represents a physical node. It has NumVnodes of vnodes.
 type Node struct {
 	config *NodeConfig
-	vnodes []*localVnode
+	Vnodes []*localVnode
 }
 
 func DefaultConfig(hostname, serfname string) *NodeConfig {
 	return &NodeConfig{
-		serf: &SerfConfig{
+		Serf: &SerfConfig{
+			BinPath:    "/usr/local/bin/serf",
 			NodeName:   serfname,
 			BindAddr:   "0.0.0.0:7946",
 			RPCAddr:    "127.0.0.1:7373",
@@ -77,19 +79,19 @@ func DefaultConfig(hostname, serfname string) *NodeConfig {
 		NumVnodes:     16,
 		NumSuccessors: 3,
 		HashFunc:      sha1.New,
-		hashBits:      160,
-		startHash:     make([]byte, 20),
+		HashBits:      160,
+		StartHash:     make([]byte, 20),
 	}
 }
 
 func initHashConstant(conf *NodeConfig) {
-	maxHashBytes := make([]byte, conf.hashBits/8+1)
+	maxHashBytes := make([]byte, conf.HashBits/8+1)
 	maxHashBytes[0] = 1
-	maxhash = big.NewInt(0)
+	maxhash := big.NewInt(0)
 	maxhash.SetBytes(maxHashBytes)
 
 	minusBi := big.NewInt(int64(conf.NumVnodes))
-	step = big.NewInt(0)
+	step := big.NewInt(0)
 	step.SetBytes(maxhash.Bytes())
 	step.Div(step, minusBi)
 

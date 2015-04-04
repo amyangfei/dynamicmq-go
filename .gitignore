@@ -8,5 +8,6 @@ build/
 connector/connector
 authsrv/authsrv
 dispatcher/dispatcher
+match/datanode/datanode
 cmd/subscriber/subscriber
 cmd/pusher/pusher

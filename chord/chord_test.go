@@ -14,8 +14,7 @@ var serfLogFile = "./serfagent.log"
 func fastConf() *NodeConfig {
 	conf := DefaultConfig("localhost", "serf0101")
 	conf.WorkDir = "."
-	conf.serf.BinPath = "/usr/local/bin/serf"
-	conf.serf.Args = []string{"-log-level=info"}
+	conf.Serf.Args = []string{"-log-level=info"}
 	return conf
 }
 
@@ -48,11 +47,11 @@ func fakeSerf(c chan Notification) {
 	cmd.Stderr = &out
 
 	if err := cmd.Start(); err != nil {
-		c <- Notification{err: err, msg: out.String()}
+		c <- Notification{Err: err, Msg: out.String()}
 		return
 	}
 	if err := cmd.Wait(); err != nil {
-		c <- Notification{err: err, msg: out.String()}
+		c <- Notification{Err: err, Msg: out.String()}
 	}
 }
 
@@ -70,9 +69,9 @@ func fakeSerfLeave(c chan Notification) {
 	cmd.Stderr = &out
 
 	if err := cmd.Run(); err != nil {
-		c <- Notification{err: err, msg: out.String()}
+		c <- Notification{Err: err, Msg: out.String()}
 	}
-	c <- Notification{err: nil, msg: out.String()}
+	c <- Notification{Err: nil, Msg: out.String()}
 }
 
 func TestCreateShutdown(t *testing.T) {
@@ -92,9 +91,9 @@ func TestCreateShutdown(t *testing.T) {
 	go func() {
 		for {
 			notify := <-c
-			if notify.err != nil {
+			if notify.Err != nil {
 				// only record the error log from serf
-				t.Logf("serf minor error %v: %s", notify.err, notify.msg)
+				t.Logf("serf minor error %v: %s", notify.Err, notify.Msg)
 			}
 		}
 	}()
@@ -126,8 +125,8 @@ func TestLifeCycle(t *testing.T) {
 	go func() {
 		for {
 			notify := <-c
-			if notify.err != nil {
-				t.Logf("serf minor error %v: %s", notify.err, notify.msg)
+			if notify.Err != nil {
+				t.Logf("serf minor error %v: %s", notify.Err, notify.Msg)
 			}
 		}
 	}()

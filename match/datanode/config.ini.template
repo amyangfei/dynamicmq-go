@@ -1,0 +1,22 @@
+[basic]
+bind_ip = 127.0.0.1
+workdir = .
+log_level = DEBUG
+log_file = ./datanode.log
+pid_file = ./datanode.pid
+
+[serf]
+bin_path = /usr/local/bin/template
+node_name = serf0101
+bind_port = 7946
+rpc_addr = 127.0.0.1:7373
+ev_handler = ./serfev_handler.py
+log_file = ./serf.log
+
+[chord]
+hostname = chod0101
+bind_port = 5000
+rpc_addr = 127.0.0.1:5500
+num_vnodes = 16
+num_successors = 3
+hash_bits = 160
