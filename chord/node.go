@@ -3,6 +3,8 @@ package chord
 import (
 	"bufio"
 	"bytes"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -158,7 +160,45 @@ func (n *Node) serfSchdule(c chan Notification, logger io.Writer) error {
 		}
 	}
 
-	// TODO: broadcast self node information
+	// broadcast node information
+	if info, err := n.Nodeinfo(); err != nil {
+		return err
+	} else {
+		n.SerfUserEvent(serf_userev_nodeinfo, string(info), false, c)
+	}
+
+	// broadcast node's virtual nodes information
+	if info, err := n.Vnodeinfo(); err != nil {
+		return err
+	} else {
+		n.SerfUserEvent(serf_userev_vnodeinfo, string(info), false, c)
+	}
 
 	return nil
+}
+
+// return a json string represents chord node information
+func (n *Node) Nodeinfo() ([]byte, error) {
+	info := make(map[string]string)
+	info["hostname"] = n.config.Hostname
+	info["bindaddr"] = n.config.BindAddr
+	info["rpcaddr"] = n.config.RPCAddr
+	info["starthash"] = hex.EncodeToString(n.config.StartHash)
+
+	return json.Marshal(&info)
+}
+
+// TODO: Support vnode information broadcasting with any packet size.
+// Currently we don't support broadcasting vnode info larger than 512 byte.
+// because serf has data size limitation with UserEventSizeLimit = 512 byte
+func (n *Node) Vnodeinfo() ([]byte, error) {
+	info := make(map[string][]byte)
+	info["hostname"] = []byte(n.config.Hostname)
+	ids := make([]byte, 0)
+	for _, vnode := range n.Vnodes {
+		ids = append(ids, vnode.Id...)
+	}
+	info["vnode"] = ids
+
+	return json.Marshal(&info)
 }

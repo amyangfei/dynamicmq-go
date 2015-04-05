@@ -2,6 +2,7 @@ package chord
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,6 +17,7 @@ func fastConf() *NodeConfig {
 	conf := DefaultConfig("localhost", "serf0101")
 	conf.WorkDir = "."
 	conf.Serf.Args = []string{"-log-level=info"}
+	conf.StartHash, _ = hex.DecodeString("aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d")
 	return conf
 }
 

@@ -9,3 +9,8 @@ var (
 var (
 	serf_agent_alive = "alive"
 )
+
+var (
+	serf_userev_nodeinfo  = "nodeinfo"
+	serf_userev_vnodeinfo = "vnodeinfo"
+)
