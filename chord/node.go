@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
+	"strings"
 )
 
 func chgWorkdir(path string) error {
@@ -76,84 +76,35 @@ func (n *Node) Swap(i, j int) {
 	n.Vnodes[i], n.Vnodes[j] = n.Vnodes[j], n.Vnodes[i]
 }
 
-func (n *Node) serfStart(c chan Notification, logger io.Writer) {
-	args := make([]string, 0)
-	args = append(args, "agent")
+func (n *Node) SerfStart(c chan Notification, logger io.Writer) {
+	params := make(map[string]string)
 	if n.config.Serf.NodeName != "" {
-		args = append(args, fmt.Sprintf("-node=%s", n.config.Serf.NodeName))
+		params["node"] = n.config.Serf.NodeName
 	}
 	if n.config.Serf.BindAddr != "" {
-		args = append(args, fmt.Sprintf("-bind=%s", n.config.Serf.BindAddr))
+		params["bind"] = n.config.Serf.BindAddr
 	}
 	if n.config.Serf.RPCAddr != "" {
-		args = append(args, fmt.Sprintf("-rpc-addr=%s", n.config.Serf.RPCAddr))
+		params["rpc-addr"] = n.config.Serf.RPCAddr
 	}
 	if n.config.Serf.EvHandler != "" {
-		args = append(args, fmt.Sprintf("-event-handler=%s", n.config.Serf.EvHandler))
+		params["event-handler"] = n.config.Serf.EvHandler
 	}
 	if n.config.Serf.ConfigFile != "" {
-		args = append(args, fmt.Sprintf("-config-file=%s", n.config.Serf.ConfigFile))
-	}
-	if len(n.config.Serf.Args) > 0 {
-		args = append(args, n.config.Serf.Args...)
+		params["config-file"] = n.config.Serf.ConfigFile
 	}
 
-	cmd := exec.Command(n.config.Serf.BinPath, args...)
-	cmd.Env = os.Environ()[:]
-	var out bytes.Buffer
-	cmd.Stdout = logger
-	cmd.Stderr = &out
-
-	go func() {
-		if err := cmd.Run(); err != nil {
-			c <- Notification{Err: err, Msg: out.String()}
-		}
-	}()
+	serfStart(c, logger, n.config.Serf.BinPath, params, n.config.Serf.Args)
 }
 
-func (n *Node) serfStop() error {
-	args := make([]string, 0)
-	args = append(args, "leave")
-	if n.config.Serf.RPCAddr != "" {
-		args = append(args, fmt.Sprintf("-rpc-addr=%s", n.config.Serf.RPCAddr))
-	}
-
-	cmd := exec.Command(n.config.Serf.BinPath, args...)
-	cmd.Env = os.Environ()[:]
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-
-	if err := cmd.Run(); err != nil {
-		// "client closed" error may occur, ignore it
-	}
-
-	fmt.Printf("stop serf output: %s\n", out.String())
-
-	return nil
+func (n *Node) SerfStop() error {
+	return serfStop(n.config.Serf.BinPath, n.config.Serf.RPCAddr)
 }
 
 // Call This function to tell serf running on this node to join the cluster
 // addr is an arbitrary serf bind address of nodes in Chord ring
-func (n *Node) serfJoin(addr string) error {
-	args := make([]string, 0)
-	args = append(args, "join")
-	if n.config.Serf.RPCAddr != "" {
-		args = append(args, fmt.Sprintf("-rpc-addr=%s", n.config.Serf.RPCAddr))
-	}
-	args = append(args, addr)
-
-	cmd := exec.Command(n.config.Serf.BinPath, args...)
-	cmd.Env = os.Environ()[:]
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%v: %s", err, out.String())
-	}
-
-	return nil
+func (n *Node) SerfJoin(addr string) error {
+	return serfJoin(n.config.Serf.BinPath, n.config.Serf.RPCAddr, addr)
 }
 
 // Call This function to send serf user event to serf cluster
@@ -163,42 +114,51 @@ func (n *Node) serfJoin(addr string) error {
 // coalesce:
 //   If coalesce is true, if many events of the same name are received within a
 //   short amount of time, the event handler is only invoked once.
-func (n *Node) serfUserEvent(evname, payload string, coalesce bool, c chan Notification) {
-	args := make([]string, 0)
-	args = append(args, "event")
-	if !coalesce {
-		args = append(args, "-coalesce=false")
-	}
+func (n *Node) SerfUserEvent(evname, payload string, coalesce bool, c chan Notification) {
+	params := make(map[string]string)
+	params["coalesce"] = "false"
 	if n.config.Serf.RPCAddr != "" {
-		args = append(args, fmt.Sprintf("-rpc-addr=%s", n.config.Serf.RPCAddr))
+		params["rpc-addr"] = n.config.Serf.RPCAddr
 	}
-	args = append(args, evname)
-	args = append(args, payload)
-
-	cmd := exec.Command(n.config.Serf.BinPath, args...)
-	cmd.Env = os.Environ()[:]
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-
-	if err := cmd.Run(); err != nil {
-		go func() {
-			c <- Notification{Err: err, Msg: out.String()}
-		}()
-	}
+	serfUserEvent(n.config.Serf.BinPath, evname, payload, params, c)
 }
 
 func (n *Node) Shutdown() error {
-	err := n.serfStop()
+	err := n.SerfStop()
 	return err
 }
 
-// Let serf agent join the serf cluster,
-// then broadcast local information to cluster
-func (n *Node) schdule() error {
-	var serfBind string = "127.0.0.1:7497"
-	if err := n.serfJoin(serfBind); err != nil {
-		return err
+func (n *Node) serfSchdule(c chan Notification, logger io.Writer) error {
+	// start serf agent
+	n.SerfStart(c, logger)
+
+	// try to detect member's aliveness for three times
+	retry_count := 3
+	for i := 0; i < retry_count; i++ {
+		msg, err := checkMemberAlive(n.config.Serf.BinPath, n.config.Serf.RPCAddr)
+		if err == nil {
+			if strings.Contains(msg, n.config.Serf.NodeName) &&
+				strings.Contains(msg, serf_agent_alive) {
+				break
+			}
+		}
+		if i == retry_count-1 {
+			if err != nil {
+				return fmt.Errorf("%v: %s", err, msg)
+			} else {
+				return fmt.Errorf("alive not detected: %s", msg)
+			}
+		}
 	}
+
+	// if not the first launched serf agent, join the cluster
+	if n.config.Entrypoint != "" {
+		if err := n.SerfJoin(n.config.Entrypoint); err != nil {
+			return err
+		}
+	}
+
+	// TODO: broadcast self node information
+
 	return nil
 }

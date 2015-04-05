@@ -6,10 +6,11 @@ import (
 	"os"
 	"os/exec"
 	"testing"
-	"time"
 )
 
 var serfLogFile = "./serfagent.log"
+var fakeSerfBind string = "127.0.0.1:7497"
+var fakeSerfRPC string = "127.0.0.1:7374"
 
 func fastConf() *NodeConfig {
 	conf := DefaultConfig("localhost", "serf0101")
@@ -17,9 +18,6 @@ func fastConf() *NodeConfig {
 	conf.Serf.Args = []string{"-log-level=info"}
 	return conf
 }
-
-var fakeSerfBind string = "127.0.0.1:7497"
-var fakeSerfRPC string = "127.0.0.1:7374"
 
 func fakeSerfConf() *SerfConfig {
 	return &SerfConfig{
@@ -98,7 +96,6 @@ func TestCreateShutdown(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(time.Millisecond * time.Duration(100))
 	if n != nil {
 		err := n.Shutdown()
 		if err != nil {
@@ -108,18 +105,23 @@ func TestCreateShutdown(t *testing.T) {
 }
 
 func TestLifeCycle(t *testing.T) {
-	conf := fastConf()
 	c := make(chan Notification)
+
+	// start a serf agent as first node in cluster
+	go fakeSerf(c)
+
+	conf := fastConf()
+	conf.Entrypoint = fakeSerfBind
 	logger, err := os.OpenFile(serfLogFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
 		t.Errorf("failed to open file %s with error: %v", serfLogFile, err)
 		return
 	}
+
 	n, err := Create(conf, c, logger)
 	if err != nil {
 		t.Errorf("failed to create node %v", err)
 	}
-	go fakeSerf(c)
 
 	// monitor notification channel
 	go func() {
@@ -131,14 +133,7 @@ func TestLifeCycle(t *testing.T) {
 		}
 	}()
 
-	// FIXME: short time wait for serf agent startup
-	time.Sleep(time.Millisecond * time.Duration(100))
-	if err := n.serfJoin(fakeSerfBind); err != nil {
-		t.Errorf("serf join error: %v", err)
-	}
-
-	n.serfUserEvent("nodeinfo", "testpayload", false, c)
-	time.Sleep(time.Millisecond * time.Duration(100))
+	n.SerfUserEvent("nodeinfo", "testpayload", false, c)
 
 	if n != nil {
 		err := n.Shutdown()

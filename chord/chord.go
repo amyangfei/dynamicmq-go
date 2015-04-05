@@ -104,12 +104,6 @@ func Create(conf *NodeConfig, c chan Notification, logger io.Writer) (*Node, err
 	initHashConstant(conf)
 	node := CreateNode(conf)
 	// TODO: start routine running with serf agent
-	node.serfStart(c, logger)
-	return node, nil
-}
-
-// Joins an existing Chord ring
-// serfAddr is an arbitrary serf bind address of nodes in Chord ring
-func Join(node *Node, serfAddr string) error {
-	return nil
+	err := node.serfSchdule(c, logger)
+	return node, err
 }
