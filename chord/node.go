@@ -3,13 +3,46 @@ package chord
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
+	"github.com/op/go-logging"
 	"io"
+	"net"
 	"os"
 	"strings"
+	"time"
 )
+
+type StatusClient struct {
+	hostname   string
+	expire     int64
+	conn       net.Conn
+	processBuf []byte
+	processEnd int
+}
+
+type DecodedMsg struct {
+	extra   uint8
+	bodyLen uint16
+	items   map[uint8]string
+}
+
+var (
+	DfltExpire int64 = 15 * 60
+)
+
+type HandleMsgFunc struct {
+	validate func(msg *DecodedMsg, n *Node) error
+	process  func(msg *DecodedMsg, n *Node) error
+}
+
+var StatusCmdTable = map[uint8]HandleMsgFunc{
+	dmq.SDDMsgCmdNodeInfo:  HandleMsgFunc{validate: validateNodeInfoMsg, process: processNodeInfoMsg},
+	dmq.SDDMsgCmdVNodeInfo: HandleMsgFunc{validate: validateVNodeInfoMsg, process: processVNodeInfoMsg},
+}
 
 func chgWorkdir(path string) error {
 	if path == "" {
@@ -60,6 +93,10 @@ func (n *Node) init() {
 		lvn.init(curHash)
 		curHash = HashJump(curHash, n.config.step, n.config.maxhash)
 	}
+}
+
+func (n *Node) SetLogger(log *logging.Logger) {
+	n.log = log
 }
 
 // Len is the number of vnodes
@@ -201,4 +238,196 @@ func (n *Node) Vnodeinfo() ([]byte, error) {
 	info["vnode"] = ids
 
 	return json.Marshal(&info)
+}
+
+// Public interface for node/vnode information and status broadcasting
+// FIXME: use generic log interface
+func (n *Node) StartStatusTcp() {
+	go n.statusTcpListen()
+}
+
+func (n *Node) statusTcpListen() {
+	log := n.log
+	bind := n.config.BindAddr
+	addr, err := net.ResolveTCPAddr("tcp", n.config.BindAddr)
+	if err != nil {
+		log.Error("net.ResolveTCPAddr(%s) error", bind)
+		panic(err)
+	}
+
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		log.Error("net.ListenTCP(%s) error", bind, err)
+		panic(err)
+	}
+	// free the listener
+	defer func() {
+		log.Info("tcp addr: %s close", bind)
+		if err := l.Close(); err != nil {
+			log.Error("listener.Close() error(%v)", err)
+		}
+	}()
+
+	// init reader buffer instance
+	recvTcpBufCache := dmq.NewTcpBufCache(n.config.TCPBufInsNum, n.config.TCPBufioNum)
+	for {
+		conn, err := l.AcceptTCP()
+		if err != nil {
+			log.Error("listener.AcceptTCP() error(%v)", err)
+			continue
+		}
+		if err = conn.SetKeepAlive(true); err != nil {
+			log.Error("conn.SetKeepAlive() error(%v)", err)
+			conn.Close()
+			continue
+		}
+		if err = conn.SetReadBuffer(n.config.TCPRecvBufSize * 2); err != nil {
+			log.Error("conn.SetReadBuffer(%d) error(%v)",
+				n.config.TCPRecvBufSize, err)
+			conn.Close()
+			continue
+		}
+		if err = conn.SetWriteBuffer(n.config.TCPSendBufSize * 2); err != nil {
+			log.Error("conn.SetWriteBuffer(%d) error(%v)",
+				n.config.TCPSendBufSize, err)
+			conn.Close()
+			continue
+		}
+		statusCli := &StatusClient{
+			expire:     time.Now().Unix() + DfltExpire,
+			conn:       conn,
+			processBuf: make([]byte, n.config.TCPRecvBufSize*2),
+			processEnd: 0,
+		}
+		rc := recvTcpBufCache.Get()
+		go n.handleStatusTCPconn(statusCli, rc)
+	}
+}
+
+func (n *Node) handleStatusTCPconn(cli *StatusClient, rc chan *bufio.Reader) {
+	log := n.log
+	addr := cli.conn.RemoteAddr().String()
+	log.Debug("handleStatusTCPconn(%s) routine start", addr)
+
+	for {
+		timeout := time.Now().Add(time.Second * time.Duration(DfltExpire))
+		if err := cli.conn.SetReadDeadline(timeout); err != nil {
+			log.Error("StatusClient set timeout error(%v)", err)
+			break
+		}
+		rd := dmq.NewBufioReader(rc, cli.conn, n.config.TCPRecvBufSize)
+		rlen, err := rd.Read(cli.processBuf[cli.processEnd:])
+		dmq.RecycleBufioReader(rc, rd)
+		if err != nil {
+			if err == io.EOF {
+				log.Info("addr: %s close connection", addr)
+				return
+			} else {
+				log.Error("addr: %s read with error(%v)", addr, err)
+				break
+			}
+		} else {
+			err := n.processReadbuf(cli, cli.processBuf[:cli.processEnd+rlen])
+			if err != nil && err != ProcessLater {
+				log.Error("process conn readbuf error(%v)", err)
+				break
+			}
+		}
+	}
+
+	// close the connection
+	if err := cli.conn.Close(); err != nil {
+		log.Error("addr: %s conn.Close() error(%v)", addr, err)
+	}
+	log.Debug("addr: %s handleStatusTCPconn routine stop", addr)
+}
+
+func (n *Node) processReadbuf(cli *StatusClient, buf []byte) error {
+	log := n.log
+	var remaining uint16 = uint16(len(buf))
+	for {
+		if remaining == 0 {
+			return nil
+		}
+		if remaining < dmq.SDDMsgHeaderSize {
+			return ProcessLater
+		}
+		start := uint16(len(buf)) - remaining
+		var cmd uint8 = buf[start]
+		var bodyLen uint16 = binary.BigEndian.Uint16(buf[start+dmq.SDDMsgCmdSize:])
+		if bodyLen > dmq.SDDMsgMaxBodyLen {
+			cli.processEnd = 0
+			log.Error("invalid request, invalid body length: %d", bodyLen)
+			return fmt.Errorf("invalid msg body len")
+		}
+		if remaining >= dmq.SDDMsgHeaderSize+bodyLen {
+			decMsg, err := binaryMsgDecode(buf[start:], bodyLen)
+			remaining -= (dmq.SDDMsgHeaderSize + bodyLen)
+			if err != nil {
+				log.Error("invalid request error(%v)", err)
+				continue
+			}
+			if processFunc, ok := StatusCmdTable[cmd]; ok {
+				if err := processFunc.validate(decMsg, n); err != nil {
+					log.Error("cmd %d request valid error(%v)", cmd, err)
+				} else {
+					processFunc.process(decMsg, n)
+				}
+			} else {
+				log.Error("cmd: %d not support", cmd)
+			}
+		} else {
+			return ProcessLater
+		}
+	}
+	return nil
+}
+
+func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
+	var extra uint8 = msg[dmq.SDDMsgCmdSize+dmq.SDDMsgBodySize]
+	decMsg := DecodedMsg{
+		extra: extra, bodyLen: bodyLen, items: make(map[uint8]string, 0),
+	}
+
+	totalLen := dmq.SDDMsgHeaderSize + bodyLen
+	offset := dmq.SDDMsgHeaderSize
+	for offset < totalLen {
+		if offset+dmq.SDDMsgItemHeaderSize > totalLen {
+			return nil, fmt.Errorf("invalid item header length")
+		}
+		itemLen := binary.BigEndian.Uint16(msg[offset+dmq.SDDMsgItemIdSize:])
+		if itemLen+dmq.SDDMsgItemHeaderSize+offset > totalLen {
+			return nil, fmt.Errorf("invalid item body length")
+		}
+		var itemId uint8 = msg[offset]
+		decMsg.items[itemId] = string(
+			msg[offset+dmq.SDDMsgItemHeaderSize : offset+dmq.SDDMsgItemHeaderSize+itemLen])
+		offset += dmq.SDDMsgItemHeaderSize + itemLen
+	}
+
+	return &decMsg, nil
+}
+
+func validateNodeInfoMsg(msg *DecodedMsg, n *Node) error {
+	return nil
+}
+
+func processNodeInfoMsg(msg *DecodedMsg, n *Node) error {
+	return nil
+}
+
+func validateVNodeInfoMsg(msg *DecodedMsg, n *Node) error {
+	return nil
+}
+
+func processVNodeInfoMsg(msg *DecodedMsg, n *Node) error {
+	return nil
+}
+
+// Public interface for messages delivery
+func (n *Node) StartMsgTcp(log *logging.Logger) {
+	go n.msgTcpListen(log)
+}
+
+func (n *Node) msgTcpListen(log *logging.Logger) {
 }

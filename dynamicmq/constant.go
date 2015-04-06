@@ -100,3 +100,27 @@ var (
 
 	DRMsgSubInfoSep = ","
 )
+
+// Message protocol from local serf handler or datanode to datanode
+var (
+	SDDMsgCmdSize        uint16 = 1
+	SDDMsgBodySize       uint16 = 2
+	SDDMsgExtraSize      uint16 = 1
+	SDDMsgHeaderSize     uint16 = SDDMsgCmdSize + SDDMsgBodySize + SDDMsgExtraSize
+	SDDMsgItemIdSize     uint16 = 1
+	SDDMsgItemBodySize   uint16 = 2
+	SDDMsgItemHeaderSize uint16 = SDDMsgItemIdSize + SDDMsgItemBodySize
+	SDDMsgMaxBodyLen     uint16 = 2000
+
+	// command
+	SDDMsgCmdNodeInfo  uint8 = 1
+	SDDMsgCmdVNodeInfo uint8 = 2
+
+	// Message body item id
+	SDDMsgItemHostnameId  uint8 = 1
+	SDDMsgItemBindAddrId  uint8 = 2
+	SDDMsgItemRPCAddrId   uint8 = 3
+	SDDMsgItemStartHashId uint8 = 4
+	SDDMsgItemSerfNodeId  uint8 = 5
+	SDDMsgItemVNodeListId uint8 = 6
+)

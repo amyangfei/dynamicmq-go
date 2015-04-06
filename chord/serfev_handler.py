@@ -22,7 +22,7 @@ def get_serf_node():
     return os.environ.get('SERF_SELF_NAME', '')
 
 
-# This function should raises Exception when error happens, so we should catch
+# This function could raises Exception when error happens, so we should catch
 # Exception when we call this function
 def parse_serf_helper(serf_node, section, item):
     cfg_name = '{0}.evhelper.ini'.format(serf_node)
@@ -32,21 +32,25 @@ def parse_serf_helper(serf_node, section, item):
 
 
 class DefaultHandler(SerfHandler):
+    def __init__(self):
+        super(SerfHandler, self).__init__()
+        self.serf_node = get_serf_node()
+        self.logfile = "py-serf-master.{}.log".format(self.serf_node)
+
     def nodeinfo(self):
-        serf_node = get_serf_node()
         try:
             rpc_addr = parse_serf_helper(
-                    serf_node, cfg_sect_node, cfg_item_rpcaddr)
+                    self.serf_node, cfg_sect_node, cfg_item_rpcaddr)
         except (KeyError, ConfigParser.NoSectionError,ConfigParser.NoOptionError) as e:
             print e
-        with open('py-serf-master.log', 'a+') as f:
+        with open(self.logfile, 'a+') as f:
             f.write('nodeinfo event detected...\n')
             payload = read_from_stdin()
             f.write('send payload: {0} to {1}'.format(payload, rpc_addr))
             f.write('\n')
 
     def vnodeinfo(self):
-        with open('py-serf-master.log', 'a+') as f:
+        with open(self.logfile, 'a+') as f:
             f.write('vnodeinfo event detected...\n')
             for line in sys.stdin:
                 line = line[:line.rindex('\n')-1]

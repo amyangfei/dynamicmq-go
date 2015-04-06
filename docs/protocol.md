@@ -91,3 +91,28 @@
             #<subsequence message length(number of bytes)> CR LF
             <message content json string> CR LF
 
+
+## Matcher
+
+1. Status message
+    * Message binary protocol
+        * Message header
+            * 1 byte message comamnd type
+            * 2 byte message body length
+            * 1 byte message extra field
+        * Message body contains one or more items, total length equals to body length in header
+            * Item header
+                * 1 byte item id
+                * 2 byte item body length
+            * Item body
+                * Lenght equals to body length in item header
+    * MaxBodyLength 2000
+    * ExtraField, not use now
+    * Body item id
+        * HostnameId  1
+        * BindAddrId  2
+        * RPCAddrId   3
+        * StartHashId 4
+        * SerfNodeId  5
+        * VnodeListId 6
+

@@ -2,10 +2,14 @@ package main
 
 type SrvConfig struct {
 	// basic config
-	BindIp   string
-	LogLevel string
-	LogFile  string
-	PidFile  string
+	BindIp         string
+	LogLevel       string
+	LogFile        string
+	PidFile        string
+	TCPRecvBufSize int
+	TCPSendBufSize int
+	TCPBufInsNum   int
+	TCPBufioNum    int
 
 	// serf config
 	SerfBinPath   string

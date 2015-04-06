@@ -1,5 +1,9 @@
 package chord
 
+import (
+	"errors"
+)
+
 // Serf event-handler helper
 var (
 	cfg_sect_node    = "node"
@@ -13,4 +17,8 @@ var (
 var (
 	serf_userev_nodeinfo  = "nodeinfo"
 	serf_userev_vnodeinfo = "vnodeinfo"
+)
+
+var (
+	ProcessLater = errors.New("process Later")
 )

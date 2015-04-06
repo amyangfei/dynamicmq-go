@@ -12,11 +12,11 @@ func init() {
 
 	maxHashBytes := make([]byte, conf.HashBits/8+1)
 	maxHashBytes[0] = 1
-	maxhash = big.NewInt(0)
+	maxhash := big.NewInt(0)
 	maxhash.SetBytes(maxHashBytes)
 
 	minusBi := big.NewInt(int64(conf.NumVnodes))
-	step = big.NewInt(0)
+	step := big.NewInt(0)
 	step.SetBytes(maxhash.Bytes())
 	step.Div(step, minusBi)
 

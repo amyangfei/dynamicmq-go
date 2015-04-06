@@ -10,6 +10,7 @@ import (
 	"github.com/op/go-logging"
 	"github.com/rakyll/globalconf"
 	"os"
+	"runtime"
 	"strconv"
 	"time"
 )
@@ -32,6 +33,9 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 	basicFlagSet.String("log_level", "DEBUG", "log level")
 	basicFlagSet.String("log_file", "./datanode.log", "log file path")
 	basicFlagSet.String("pid_file", "./datanode_pid", "pid file")
+	basicFlagSet.Int("tcp_recvbuf_size", 2048, "tcp receive buffer size")
+	basicFlagSet.Int("tcp_sendbuf_size", 2048, "tcp send buffer size")
+	basicFlagSet.Int("tcp_bufio_num", 64, "bufio num for each cache instance")
 
 	serfFlagSet := flag.NewFlagSet("basic", flag.PanicOnError)
 	serfFlagSet.String("bin_path", "/usr/local/bin/path", "serf bin path")
@@ -62,6 +66,13 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 	Config.LogLevel = basicFlagSet.Lookup("log_level").Value.String()
 	Config.LogFile = basicFlagSet.Lookup("log_file").Value.String()
 	Config.PidFile = basicFlagSet.Lookup("pid_file").Value.String()
+	Config.TCPRecvBufSize, err =
+		strconv.Atoi(basicFlagSet.Lookup("tcp_recvbuf_size").Value.String())
+	Config.TCPSendBufSize, err =
+		strconv.Atoi(basicFlagSet.Lookup("tcp_sendbuf_size").Value.String())
+	Config.TCPBufioNum, err =
+		strconv.Atoi(basicFlagSet.Lookup("tcp_bufio_num").Value.String())
+	Config.TCPBufInsNum = runtime.NumCPU()
 
 	Config.SerfBinPath = serfFlagSet.Lookup("bin_path").Value.String()
 	Config.SerfNodeName = serfFlagSet.Lookup("node_name").Value.String()
@@ -84,6 +95,9 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 		strconv.Atoi(chordFlagSet.Lookup("hash_bits").Value.String())
 
 	Config.Entrypoint = entrypoint
+	if len(starthash)%2 == 1 {
+		starthash = "0" + starthash
+	}
 	if sh, err := hex.DecodeString(starthash); err != nil {
 		return err
 	} else if len(sh) != Config.HashBits/8 {
@@ -131,14 +145,19 @@ func chordRoutine() {
 			RPCAddr:   Config.SerfRPCAddr,
 			EvHandler: Config.SerfEvHandler,
 		},
-		Hostname:      Config.Hostname,
-		BindAddr:      Config.BindAddr,
-		RPCAddr:       Config.RPCAddr,
-		NumVnodes:     Config.NumVnodes,
-		NumSuccessors: Config.NumSuccessors,
-		HashFunc:      sha1.New,
-		HashBits:      Config.HashBits,
-		StartHash:     Config.StartHash,
+		Hostname:       Config.Hostname,
+		BindAddr:       Config.BindAddr,
+		RPCAddr:        Config.RPCAddr,
+		NumVnodes:      Config.NumVnodes,
+		NumSuccessors:  Config.NumSuccessors,
+		HashFunc:       sha1.New,
+		HashBits:       Config.HashBits,
+		StartHash:      Config.StartHash,
+		Entrypoint:     Config.Entrypoint,
+		TCPRecvBufSize: Config.TCPRecvBufSize,
+		TCPSendBufSize: Config.TCPSendBufSize,
+		TCPBufInsNum:   Config.TCPBufInsNum,
+		TCPBufioNum:    Config.TCPBufioNum,
 	}
 
 	c := make(chan chord.Notification)
@@ -146,6 +165,7 @@ func chordRoutine() {
 	if err != nil {
 		panic(err)
 	}
+	n.SetLogger(log)
 
 	for idx, vnode := range n.Vnodes {
 		log.Debug("vnode %d Id %v", idx, vnode.Id)

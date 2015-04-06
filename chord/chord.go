@@ -2,9 +2,11 @@ package chord
 
 import (
 	"crypto/sha1"
+	"github.com/op/go-logging"
 	"hash"
 	"io"
 	"math/big"
+	"runtime"
 )
 
 type Notification struct {
@@ -36,6 +38,11 @@ type NodeConfig struct {
 	maxhash       *big.Int         // max hash value in hash ring
 	step          *big.Int         // hash interval for virtual node
 	Entrypoint    string           // arbitrary BindAddr of other node in cluseter, empty for the first launched node
+
+	TCPRecvBufSize int
+	TCPSendBufSize int
+	TCPBufInsNum   int
+	TCPBufioNum    int
 }
 
 // Represents an Vnode
@@ -61,6 +68,7 @@ type localVnode struct {
 type Node struct {
 	config *NodeConfig
 	Vnodes []*localVnode
+	log    *logging.Logger
 }
 
 func DefaultConfig(hostname, serfname string) *NodeConfig {
@@ -73,14 +81,18 @@ func DefaultConfig(hostname, serfname string) *NodeConfig {
 			EvHandler:  "./serfev_handler.py",
 			ConfigFile: "",
 		},
-		Hostname:      hostname,
-		BindAddr:      "0.0.0.0:5000",
-		RPCAddr:       "127.0.0.1:5500",
-		NumVnodes:     16,
-		NumSuccessors: 3,
-		HashFunc:      sha1.New,
-		HashBits:      160,
-		StartHash:     make([]byte, 20),
+		Hostname:       hostname,
+		BindAddr:       "0.0.0.0:5000",
+		RPCAddr:        "127.0.0.1:5500",
+		NumVnodes:      16,
+		NumSuccessors:  3,
+		HashFunc:       sha1.New,
+		HashBits:       160,
+		StartHash:      make([]byte, 20),
+		TCPRecvBufSize: 2048,
+		TCPSendBufSize: 2048,
+		TCPBufInsNum:   runtime.NumCPU(),
+		TCPBufioNum:    64,
 	}
 }
 
