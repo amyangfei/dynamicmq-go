@@ -27,6 +27,7 @@ type SerfConfig struct {
 type NodeConfig struct {
 	Serf          *SerfConfig
 	Hostname      string           // Local host name
+	HostIp        string           // Host ip
 	BindAddr      string           // Addr for message dispatching
 	WorkDir       string           // working dir
 	RPCAddr       string           // Addr for local serf agent communication
@@ -82,8 +83,9 @@ func DefaultConfig(hostname, serfname string) *NodeConfig {
 			ConfigFile: "",
 		},
 		Hostname:       hostname,
+		HostIp:         "127.0.0.1",
 		BindAddr:       "0.0.0.0:5000",
-		RPCAddr:        "127.0.0.1:5500",
+		RPCAddr:        "0.0.0.0:5500",
 		NumVnodes:      16,
 		NumSuccessors:  3,
 		HashFunc:       sha1.New,

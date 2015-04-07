@@ -65,7 +65,9 @@ func createSerfevHelper(conf *NodeConfig) error {
 	defer f.Close()
 	w := bufio.NewWriter(f)
 	w.WriteString(fmt.Sprintf("[%s]\n", cfg_sect_node))
-	w.WriteString(fmt.Sprintf("%s = %s\n", cfg_item_rpcaddr, conf.RPCAddr))
+	rpcAddr := strings.Split(conf.RPCAddr, ":")
+	rpcPort := rpcAddr[len(rpcAddr)-1]
+	w.WriteString(fmt.Sprintf("%s = %s:%s\n", cfg_item_rpcaddr, conf.HostIp, rpcPort))
 	w.Flush()
 	return nil
 }
@@ -218,6 +220,7 @@ func (n *Node) serfSchdule(c chan Notification, logger io.Writer) error {
 func (n *Node) Nodeinfo() ([]byte, error) {
 	info := make(map[string]string)
 	info["hostname"] = n.config.Hostname
+	info["serf"] = n.config.Serf.NodeName
 	info["bindaddr"] = n.config.BindAddr
 	info["rpcaddr"] = n.config.RPCAddr
 	info["starthash"] = hex.EncodeToString(n.config.StartHash)
@@ -231,6 +234,7 @@ func (n *Node) Nodeinfo() ([]byte, error) {
 func (n *Node) Vnodeinfo() ([]byte, error) {
 	info := make(map[string][]byte)
 	info["hostname"] = []byte(n.config.Hostname)
+	info["serf"] = []byte(n.config.Serf.NodeName)
 	ids := make([]byte, 0)
 	for _, vnode := range n.Vnodes {
 		ids = append(ids, vnode.Id...)
@@ -248,14 +252,14 @@ func (n *Node) StartStatusTcp() {
 
 func (n *Node) statusTcpListen() {
 	log := n.log
-	bind := n.config.BindAddr
-	addr, err := net.ResolveTCPAddr("tcp", n.config.BindAddr)
+	bind := n.config.RPCAddr
+	addr, err := net.ResolveTCPAddr("tcp", bind)
 	if err != nil {
 		log.Error("net.ResolveTCPAddr(%s) error", bind)
 		panic(err)
 	}
 
-	l, err := net.ListenTCP("tcp", addr)
+	l, err := net.ListenTCP("tcp4", addr)
 	if err != nil {
 		log.Error("net.ListenTCP(%s) error", bind, err)
 		panic(err)
@@ -274,11 +278,6 @@ func (n *Node) statusTcpListen() {
 		conn, err := l.AcceptTCP()
 		if err != nil {
 			log.Error("listener.AcceptTCP() error(%v)", err)
-			continue
-		}
-		if err = conn.SetKeepAlive(true); err != nil {
-			log.Error("conn.SetKeepAlive() error(%v)", err)
-			conn.Close()
 			continue
 		}
 		if err = conn.SetReadBuffer(n.config.TCPRecvBufSize * 2); err != nil {
@@ -409,14 +408,46 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 }
 
 func validateNodeInfoMsg(msg *DecodedMsg, n *Node) error {
+	if _, ok := msg.items[dmq.SDDMsgItemHostnameId]; !ok {
+		return fmt.Errorf("msg hostname item not found")
+	}
+
+	if _, ok := msg.items[dmq.SDDMsgItemSerfNodeId]; !ok {
+		return fmt.Errorf("msg serfnode item not found")
+	}
+
+	if _, ok := msg.items[dmq.SDDMsgItemBindAddrId]; !ok {
+		return fmt.Errorf("msg bindaddr item not found")
+	}
+
+	if _, ok := msg.items[dmq.SDDMsgItemRPCAddrId]; !ok {
+		return fmt.Errorf("msg rpcaddr item not found")
+	}
+
+	if _, ok := msg.items[dmq.SDDMsgItemStartHashId]; !ok {
+		return fmt.Errorf("msg starthash item not found")
+	}
 	return nil
 }
 
 func processNodeInfoMsg(msg *DecodedMsg, n *Node) error {
+	log := n.log
+	log.Debug("recv nodeinfo msg: %v", msg)
 	return nil
 }
 
 func validateVNodeInfoMsg(msg *DecodedMsg, n *Node) error {
+	if _, ok := msg.items[dmq.SDDMsgItemHostnameId]; !ok {
+		return fmt.Errorf("msg hostname item not found")
+	}
+
+	if _, ok := msg.items[dmq.SDDMsgItemSerfNodeId]; !ok {
+		return fmt.Errorf("msg serfnode item not found")
+	}
+
+	if _, ok := msg.items[dmq.SDDMsgItemVNodeListId]; !ok {
+		return fmt.Errorf("msg vnode list item not found")
+	}
 	return nil
 }
 

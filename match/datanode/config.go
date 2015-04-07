@@ -16,6 +16,7 @@ type SrvConfig struct {
 	SerfNodeName  string
 	SerfBindPort  int
 	SerfBindAddr  string
+	SerfRPCPort   int
 	SerfRPCAddr   string
 	SerfEvHandler string
 	SerfLogFile   string
@@ -25,6 +26,7 @@ type SrvConfig struct {
 	Hostname      string
 	BindPort      int
 	BindAddr      string
+	RPCPort       int
 	RPCAddr       string
 	Workdir       string
 	NumVnodes     int

@@ -1,7 +1,8 @@
 [node]
 workdir = .
+ip = 127.0.0.1
 bind_addr = 0.0.0.0:5000
-rpc_addr = 127.0.0.1:5500
+rpc_addr = 0.0.0.0:5500
 
 [serf]
 node_name = serf0101

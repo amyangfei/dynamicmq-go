@@ -19,7 +19,7 @@ log_file = ./serf.log
 [chord]
 hostname = chod0101
 bind_port = 5000
-rpc_addr = 127.0.0.1:5500
+rpc_port = 5500
 num_vnodes = 16
 num_successors = 3
 hash_bits = 160

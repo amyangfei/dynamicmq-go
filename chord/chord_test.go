@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"github.com/op/go-logging"
 	"os"
 	"os/exec"
 	"testing"
@@ -13,12 +14,32 @@ var serfLogFile = "./serfagent.log"
 var fakeSerfBind string = "127.0.0.1:7497"
 var fakeSerfRPC string = "127.0.0.1:7374"
 
+var nodeLogFile = "./test_node.log"
+
+var nodeLog = logging.MustGetLogger("chord-test")
+
 func fastConf() *NodeConfig {
 	conf := DefaultConfig("localhost", "serf0101")
 	conf.WorkDir = "."
 	conf.Serf.Args = []string{"-log-level=info"}
 	conf.StartHash, _ = hex.DecodeString("aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d")
 	return conf
+}
+
+func initLog(logFile string) error {
+	var format = logging.MustStringFormatter(
+		"%{time:2006-01-02 15:04:05.000} [%{level:.4s}] %{id:03x} [%{shortfunc}] %{message}",
+	)
+
+	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+	if err != nil {
+		return err
+	}
+	backend1 := logging.NewLogBackend(f, "", 0)
+	backend1Formatter := logging.NewBackendFormatter(backend1, format)
+	logging.SetBackend(backend1Formatter)
+
+	return nil
 }
 
 func fakeSerfConf() *SerfConfig {
@@ -74,6 +95,10 @@ func fakeSerfLeave(c chan Notification) {
 	c <- Notification{Err: nil, Msg: out.String()}
 }
 
+func init() {
+	initLog(nodeLogFile)
+}
+
 func TestCreateShutdown(t *testing.T) {
 	conf := fastConf()
 	c := make(chan Notification)
@@ -86,6 +111,7 @@ func TestCreateShutdown(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to create node %v", err)
 	}
+	n.SetLogger(nodeLog)
 
 	// monitor notification channel
 	go func() {
@@ -135,7 +161,7 @@ func TestLifeCycle(t *testing.T) {
 		}
 	}()
 
-	n.SerfUserEvent("nodeinfo", "testpayload", false, c)
+	// n.SerfUserEvent("nodeinfo", "testpayload", false, c)
 
 	if n != nil {
 		err := n.Shutdown()

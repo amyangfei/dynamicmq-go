@@ -48,7 +48,7 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 	chordFlagSet := flag.NewFlagSet("chord", flag.PanicOnError)
 	chordFlagSet.String("hostname", "chod0101", "chord hostname")
 	chordFlagSet.Int("bind_port", 5000, "chord bind port")
-	chordFlagSet.String("rpc_addr", "127.0.0.1:5500", "chord rpc addr")
+	chordFlagSet.Int("rpc_port", 5500, "chord rpc port")
 	chordFlagSet.Int("num_vnodes", 16, "chord virtual node numbers")
 	chordFlagSet.Int("num_successors", 3, "chord successor node numbers")
 	chordFlagSet.Int("hash_bits", 160, "chord hash bits")
@@ -86,7 +86,10 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 	Config.Hostname = chordFlagSet.Lookup("hostname").Value.String()
 	Config.BindPort, err =
 		strconv.Atoi(chordFlagSet.Lookup("bind_port").Value.String())
-	Config.RPCAddr = chordFlagSet.Lookup("rpc_addr").Value.String()
+	Config.BindAddr = fmt.Sprintf("0.0.0.0:%d", Config.BindPort)
+	Config.RPCPort, err =
+		strconv.Atoi(chordFlagSet.Lookup("rpc_port").Value.String())
+	Config.RPCAddr = fmt.Sprintf("0.0.0.0:%d", Config.RPCPort)
 	Config.NumVnodes, err =
 		strconv.Atoi(chordFlagSet.Lookup("num_vnodes").Value.String())
 	Config.NumSuccessors, err =
@@ -122,6 +125,7 @@ func InitLog(logFile, serfLogFile string) error {
 	backend1 := logging.NewLogBackend(f, "", 0)
 	backend1Formatter := logging.NewBackendFormatter(backend1, format)
 	logging.SetBackend(backend1Formatter)
+	logging.SetLevel(logging.DEBUG, "dynamicmq-match-datanode")
 
 	serfLog, err = os.OpenFile(serfLogFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
@@ -146,6 +150,7 @@ func chordRoutine() {
 			EvHandler: Config.SerfEvHandler,
 		},
 		Hostname:       Config.Hostname,
+		HostIp:         Config.BindIp,
 		BindAddr:       Config.BindAddr,
 		RPCAddr:        Config.RPCAddr,
 		NumVnodes:      Config.NumVnodes,
@@ -166,10 +171,7 @@ func chordRoutine() {
 		panic(err)
 	}
 	n.SetLogger(log)
-
-	for idx, vnode := range n.Vnodes {
-		log.Debug("vnode %d Id %v", idx, vnode.Id)
-	}
+	n.StartStatusTcp()
 
 	go func() {
 		for {
