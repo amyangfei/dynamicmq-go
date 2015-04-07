@@ -3,6 +3,7 @@ package chord
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -73,26 +74,41 @@ func createSerfevHelper(conf *NodeConfig) error {
 }
 
 func CreateNode(conf *NodeConfig) *Node {
-	node := &Node{config: conf}
+	node := &Node{
+		config: conf,
+		rtable: &RTable{
+			vnodes: make([]*Vnode, 0),
+			peers:  make([]*PeerNode, 0),
+		},
+	}
 	node.init()
 	return node
 }
 
 func (n *Node) init() {
-	n.Vnodes = make([]*localVnode, n.config.NumVnodes)
+	n.LVnodes = make([]*localVnode, n.config.NumVnodes)
 
 	// change working dir
 	chgWorkdir(n.config.WorkDir)
 
 	createSerfevHelper(n.config)
 
+	peerNode := &PeerNode{
+		Hostname:  n.config.Hostname,
+		SerfNode:  n.config.Serf.NodeName,
+		BindAddr:  n.config.BindAddr,
+		RPCAddr:   n.config.RPCAddr,
+		StartHash: n.config.StartHash,
+	}
+	n.rtable.peers = append(n.rtable.peers, peerNode)
 	curHash := n.config.StartHash[:]
 	for i := 0; i < n.config.NumVnodes; i++ {
 		lvn := &localVnode{
 			node: n,
 		}
-		n.Vnodes[i] = lvn
-		lvn.init(curHash)
+		n.LVnodes[i] = lvn
+		lvn.init(peerNode, curHash)
+		n.rtable.JoinVnode(&lvn.Vnode)
 		curHash = HashJump(curHash, n.config.step, n.config.maxhash)
 	}
 }
@@ -103,18 +119,18 @@ func (n *Node) SetLogger(log *logging.Logger) {
 
 // Len is the number of vnodes
 func (n *Node) Len() int {
-	return len(n.Vnodes)
+	return len(n.LVnodes)
 }
 
 // Less returns whether the vnode with index i should sort
 // before the vnode with index j.
 func (n *Node) Less(i, j int) bool {
-	return bytes.Compare(n.Vnodes[i].Id, n.Vnodes[j].Id) == -1
+	return bytes.Compare(n.LVnodes[i].Id, n.LVnodes[j].Id) == -1
 }
 
 // Swap swaps the vnodes with indexes i and j.
 func (n *Node) Swap(i, j int) {
-	n.Vnodes[i], n.Vnodes[j] = n.Vnodes[j], n.Vnodes[i]
+	n.LVnodes[i], n.LVnodes[j] = n.LVnodes[j], n.LVnodes[i]
 }
 
 func (n *Node) SerfStart(c chan Notification, logger io.Writer) {
@@ -236,7 +252,7 @@ func (n *Node) Vnodeinfo() ([]byte, error) {
 	info["hostname"] = []byte(n.config.Hostname)
 	info["serf"] = []byte(n.config.Serf.NodeName)
 	ids := make([]byte, 0)
-	for _, vnode := range n.Vnodes {
+	for _, vnode := range n.LVnodes {
 		ids = append(ids, vnode.Id...)
 	}
 	info["vnode"] = ids
@@ -433,6 +449,24 @@ func validateNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 func processNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 	log := n.log
 	log.Debug("recv nodeinfo msg: %v", msg)
+
+	// Message must have been validated before processing
+	hostname := msg.items[dmq.SDDMsgItemHostnameId]
+	_, peer := n.rtable.FindPeer(hostname)
+	if peer != nil {
+		// TODO: update both peer information and vnodes information
+	} else {
+		// new peer node
+		peerNode := &PeerNode{
+			Hostname:  hostname,
+			SerfNode:  msg.items[dmq.SDDMsgItemSerfNodeId],
+			BindAddr:  msg.items[dmq.SDDMsgItemBindAddrId],
+			RPCAddr:   msg.items[dmq.SDDMsgItemRPCAddrId],
+			StartHash: []byte(msg.items[dmq.SDDMsgItemStartHashId]),
+		}
+		n.rtable.peers = append(n.rtable.peers, peerNode)
+	}
+
 	return nil
 }
 
@@ -452,6 +486,40 @@ func validateVNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 }
 
 func processVNodeInfoMsg(msg *DecodedMsg, n *Node) error {
+	log := n.log
+	log.Debug("recv vnodeinfo msg: %v", msg)
+
+	// Message must have been validated before processing
+	hostname, err :=
+		base64.StdEncoding.DecodeString(msg.items[dmq.SDDMsgItemHostnameId])
+	if err != nil {
+		log.Error("failed to parse hostname %v", err)
+		return err
+	}
+	log.Debug("hostname: %s", string(hostname))
+
+	serfnode, err :=
+		base64.StdEncoding.DecodeString(msg.items[dmq.SDDMsgItemSerfNodeId])
+	if err != nil {
+		log.Error("failed to parse serfnode %v", err)
+		return err
+	}
+	log.Debug("serfnode: %s", string(serfnode))
+
+	vnodes, err :=
+		base64.StdEncoding.DecodeString(msg.items[dmq.SDDMsgItemVNodeListId])
+	if err != nil {
+		log.Error("failed to parse vnodelist %v", err)
+		return err
+	}
+	vnodeIds := make([][]byte, 0)
+	for i := 0; i < len(vnodes); i += n.config.HashBits / 8 {
+		if i+n.config.HashBits/8 <= len(vnodes) {
+			vnodeIds = append(vnodeIds, vnodes[i:i+20])
+		}
+	}
+	log.Debug("vnodes: %v", vnodeIds)
+
 	return nil
 }
 

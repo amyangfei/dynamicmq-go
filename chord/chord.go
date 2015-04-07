@@ -48,13 +48,14 @@ type NodeConfig struct {
 
 // Represents an Vnode
 type Vnode struct {
-	Id   []byte // Virtual ID
-	Host string // Host identifier
+	Id    []byte    // Virtual ID
+	Pnode *PeerNode // physical node pointer
 }
 
 // Router Table: stores all vnodes in chord hash ring
 type RTable struct {
 	vnodes []*Vnode
+	peers  []*PeerNode
 }
 
 // Contains a virtual node
@@ -67,9 +68,19 @@ type localVnode struct {
 
 // Node represents a physical node. It has NumVnodes of vnodes.
 type Node struct {
-	config *NodeConfig
-	Vnodes []*localVnode
-	log    *logging.Logger
+	config  *NodeConfig
+	LVnodes []*localVnode
+	log     *logging.Logger
+	rtable  *RTable
+}
+
+// represents for peer physical node
+type PeerNode struct {
+	Hostname  string
+	SerfNode  string
+	BindAddr  string
+	RPCAddr   string
+	StartHash []byte
 }
 
 func DefaultConfig(hostname, serfname string) *NodeConfig {

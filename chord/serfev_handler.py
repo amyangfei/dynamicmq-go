@@ -5,6 +5,7 @@ import sys
 import os
 import json
 import socket
+import base64
 import struct
 import traceback
 from serf_master import SerfHandler, SerfHandlerProxy
@@ -127,6 +128,19 @@ class DefaultHandler(SerfHandler):
         bmsg = BinaryMsg(msg_cmd_nodeinfo, items)
         self._send_status(bmsg, rpc_addr)
 
+    def _send_vnodeinfo(self, msg_dict, rpc_addr):
+        # missing all the following filed will raise Exception
+        items = []
+        items.append(
+            BinaryItem(msg_item_hostname_id, msg_dict[serf_msg_hostname]))
+        items.append(
+            BinaryItem(msg_item_serfnode_id, msg_dict[serf_msg_serf]))
+        items.append(
+            BinaryItem(msg_item_vnode_id, msg_dict[serf_msg_vnode]))
+
+        bmsg = BinaryMsg(msg_cmd_vnodeinfo, items)
+        self._send_status(bmsg, rpc_addr)
+
     def nodeinfo(self):
         with open(self.logfile, 'a+') as f:
             try:
@@ -155,13 +169,29 @@ class DefaultHandler(SerfHandler):
 
     def vnodeinfo(self):
         with open(self.logfile, 'a+') as f:
-            f.write('vnodeinfo event detected...\n')
-            """
-            for line in sys.stdin:
-                line = line[:line.rindex('\n') - 1]
-                f.write(line)
-                f.write('\n')
-            """
+            try:
+                rpc_addr = parse_serf_helper(
+                    self.serf_node, cfg_sect_node, cfg_item_rpcaddr)
+            except (KeyError, ConfigParser.NoSectionError, ConfigParser.NoOptionError):
+                f.write(traceback.format_exc())
+                return
+
+            payload = read_from_stdin()
+            try:
+                msg_dict = json.loads(payload)
+
+                # ignore self serf event
+                serf_node_name = base64.b64decode(msg_dict[serf_msg_serf])
+                if serf_node_name == get_serf_node():
+                    f.write('self vnodeinfo event detected, ignore...\n')
+                    return
+
+                f.write('vnodeinfo event detected...\n')
+
+                self._send_vnodeinfo(msg_dict, rpc_addr)
+
+            except Exception:
+                f.write(traceback.format_exc())
 
     def member_join(self):
         pass

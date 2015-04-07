@@ -4,10 +4,9 @@ import (
 	"math/big"
 )
 
-func (lvn *localVnode) init(curHash []byte) {
-	// lvn.Id = make([]byte, len(curHash))
+func (lvn *localVnode) init(pnode *PeerNode, curHash []byte) {
 	lvn.Id = curHash[:]
-	lvn.Host = lvn.node.config.Hostname
+	lvn.Pnode = pnode
 	lvn.successors = make([]*Vnode, lvn.node.config.NumSuccessors)
 }
 
