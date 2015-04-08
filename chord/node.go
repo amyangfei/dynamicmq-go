@@ -25,6 +25,13 @@ type StatusClient struct {
 	processEnd int
 }
 
+type BasicMsg struct {
+	cmdType uint8
+	bodyLen uint16
+	extra   uint8
+	items   map[uint8]string
+}
+
 type DecodedMsg struct {
 	extra   uint8
 	bodyLen uint16
@@ -215,14 +222,14 @@ func (n *Node) serfSchdule(c chan Notification, logger io.Writer) error {
 		}
 	}
 
-	// broadcast node information
+	// broadcast node information via serf
 	if info, err := n.Nodeinfo(); err != nil {
 		return err
 	} else {
 		n.SerfUserEvent(serf_userev_nodeinfo, string(info), false, c)
 	}
 
-	// broadcast node's virtual nodes information
+	// broadcast node's virtual nodes information via serf
 	if info, err := n.Vnodeinfo(); err != nil {
 		return err
 	} else {
@@ -386,7 +393,9 @@ func (n *Node) processReadbuf(cli *StatusClient, buf []byte) error {
 				if err := processFunc.validate(decMsg, n); err != nil {
 					log.Error("cmd %d request valid error(%v)", cmd, err)
 				} else {
-					processFunc.process(decMsg, n)
+					if processErr := processFunc.process(decMsg, n); processErr != nil {
+						log.Error("process error: %v", processErr)
+					}
 				}
 			} else {
 				log.Error("cmd: %d not support", cmd)
@@ -448,10 +457,12 @@ func validateNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 
 func processNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 	log := n.log
-	log.Debug("recv nodeinfo msg: %v", msg)
 
 	// Message must have been validated before processing
 	hostname := msg.items[dmq.SDDMsgItemHostnameId]
+
+	log.Debug("recv nodeinfo msg: %v from %s", msg, hostname)
+
 	_, peer := n.rtable.FindPeer(hostname)
 	if peer != nil {
 		// TODO: update both peer information and vnodes information
@@ -465,6 +476,10 @@ func processNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 			StartHash: []byte(msg.items[dmq.SDDMsgItemStartHashId]),
 		}
 		n.rtable.peers = append(n.rtable.peers, peerNode)
+
+		// send node and vnode info directly to newly joined node
+		go n.sendNodeInfo(peerNode.RPCAddr)
+		go n.sendVnodeInfo(peerNode.RPCAddr)
 	}
 
 	return nil
@@ -487,7 +502,6 @@ func validateVNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 
 func processVNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 	log := n.log
-	log.Debug("recv vnodeinfo msg: %v", msg)
 
 	// Message must have been validated before processing
 	hostname, err :=
@@ -496,15 +510,6 @@ func processVNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 		log.Error("failed to parse hostname %v", err)
 		return err
 	}
-	log.Debug("hostname: %s", string(hostname))
-
-	serfnode, err :=
-		base64.StdEncoding.DecodeString(msg.items[dmq.SDDMsgItemSerfNodeId])
-	if err != nil {
-		log.Error("failed to parse serfnode %v", err)
-		return err
-	}
-	log.Debug("serfnode: %s", string(serfnode))
 
 	vnodes, err :=
 		base64.StdEncoding.DecodeString(msg.items[dmq.SDDMsgItemVNodeListId])
@@ -518,9 +523,116 @@ func processVNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 			vnodeIds = append(vnodeIds, vnodes[i:i+20])
 		}
 	}
-	log.Debug("vnodes: %v", vnodeIds)
+
+	log.Debug("recv vnodeinfo from %s", hostname)
+
+	var peer *PeerNode
+	var retry_count int = 5
+	for i := 0; i < retry_count; i++ {
+		_, peer = n.rtable.FindPeer(string(hostname))
+		if peer == nil {
+			// wait a short time
+			log.Warning("waiting for node %s's nodeinfo", string(hostname))
+			time.Sleep(time.Millisecond * time.Duration(100))
+			_, peer = n.rtable.FindPeer(string(hostname))
+		} else {
+			break
+		}
+	}
+
+	if peer == nil {
+		return fmt.Errorf("peer %s not found", string(hostname))
+	}
+
+	for _, nid := range vnodeIds {
+		vnode := &Vnode{
+			Id:    nid,
+			Pnode: peer,
+		}
+		n.rtable.JoinVnode(vnode)
+	}
 
 	return nil
+}
+
+func (n *Node) sendInfoDirect(info []byte, rpcAddr string) error {
+	raddr, err := net.ResolveTCPAddr("tcp", rpcAddr)
+	if err != nil {
+		return err
+	}
+
+	conn, err := net.DialTCP("tcp", nil, raddr)
+	if err != nil {
+		return err
+	}
+
+	_, err = conn.Write(info)
+	return err
+}
+
+func binaryMsgEncode(msg *BasicMsg) []byte {
+	bmsg := make([]byte, dmq.DRMsgHeaderSize)
+	bmsg[0] = msg.cmdType
+	binary.BigEndian.PutUint16(bmsg[1:], msg.bodyLen)
+	bmsg[dmq.SDDMsgCmdSize+dmq.SDDMsgBodySize] = msg.extra
+	var bodyLen uint16 = 0
+	for itemid, item := range msg.items {
+		bmsg = append(bmsg, itemid)
+		bItemLen := make([]byte, dmq.SDDMsgItemBodySize)
+		binary.BigEndian.PutUint16(bItemLen, uint16(len(item)))
+		bmsg = append(bmsg, bItemLen...)
+		bmsg = append(bmsg, item...)
+		bodyLen += dmq.SDDMsgItemHeaderSize + uint16(len(item))
+	}
+	if msg.bodyLen != bodyLen {
+		binary.BigEndian.PutUint16(bmsg[1:], bodyLen)
+	}
+	return bmsg
+}
+
+// send node information directly to a chord node via RPCBind address
+func (n *Node) sendNodeInfo(rpcAddr string) {
+	log := n.log
+	basicMsg := &BasicMsg{
+		cmdType: dmq.SDDMsgCmdNodeInfo,
+		bodyLen: 0,
+		extra:   0,
+		items: map[uint8]string{
+			dmq.SDDMsgItemHostnameId:  n.config.Hostname,
+			dmq.SDDMsgItemBindAddrId:  n.config.BindAddr,
+			dmq.SDDMsgItemRPCAddrId:   n.config.RPCAddr,
+			dmq.SDDMsgItemSerfNodeId:  n.config.Serf.NodeName,
+			dmq.SDDMsgItemStartHashId: hex.EncodeToString(n.config.StartHash),
+		},
+	}
+	bmsg := binaryMsgEncode(basicMsg)
+	if err := n.sendInfoDirect(bmsg, rpcAddr); err != nil {
+		log.Error("send node info with error: %v", err)
+	}
+}
+
+// send vritual node information directly to a chord node via RPCBind address
+func (n *Node) sendVnodeInfo(rpcAddr string) {
+	log := n.log
+
+	ids := make([]byte, 0)
+	for _, vnode := range n.LVnodes {
+		ids = append(ids, vnode.Id...)
+	}
+	basicMsg := &BasicMsg{
+		cmdType: dmq.SDDMsgCmdVNodeInfo,
+		bodyLen: 0,
+		extra:   0,
+		items: map[uint8]string{
+			dmq.SDDMsgItemHostnameId:  base64.StdEncoding.EncodeToString([]byte(n.config.Hostname)),
+			dmq.SDDMsgItemSerfNodeId:  base64.StdEncoding.EncodeToString([]byte(n.config.Serf.NodeName)),
+			dmq.SDDMsgItemVNodeListId: base64.StdEncoding.EncodeToString(ids),
+		},
+	}
+	bmsg := binaryMsgEncode(basicMsg)
+	if err := n.sendInfoDirect(bmsg, rpcAddr); err != nil {
+		log.Error("send vnode info with error: %v", err)
+	}
 }
 
 // Public interface for messages delivery

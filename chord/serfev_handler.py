@@ -194,7 +194,12 @@ class DefaultHandler(SerfHandler):
                 f.write(traceback.format_exc())
 
     def member_join(self):
-        pass
+        with open(self.logfile, 'a+') as f:
+            try:
+                payload = read_from_stdin()
+                f.write("member join detected, payload: {}\n".format(payload))
+            except Exception:
+                f.write(traceback.format_exc())
         # maybe rebalance the load balancer
 
 

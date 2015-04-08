@@ -86,10 +86,10 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 	Config.Hostname = chordFlagSet.Lookup("hostname").Value.String()
 	Config.BindPort, err =
 		strconv.Atoi(chordFlagSet.Lookup("bind_port").Value.String())
-	Config.BindAddr = fmt.Sprintf("0.0.0.0:%d", Config.BindPort)
+	Config.BindAddr = fmt.Sprintf("%s:%d", Config.BindIp, Config.BindPort)
 	Config.RPCPort, err =
 		strconv.Atoi(chordFlagSet.Lookup("rpc_port").Value.String())
-	Config.RPCAddr = fmt.Sprintf("0.0.0.0:%d", Config.RPCPort)
+	Config.RPCAddr = fmt.Sprintf("%s:%d", Config.BindIp, Config.RPCPort)
 	Config.NumVnodes, err =
 		strconv.Atoi(chordFlagSet.Lookup("num_vnodes").Value.String())
 	Config.NumSuccessors, err =
