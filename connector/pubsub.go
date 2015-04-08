@@ -266,7 +266,7 @@ func processAuth(cli *SubClient, args []string) error {
 }
 
 func processHeartbeat(cli *SubClient, args []string) error {
-	log.Debug("receive addr: %s heartbeat", cli.conn.RemoteAddr())
+	log.Debug("receive subclient addr: %s heartbeat", cli.conn.RemoteAddr())
 	cli.conn.Write(HeartbeatReply)
 	return nil
 }

@@ -181,12 +181,10 @@ func (sub *SubSdk) Heartbeat() error {
 		if err := sub.sendMessage([]string{cmd}); err != nil {
 			sub.Close()
 			return err
-		} else {
-			resp := make([]byte, 64)
-			sub.conn.Read(resp)
-			return nil
 		}
+		// get response data back in RecvMsgRoutine
 	}
+	return nil
 }
 
 func (sub *SubSdk) HeartbeatRoutine(interval int) {

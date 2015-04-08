@@ -18,7 +18,7 @@ func main() {
 	}
 	defer cli.Close()
 
-	go cli.HeartbeatRoutine(5)
+	go cli.HeartbeatRoutine(300)
 	go cli.RecvMsgRoutine()
 
 	c := make(chan os.Signal, 1)
