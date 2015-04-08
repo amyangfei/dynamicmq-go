@@ -132,7 +132,7 @@ func RegisterSub(cli *SubClient, cfg *SrvConfig) error {
 }
 
 func UpdateSubAttr(cli *SubClient, attr *Attribute, cfg *SrvConfig) error {
-	key := dmq.GetSubAttrBase(cli.id.Hex())
+	key := dmq.GetSubAttrKey(cli.id.Hex(), attr.name)
 	jsonStr, err := AttrMarshal(attr)
 	if err != nil {
 		return err
@@ -145,8 +145,8 @@ func UpdateSubAttr(cli *SubClient, attr *Attribute, cfg *SrvConfig) error {
 	return err
 }
 
-func GetSubAttr(cli *SubClient, cfg *SrvConfig) (string, error) {
-	key := dmq.GetSubAttrBase(cli.id.Hex())
+func GetSubAttr(cli *SubClient, attrname string, cfg *SrvConfig) (string, error) {
+	key := dmq.GetSubAttrKey(cli.id.Hex(), attrname)
 	c, err := GetEtcdClient(cfg)
 	if err != nil {
 		return "", err
@@ -158,8 +158,8 @@ func GetSubAttr(cli *SubClient, cfg *SrvConfig) (string, error) {
 	}
 }
 
-func RemoveSubAttr(cli *SubClient, cfg *SrvConfig) error {
-	key := dmq.GetSubAttrBase(cli.id.Hex())
+func RemoveSubAttr(cli *SubClient, attrname string, cfg *SrvConfig) error {
+	key := dmq.GetSubAttrKey(cli.id.Hex(), attrname)
 	c, err := GetEtcdClient(cfg)
 	if err != nil {
 		return err

@@ -106,15 +106,16 @@ func TestUpdateAttr(t *testing.T) {
 		id: bson.NewObjectId(),
 	}
 	attr := &Attribute{
+		name:   "test_attr",
 		use:    byte(AttrUseField["strval"]),
 		strval: "test app",
 	}
-	attrKey := dmq.GetSubAttrBase(cli.id.Hex())
+	attrKey := dmq.GetSubAttrKey(cli.id.Hex(), attr.name)
 
 	if err := UpdateSubAttr(cli, attr, cfg); err != nil {
 		t.Errorf("Failed to update subscriber attribute: %v", attr)
 	}
-	if resp, err := GetSubAttr(cli, cfg); err != nil {
+	if resp, err := GetSubAttr(cli, attr.name, cfg); err != nil {
 		t.Errorf("Failed to get subscriber attribute: %s", attrKey)
 	} else {
 		jsonData := make(map[string]interface{})
@@ -136,6 +137,7 @@ func TestUpdateAttr(t *testing.T) {
 	}
 
 	attr = &Attribute{
+		name: "range_test",
 		use:  byte(AttrUseField["range"]),
 		low:  12.3,
 		high: 21.7,
@@ -143,7 +145,7 @@ func TestUpdateAttr(t *testing.T) {
 	if err := UpdateSubAttr(cli, attr, cfg); err != nil {
 		t.Errorf("Failed to update subscriber attribute: %v", attr)
 	}
-	if resp, err := GetSubAttr(cli, cfg); err != nil {
+	if resp, err := GetSubAttr(cli, attr.name, cfg); err != nil {
 		t.Errorf("Failed to get subscriber attribute: %s", attrKey)
 	} else {
 		jsonData := make(map[string]interface{})

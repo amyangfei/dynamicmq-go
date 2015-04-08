@@ -19,6 +19,7 @@ import (
 )
 
 type Attribute struct {
+	name   string
 	use    byte
 	strval string
 	low    float64
