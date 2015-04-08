@@ -60,12 +60,12 @@ func AttrMarshal(attr *Attribute) ([]byte, error) {
 		"use": attr.use,
 	}
 	switch int(attr.use) {
-	case AttrUseField["strval"]:
+	case dmq.AttrUseField["strval"]:
 		data["strval"] = attr.strval
-	case AttrUseField["range"]:
+	case dmq.AttrUseField["range"]:
 		data["low"] = attr.low
 		data["high"] = attr.high
-	case AttrUseField["extra"]:
+	case dmq.AttrUseField["extra"]:
 		data["extra"] = attr.extra
 	}
 	return json.Marshal(data)

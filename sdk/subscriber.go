@@ -170,7 +170,29 @@ func (sub *SubSdk) Auth() error {
 	return nil
 }
 
-func (sub *SubSdk) Subscribe() error {
+// attrnames is an array attribute name.
+// attrvals is an array of json string represents attribute information
+func (sub *SubSdk) Subscribe(attrnames, attrvals []string) error {
+	if len(attrnames) != len(attrvals) {
+		return fmt.Errorf("attrnames and attrvals not matching")
+	}
+	for _, attrval := range attrvals {
+		if !isJSONString(attrval) {
+			return fmt.Errorf("%v is not a validate json string", attrval)
+		}
+	}
+
+	msg := make([]string, 0)
+	msg = append(msg, CmdTable["subscribe"])
+	for i := 0; i < len(attrnames); i++ {
+		msg = append(msg, attrnames[i])
+		msg = append(msg, attrvals[i])
+	}
+
+	if err := sub.sendMessage(msg); err != nil {
+		sub.Close()
+		return err
+	}
 	return nil
 }
 
@@ -225,4 +247,9 @@ func (sub *SubSdk) recvMsg(dataChan chan []byte, errChan chan error) {
 
 func (sub *SubSdk) Close() error {
 	return sub.conn.Close()
+}
+
+func isJSONString(s string) bool {
+	var js map[string]interface{}
+	return json.Unmarshal([]byte(s), &js) == nil
 }

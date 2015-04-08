@@ -171,13 +171,24 @@ func RemoveSubAttr(cli *SubClient, attrname string, cfg *SrvConfig) error {
 }
 
 func RemoveSub(cli *SubClient, cfg *SrvConfig) error {
-	key := dmq.GetInfoKey(dmq.EtcdSubscriberType, cli.id.Hex())
 	c, err := GetEtcdClient(cfg)
 	if err != nil {
 		return err
 	}
-	if _, err := c.Delete(key, true); err != nil {
-		return err
+
+	key := dmq.GetInfoKey(dmq.EtcdSubscriberType, cli.id.Hex())
+	attrKey := dmq.GetSubAttrBase(cli.id.Hex())
+
+	_, infoErr := c.Delete(key, true)
+	_, attrErr := c.Delete(attrKey, true)
+
+	if infoErr != nil && attrErr != nil {
+		return fmt.Errorf(
+			"remove subinfo err: %v; remove subattr err: %v", infoErr, attrErr)
+	} else if infoErr != nil {
+		return infoErr
+	} else if attrErr != nil {
+		return attrErr
 	}
 	return nil
 }

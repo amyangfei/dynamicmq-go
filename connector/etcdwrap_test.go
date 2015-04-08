@@ -107,7 +107,7 @@ func TestUpdateAttr(t *testing.T) {
 	}
 	attr := &Attribute{
 		name:   "test_attr",
-		use:    byte(AttrUseField["strval"]),
+		use:    byte(dmq.AttrUseField["strval"]),
 		strval: "test app",
 	}
 	attrKey := dmq.GetSubAttrKey(cli.id.Hex(), attr.name)
@@ -138,7 +138,7 @@ func TestUpdateAttr(t *testing.T) {
 
 	attr = &Attribute{
 		name: "range_test",
-		use:  byte(AttrUseField["range"]),
+		use:  byte(dmq.AttrUseField["range"]),
 		low:  12.3,
 		high: 21.7,
 	}

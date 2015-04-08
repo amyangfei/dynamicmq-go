@@ -273,10 +273,10 @@ func processHeartbeat(cli *SubClient, args []string) error {
 }
 
 func processSubscribe(cli *SubClient, args []string) error {
-	if len(args)/2 != 0 {
+	if len(args)%2 != 1 {
 		return errors.New("subscribe command with wrong elements")
 	}
-	for i := 0; i < len(args); i += 2 {
+	for i := 1; i < len(args); i += 2 {
 		name := args[i]
 		dataStr := args[i+1]
 		data := make(map[string]interface{})
@@ -286,7 +286,8 @@ func processSubscribe(cli *SubClient, args []string) error {
 
 		if _, ok := cli.attrs[name]; !ok {
 			cli.attrs[name] = &Attribute{
-				use: 0,
+				name: name,
+				use:  0,
 			}
 		}
 
@@ -294,9 +295,16 @@ func processSubscribe(cli *SubClient, args []string) error {
 		if !ok {
 			return errors.New("invalid sub command, use field not found")
 		}
+		useval, ok := use.(float64)
+		if !ok {
+			return errors.New("invalid sub command, use field should be numeric")
+		}
+
+		cli.attrs[name].use = byte(int(useval))
+
 		var update bool = false
-		switch use {
-		case AttrUseField["strval"]:
+		switch int(useval) {
+		case dmq.AttrUseField["strval"]:
 			if strval, ok := data["strval"].(string); !ok {
 				return errors.New("invalid sub command, strval not found")
 			} else {
@@ -305,7 +313,7 @@ func processSubscribe(cli *SubClient, args []string) error {
 					update = true
 				}
 			}
-		case AttrUseField["range"]:
+		case dmq.AttrUseField["range"]:
 			low, ok := data["low"].(float64)
 			if !ok {
 				return errors.New("invalid sub command, low not found")
@@ -322,7 +330,7 @@ func processSubscribe(cli *SubClient, args []string) error {
 				cli.attrs[name].high = high
 				update = true
 			}
-		case AttrUseField["extra"]:
+		case dmq.AttrUseField["extra"]:
 			if extra, ok := data["extra"].(string); !ok {
 				return errors.New("invalid sub command, extra not found")
 			} else {
@@ -336,6 +344,7 @@ func processSubscribe(cli *SubClient, args []string) error {
 			if err := UpdateSubAttr(cli, cli.attrs[name], Config); err != nil {
 				log.Error("update sub attr with error(%v)", err)
 			}
+			log.Debug("update sub attr %s %v", name, cli.attrs[name])
 		}
 	}
 	log.Debug("subscribeHandle with argv: %s", args)

@@ -124,3 +124,12 @@ var (
 	SDDMsgItemSerfNodeId  uint8 = 5
 	SDDMsgItemVNodeListId uint8 = 6
 )
+
+// attribute type in subscription
+var (
+	AttrUseField = map[string]int{
+		"strval": 1,
+		"range":  2,
+		"extra":  3,
+	}
+)
