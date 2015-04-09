@@ -10,14 +10,39 @@ import (
 	"github.com/op/go-logging"
 	"github.com/rakyll/globalconf"
 	"os"
+	"os/signal"
 	"runtime"
 	"strconv"
-	"time"
+	"syscall"
 )
 
 var Config *SrvConfig
 var log = logging.MustGetLogger("dynamicmq-match-datanode")
 var serfLog *os.File
+
+// InitSignal register signals handler.
+func InitSignal() chan os.Signal {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM,
+		syscall.SIGINT, syscall.SIGSTOP)
+	return c
+}
+
+func HandleSignal(c chan os.Signal) {
+	// Block until a signal is received.
+	for {
+		s := <-c
+		log.Info("get a signal %s", s.String())
+		switch s {
+		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGSTOP, syscall.SIGINT:
+			ShutdownServer()
+		case syscall.SIGHUP:
+			// TODO reload
+		default:
+			return
+		}
+	}
+}
 
 func InitConfig(configFile, entrypoint, starthash string) error {
 	conf, err := globalconf.NewWithOptions(&globalconf.Options{
@@ -37,8 +62,8 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 	basicFlagSet.Int("tcp_sendbuf_size", 2048, "tcp send buffer size")
 	basicFlagSet.Int("tcp_bufio_num", 64, "bufio num for each cache instance")
 
-	serfFlagSet := flag.NewFlagSet("basic", flag.PanicOnError)
-	serfFlagSet.String("bin_path", "/usr/local/bin/path", "serf bin path")
+	serfFlagSet := flag.NewFlagSet("serf", flag.PanicOnError)
+	serfFlagSet.String("bin_path", "/usr/local/bin/serf", "serf bin path")
 	serfFlagSet.String("node_name", "serf0101", "serf node name")
 	serfFlagSet.Int("bind_port", 7946, "serf bind port")
 	serfFlagSet.String("rpc_addr", "127.0.0.1:7373", "serf rpc addr")
@@ -140,6 +165,11 @@ func InitServer() error {
 	return nil
 }
 
+func ShutdownServer() {
+	log.Info("Datanode stop...")
+	os.Exit(0)
+}
+
 func chordRoutine() {
 	conf := &chord.NodeConfig{
 		Serf: &chord.SerfConfig{
@@ -233,9 +263,6 @@ func main() {
 		panic(err)
 	}
 
-	for {
-		time.Sleep(time.Second * time.Duration(10))
-	}
-
-	log.Info("Datanode stop")
+	signalChan := InitSignal()
+	HandleSignal(signalChan)
 }
