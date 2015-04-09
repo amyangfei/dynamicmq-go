@@ -5,11 +5,6 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
-func GetEtcdClient(machines []string) (*etcd.Client, error) {
-	c := etcd.NewClient(machines)
-	return c, nil
-}
-
 func AttrWatcher(machines []string) {
 	receiver := make(chan *etcd.Response)
 	stop := make(chan bool)

@@ -9,6 +9,7 @@ var (
 	EtcdAuthServerType = "auth"
 	EtcdDispatcherType = "disp"
 	EtcdSubscriberType = "sub"
+	EtcdIndexInfoType  = "idx"
 )
 
 // Etcd name mapping
@@ -20,6 +21,9 @@ var (
 	ConnStatus    = "status"
 
 	DispConnId = "conn_id"
+
+	IdxAttrLower = "lower"
+	IdxAttrUpper = "upper"
 )
 
 var (

@@ -24,3 +24,10 @@
         * /sub/info/<client-id>/conn_id
         * subscription, key: /sub/attr/<client-id>/<attribute-name> value:<description-json-string>
         * more attributes ...
+
+## index base information
+    * attribute dimension
+        * /idx/info/dimension
+    * each dimension attribute's lower and upper bound
+        * /idx/info/bound/<attr-name>/lower
+        * /idx/info/bound/<attr-name>/upper

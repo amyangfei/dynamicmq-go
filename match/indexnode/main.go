@@ -15,6 +15,7 @@ import (
 )
 
 var Config *SrvConfig
+var IdxBase *IndexBase
 var log = logging.MustGetLogger("dynamicmq-match-indexnode")
 
 // InitSignal register signals handler.

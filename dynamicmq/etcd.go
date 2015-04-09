@@ -38,6 +38,18 @@ func GetSubAttrKey(clientId, attrName string) string {
 	return fmt.Sprintf("%s/%s", GetSubAttrCliBase(clientId), attrName)
 }
 
+func GetIndexBaseDim() string {
+	return fmt.Sprintf("/%s/info/dimension", EtcdIndexInfoType)
+}
+
+func GetIndexBaseBound() string {
+	return fmt.Sprintf("/%s/info/bound", EtcdIndexInfoType)
+}
+
+func GetIndexBaseBoundKey(attrname, lowerOrUpper string) string {
+	return fmt.Sprintf("%s/%s/%s", GetIndexBaseBound(), attrname, lowerOrUpper)
+}
+
 func GetWaitingLockMgr(machines []string, owner string) *sherlock.EtcdLock {
 	client := etcd.NewClient(machines)
 	l := sherlock.NewEtcdLock("WaitingConnector", client)
@@ -65,4 +77,49 @@ func UnregisterConnToWaiting(c *etcd.Client, nodeId string) error {
 	waitKey := fmt.Sprintf("%s/%s", GetWaitingBase(EtcdConnectorType), nodeId)
 	_, err := c.DeleteDir(waitKey)
 	return err
+}
+
+// remove all subscription attribute index base infromation in etcd
+func RemoveAttrIndexBase(c *etcd.Client) error {
+	idxInfoKey := GetInfoBase(EtcdIndexInfoType)
+	_, err := c.Delete(idxInfoKey, true)
+	return err
+}
+
+func NewAttrIndexBase(c *etcd.Client, dim int, names []string, lower, upper []int) error {
+	if len(names) != dim {
+		return fmt.Errorf("invalid size of names")
+	}
+	if len(lower) != dim || len(upper) != dim {
+		return fmt.Errorf("invalid size of lower bound or upper bound")
+	}
+	for i := 0; i < dim; i++ {
+		if lower[i] >= upper[i] {
+			return fmt.Errorf("invalid lower and upper group, %d >= %d", lower[i], upper[i])
+		}
+	}
+
+	// first clean existing attribute index space
+	idxInfoKey := GetInfoBase(EtcdIndexInfoType)
+	if _, err := c.Get(idxInfoKey, false, false); err == nil {
+		if err := RemoveAttrIndexBase(c); err != nil {
+			return err
+		}
+	}
+
+	dimKey := GetIndexBaseDim()
+	if _, err := c.Set(dimKey, fmt.Sprintf("%d", dim), 0); err != nil {
+		return err
+	}
+	for i := 0; i < dim; i++ {
+		lowKey := GetIndexBaseBoundKey(names[i], IdxAttrLower)
+		upKey := GetIndexBaseBoundKey(names[i], IdxAttrUpper)
+		if _, err := c.Set(lowKey, fmt.Sprintf("%d", lower[i]), 0); err != nil {
+			return err
+		}
+		if _, err := c.Set(upKey, fmt.Sprintf("%d", upper[i]), 0); err != nil {
+			return err
+		}
+	}
+	return nil
 }
