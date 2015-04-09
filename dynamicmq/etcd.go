@@ -26,12 +26,16 @@ func GetSubConnKey(clientId string) string {
 	return fmt.Sprintf("/%s/info/%s/conn_id", EtcdSubscriberType, clientId)
 }
 
-func GetSubAttrBase(clientId string) string {
-	return fmt.Sprintf("/%s/attr/%s", EtcdSubscriberType, clientId)
+func GetSubAttrBase() string {
+	return fmt.Sprintf("/%s/attr", EtcdSubscriberType)
+}
+
+func GetSubAttrCliBase(clientId string) string {
+	return fmt.Sprintf("%s/%s", GetSubAttrBase(), clientId)
 }
 
 func GetSubAttrKey(clientId, attrName string) string {
-	return fmt.Sprintf("%s/%s", GetSubAttrBase(clientId), attrName)
+	return fmt.Sprintf("%s/%s", GetSubAttrCliBase(clientId), attrName)
 }
 
 func GetWaitingLockMgr(machines []string, owner string) *sherlock.EtcdLock {

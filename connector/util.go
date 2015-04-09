@@ -55,6 +55,7 @@ func FloatCompare(a, b float64) int {
 	}
 }
 
+// TODO: attribute discretization
 func AttrMarshal(attr *Attribute) ([]byte, error) {
 	data := map[string]interface{}{
 		"use": attr.use,

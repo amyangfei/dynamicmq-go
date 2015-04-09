@@ -1,4 +1,4 @@
-package segtree
+package main
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 
 // Main interface to access the segment tree
 type Tree interface {
-	Push(xmin, ymin, xmax, ymax int) *Interval // Push new interval to tree
+	Push(xmin, ymin, xmax, ymax int, data *[]byte) *Interval // Push new interval to tree
 
 	Delete(interval *Interval) // Delete specific Interval from tree
 
@@ -67,7 +67,8 @@ func (s *SquareSegment) ToString() string {
 
 // Interval represents elements pushed into stree
 type Interval struct {
-	Id int // unique
+	Id   int // unique
+	Data *[]byte
 	SquareSegment
 }
 
@@ -158,9 +159,12 @@ type stree struct {
 	ymax int // Max value of the second dimension of all intervals
 }
 
-func (t *stree) Push(xmin, xmax, ymin, ymax int) *Interval {
-	new_interval := &Interval{t.count,
-		SquareSegment{xmin: xmin, xmax: xmax, ymin: ymin, ymax: ymax}}
+func (t *stree) Push(xmin, xmax, ymin, ymax int, data *[]byte) *Interval {
+	new_interval := &Interval{
+		Id:            t.count,
+		Data:          data,
+		SquareSegment: SquareSegment{xmin: xmin, xmax: xmax, ymin: ymin, ymax: ymax},
+	}
 	t.count++
 
 	t.base = append(t.base, new_interval)

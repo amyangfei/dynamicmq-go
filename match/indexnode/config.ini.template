@@ -1,0 +1,14 @@
+[basic]
+node_id = idxn0101
+bind_ip = 127.0.0.1
+pub_tcp_port = 6000
+workdir = .
+log_level = DEBUG
+log_file = ./indexnode.log
+pid_file = ./indexnode.pid
+tcp_recvbuf_size = 2048
+tcp_sendbuf_size = 2048
+tcp_bufio_num = 64
+
+[etcd]
+machines = http://localhost:4001

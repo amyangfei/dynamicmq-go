@@ -1,4 +1,4 @@
-package segtree
+package main
 
 import (
 	"fmt"
@@ -94,22 +94,22 @@ func clearMap(m *map[int]*Interval) {
 
 func TestPushAndQuery(t *testing.T) {
 	tree := NewTree(0, 4, 0, 4)
-	tree.Push(0, 1, 0, 1)
-	tree.Push(1, 2, 1, 2)
-	tree.Push(1, 3, 1, 3)
-	tree.Push(0, 2, 0, 2)
-	tree.Push(2, 4, 2, 4)
-	tree.Push(2, 4, 1, 4)
-	tree.Push(0, 3, 0, 2)
+	tree.Push(0, 1, 0, 1, nil)
+	tree.Push(1, 2, 1, 2, nil)
+	tree.Push(1, 3, 1, 3, nil)
+	tree.Push(0, 2, 0, 2, nil)
+	tree.Push(2, 4, 2, 4, nil)
+	tree.Push(2, 4, 1, 4, nil)
+	tree.Push(0, 3, 0, 2, nil)
 	tree.Print()
 
 	var intervals []*Interval
 
 	intervals = tree.Query(0.5, 0.5)
 	expected := make(map[int]*Interval, 0)
-	expected[0] = &Interval{0, SquareSegment{0, 1, 0, 1}}
-	expected[3] = &Interval{3, SquareSegment{0, 2, 0, 2}}
-	expected[6] = &Interval{6, SquareSegment{0, 3, 0, 2}}
+	expected[0] = &Interval{0, nil, SquareSegment{0, 1, 0, 1}}
+	expected[3] = &Interval{3, nil, SquareSegment{0, 2, 0, 2}}
+	expected[6] = &Interval{6, nil, SquareSegment{0, 3, 0, 2}}
 	if len(intervals) != len(expected) {
 		t.Errorf("error query result for (0.5, 0.5)")
 	}
@@ -126,11 +126,11 @@ func TestPushAndQuery(t *testing.T) {
 
 	clearMap(&expected)
 	intervals = tree.Query(1, 1)
-	expected[0] = &Interval{0, SquareSegment{0, 1, 0, 1}}
-	expected[1] = &Interval{1, SquareSegment{1, 2, 1, 2}}
-	expected[2] = &Interval{2, SquareSegment{1, 3, 1, 3}}
-	expected[3] = &Interval{0, SquareSegment{0, 2, 0, 2}}
-	expected[6] = &Interval{6, SquareSegment{0, 3, 0, 2}}
+	expected[0] = &Interval{0, nil, SquareSegment{0, 1, 0, 1}}
+	expected[1] = &Interval{1, nil, SquareSegment{1, 2, 1, 2}}
+	expected[2] = &Interval{2, nil, SquareSegment{1, 3, 1, 3}}
+	expected[3] = &Interval{0, nil, SquareSegment{0, 2, 0, 2}}
+	expected[6] = &Interval{6, nil, SquareSegment{0, 3, 0, 2}}
 	if len(intervals) != len(expected) {
 		t.Errorf("error query result for (1, 1)")
 	}
@@ -147,9 +147,9 @@ func TestPushAndQuery(t *testing.T) {
 
 	clearMap(&expected)
 	intervals = tree.Query(2.5, 2.5)
-	expected[2] = &Interval{2, SquareSegment{1, 3, 1, 3}}
-	expected[4] = &Interval{4, SquareSegment{2, 4, 2, 4}}
-	expected[5] = &Interval{5, SquareSegment{2, 4, 1, 4}}
+	expected[2] = &Interval{2, nil, SquareSegment{1, 3, 1, 3}}
+	expected[4] = &Interval{4, nil, SquareSegment{2, 4, 2, 4}}
+	expected[5] = &Interval{5, nil, SquareSegment{2, 4, 1, 4}}
 	if len(intervals) != len(expected) {
 		t.Errorf("error query result for (2.5, 2.5)")
 	}
@@ -177,13 +177,13 @@ func TestPushAndQuery(t *testing.T) {
 func TestDelete(t *testing.T) {
 	tree := NewTree(0, 4, 0, 4)
 	intervals := make([]*Interval, 0)
-	intervals = append(intervals, tree.Push(0, 1, 0, 1))
-	intervals = append(intervals, tree.Push(1, 2, 1, 2))
-	intervals = append(intervals, tree.Push(1, 3, 1, 3))
-	intervals = append(intervals, tree.Push(0, 2, 0, 2))
-	intervals = append(intervals, tree.Push(2, 4, 2, 4))
-	intervals = append(intervals, tree.Push(2, 4, 1, 4))
-	intervals = append(intervals, tree.Push(0, 3, 0, 2))
+	intervals = append(intervals, tree.Push(0, 1, 0, 1, nil))
+	intervals = append(intervals, tree.Push(1, 2, 1, 2, nil))
+	intervals = append(intervals, tree.Push(1, 3, 1, 3, nil))
+	intervals = append(intervals, tree.Push(0, 2, 0, 2, nil))
+	intervals = append(intervals, tree.Push(2, 4, 2, 4, nil))
+	intervals = append(intervals, tree.Push(2, 4, 1, 4, nil))
+	intervals = append(intervals, tree.Push(0, 3, 0, 2, nil))
 	tree.Print()
 	for _, interval := range intervals {
 		tree.Delete(interval)

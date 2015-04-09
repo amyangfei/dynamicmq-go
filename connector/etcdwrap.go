@@ -177,7 +177,7 @@ func RemoveSub(cli *SubClient, cfg *SrvConfig) error {
 	}
 
 	key := dmq.GetInfoKey(dmq.EtcdSubscriberType, cli.id.Hex())
-	attrKey := dmq.GetSubAttrBase(cli.id.Hex())
+	attrKey := dmq.GetSubAttrCliBase(cli.id.Hex())
 
 	_, infoErr := c.Delete(key, true)
 	_, attrErr := c.Delete(attrKey, true)
