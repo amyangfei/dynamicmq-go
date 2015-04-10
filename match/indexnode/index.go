@@ -1,6 +1,8 @@
 package main
 
-import ()
+import (
+	"fmt"
+)
 
 type IndexBase struct {
 	dimension int
@@ -20,6 +22,24 @@ type AttrIndex struct {
 	yname string
 }
 
+// TODO: uniform Attribute structure, also used in connector module.
+type Attribute struct {
+	name   string
+	use    byte
+	strval string
+	low    float64
+	high   float64
+	extra  string
+}
+
+func AttrCombine(xattr, yattr string) string {
+	if xattr < yattr {
+		return fmt.Sprintf("%s-%s", xattr, yattr)
+	} else {
+		return fmt.Sprintf("%s-%s", yattr, xattr)
+	}
+}
+
 func buildSigleAttrIndex(xattr, yattr *AttrBase) *AttrIndex {
 	aidx := &AttrIndex{
 		xname: xattr.name,
@@ -29,7 +49,7 @@ func buildSigleAttrIndex(xattr, yattr *AttrBase) *AttrIndex {
 	return aidx
 }
 
-func InitIndex(attridxes *[]*AttrIndex, idxbase *IndexBase) error {
+func InitIndex(attridxes map[string]*AttrIndex, idxbase *IndexBase) error {
 	c, err := GetEtcdClient(Config.EtcdMachines)
 	if err != nil {
 		return err
@@ -43,7 +63,8 @@ func InitIndex(attridxes *[]*AttrIndex, idxbase *IndexBase) error {
 		for j := i + 1; j < idxNum; j++ {
 			attrindex := buildSigleAttrIndex(
 				idxbase.attrbases[i], idxbase.attrbases[j])
-			*attridxes = append(*attridxes, attrindex)
+			ackey := AttrCombine(idxbase.attrbases[i].name, idxbase.attrbases[j].name)
+			attridxes[ackey] = attrindex
 		}
 	}
 	return nil

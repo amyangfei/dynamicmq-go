@@ -26,6 +26,18 @@ var (
 	IdxAttrUpper = "upper"
 )
 
+// Action name mapping in etcd
+const (
+	EtcdActionGet              = "get"
+	EtcdActionCreate           = "create"
+	EtcdActionSet              = "set"
+	EtcdActionUpdate           = "update"
+	EtcdActionDelete           = "delete"
+	EtcdActionCompareAndSwap   = "compareAndSwap"
+	EtcdActionCompareAndDelete = "compareAndDelete"
+	EtcdActionExpire           = "expire"
+)
+
 var (
 	ConnectorNodeIdSize  = 8
 	DispatcherNodeIdSize = 8

@@ -14,8 +14,14 @@ func subscribe(cli *sdk.SubSdk) {
 	attrvals := make([]string, 0)
 	attrnames = append(attrnames, "strval_attr")
 	attrvals = append(attrvals, `{"use": 1, "strval": "hello"}`)
-	attrnames = append(attrnames, "range_attr")
-	attrvals = append(attrvals, `{"use": 2, "low": 12.5, "high": 21.7}`)
+	attrnames = append(attrnames, "xcoord")
+	attrvals = append(attrvals, `{"use": 2, "low": 2.5, "high": 4.7}`)
+	attrnames = append(attrnames, "ycoord")
+	attrvals = append(attrvals, `{"use": 2, "low": 0.4, "high": 1.2}`)
+	attrnames = append(attrnames, "zcoord")
+	attrvals = append(attrvals, `{"use": 2, "low": 7, "high": 9.9}`)
+	attrnames = append(attrnames, "time")
+	attrvals = append(attrvals, `{"use": 2, "low": 3, "high": 6.2}`)
 
 	cli.Subscribe(attrnames, attrvals)
 }

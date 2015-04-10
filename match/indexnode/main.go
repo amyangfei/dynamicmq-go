@@ -15,9 +15,17 @@ import (
 )
 
 var Config *SrvConfig
-var IdxBase *IndexBase
-var AttrIdxes []*AttrIndex
 var log = logging.MustGetLogger("dynamicmq-match-indexnode")
+
+// Store attribute basic information including dimension, each dimension's range.
+var IdxBase *IndexBase
+
+// mapping from attribute-combination to its corresponding segment tree index
+var AttrIdxes map[string]*AttrIndex
+
+// Mapping from subclient's id to its subscription attribute array.
+// The subclient's id is in BSON format, not hex string.
+var CliAttrs map[string][]*Attribute
 
 // InitSignal register signals handler.
 func InitSignal() chan os.Signal {
@@ -116,8 +124,9 @@ func InitLog(logFile string) error {
 func InitServer() error {
 	log.Info("Indexnode server is starting...")
 	IdxBase = &IndexBase{}
-	AttrIdxes = make([]*AttrIndex, 0)
-	if err := InitIndex(&AttrIdxes, IdxBase); err != nil {
+	AttrIdxes = make(map[string]*AttrIndex)
+	CliAttrs = make(map[string][]*Attribute)
+	if err := InitIndex(AttrIdxes, IdxBase); err != nil {
 		return err
 	}
 	return nil
