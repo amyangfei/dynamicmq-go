@@ -16,6 +16,7 @@ import (
 
 var Config *SrvConfig
 var IdxBase *IndexBase
+var AttrIdxes []*AttrIndex
 var log = logging.MustGetLogger("dynamicmq-match-indexnode")
 
 // InitSignal register signals handler.
@@ -114,11 +115,16 @@ func InitLog(logFile string) error {
 
 func InitServer() error {
 	log.Info("Indexnode server is starting...")
+	IdxBase = &IndexBase{}
+	AttrIdxes = make([]*AttrIndex, 0)
+	if err := InitIndex(&AttrIdxes, IdxBase); err != nil {
+		return err
+	}
 	return nil
 }
 
 func ShutdownServer() {
-	log.Info("Indexnode stop...")
+	log.Info("Indexnode server stop...")
 	os.Exit(0)
 }
 

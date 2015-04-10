@@ -12,7 +12,7 @@ var etcdMachines = []string{"http://localhost:4001"}
 var dimension = 4
 var names = []string{"xcoord", "ycoord", "zcoord", "time"}
 var lower = []int{0, 0, 0, 0}
-var upper = []int{20, 20, 20, 20}
+var upper = []int{8, 8, 8, 8}
 
 var cmd = flag.String("cmd", "build", "build/clean")
 
