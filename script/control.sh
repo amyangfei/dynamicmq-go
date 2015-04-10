@@ -245,7 +245,7 @@ if [ $1 == "-h" ]; then
     show_help $*
 fi
 
-if [ $# -lt 2 ]; then
+if [ $# -lt 2 ] && [ "$1" != "status" ]; then
     show_help $*
 fi
 

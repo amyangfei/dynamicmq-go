@@ -131,6 +131,22 @@ func RegisterSub(cli *SubClient, cfg *SrvConfig) error {
 	return nil
 }
 
+// UpdateSubAttr succeeds only if the given key does not yet exists.
+func CreateSubAttr(cli *SubClient, attr *Attribute, cfg *SrvConfig) error {
+	key := dmq.GetSubAttrKey(cli.id.Hex(), attr.name)
+	jsonStr, err := AttrMarshal(attr)
+	if err != nil {
+		return err
+	}
+	c, err := GetEtcdClient(cfg)
+	if err != nil {
+		return err
+	}
+	_, err = c.Create(key, string(jsonStr), 0)
+	return err
+}
+
+// UpdateSubAttr succeeds only if the given key already exists.
 func UpdateSubAttr(cli *SubClient, attr *Attribute, cfg *SrvConfig) error {
 	key := dmq.GetSubAttrKey(cli.id.Hex(), attr.name)
 	jsonStr, err := AttrMarshal(attr)
@@ -141,7 +157,7 @@ func UpdateSubAttr(cli *SubClient, attr *Attribute, cfg *SrvConfig) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.Set(key, string(jsonStr), 0)
+	_, err = c.Update(key, string(jsonStr), 0)
 	return err
 }
 

@@ -284,7 +284,10 @@ func processSubscribe(cli *SubClient, args []string) error {
 			return err
 		}
 
+		isNewAttr, update := false, false
+
 		if _, ok := cli.attrs[name]; !ok {
+			isNewAttr = true
 			cli.attrs[name] = &Attribute{
 				name: name,
 				use:  0,
@@ -302,7 +305,7 @@ func processSubscribe(cli *SubClient, args []string) error {
 
 		cli.attrs[name].use = byte(int(useval))
 
-		var update bool = false
+		// TODO: subscription attribute validation
 		switch int(useval) {
 		case dmq.AttrUseField["strval"]:
 			if strval, ok := data["strval"].(string); !ok {
@@ -322,6 +325,9 @@ func processSubscribe(cli *SubClient, args []string) error {
 			if !ok {
 				return errors.New("invalid sub command, high not found")
 			}
+			if high < low {
+				return fmt.Errorf("invalid attribute %f < %f", high, low)
+			}
 			if low != cli.attrs[name].low {
 				cli.attrs[name].low = low
 				update = true
@@ -340,7 +346,12 @@ func processSubscribe(cli *SubClient, args []string) error {
 				}
 			}
 		}
-		if update {
+		if isNewAttr {
+			if err := CreateSubAttr(cli, cli.attrs[name], Config); err != nil {
+				log.Error("create sub attr with error(%v)", err)
+			}
+			log.Debug("create sub attr %s %v", name, cli.attrs[name])
+		} else if update {
 			if err := UpdateSubAttr(cli, cli.attrs[name], Config); err != nil {
 				log.Error("update sub attr with error(%v)", err)
 			}
