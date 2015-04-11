@@ -12,3 +12,4 @@ match/datanode/datanode
 match/indexnode/indexnode
 cmd/subscriber/subscriber
 cmd/pusher/pusher
+cmd/publisher/publisher

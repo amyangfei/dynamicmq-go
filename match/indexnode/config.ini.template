@@ -1,7 +1,7 @@
 [basic]
 node_id = idxn0101
 bind_ip = 127.0.0.1
-pub_tcp_port = 6000
+pub_tcp_port = 8000
 workdir = .
 log_level = DEBUG
 log_file = ./indexnode.log

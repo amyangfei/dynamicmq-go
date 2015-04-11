@@ -172,6 +172,8 @@ func main() {
 
 	NotifyService()
 
+	StartPubTCP(Config.PubTCPBind)
+
 	signalChan := InitSignal()
 	HandleSignal(signalChan)
 }

@@ -141,6 +141,28 @@ var (
 	SDDMsgItemVNodeListId uint8 = 6
 )
 
+// Message protocol from publisher to matching service
+var (
+	PMMsgCmdSize        uint16 = 1
+	PMMsgBodySize       uint16 = 2
+	PMMsgExtraSize      uint16 = 1
+	PMMsgHeaderSize     uint16 = PMMsgCmdSize + PMMsgBodySize + PMMsgExtraSize
+	PMMsgItemIdSize     uint16 = 1
+	PMMsgItemBodySize   uint16 = 2
+	PMMsgItemHeaderSize uint16 = PMMsgItemIdSize + PMMsgItemBodySize
+	PMMsgMaxBodyLen     uint16 = 2000
+
+	// command
+	PMMsgCmdPushMsg uint8 = 1
+
+	// Extra Field
+	PMMsgExtraNone uint8 = 0x00
+
+	// Message body item id
+	PMMsgItemAttributeId uint8 = 1
+	PMMsgItemPayloadId   uint8 = 2
+)
+
 // attribute type in subscription
 var (
 	AttrUseField = map[string]int{
