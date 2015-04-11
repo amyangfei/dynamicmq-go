@@ -6,11 +6,13 @@ import (
 
 // Main interface to access the segment tree
 type Tree interface {
-	Push(xmin, ymin, xmax, ymax int, data *[]byte) *Interval // Push new interval to tree
+	Push(xmin, xmax, ymin, ymax int, data *[]byte) *Interval // Push new interval to tree
 
 	Delete(interval *Interval) // Delete specific Interval from tree
 
-	Count(x, y float64) int // Query the count of intervals that covers the given point
+	Count() int // Return interval count
+
+	QueryCount(x, y float64) int // Query the count of intervals that covers the given point
 
 	Query(x, y float64) []*Interval // Query intervals that covers the given point
 
@@ -148,8 +150,6 @@ func (n *node) IsLeaf() bool {
 }
 
 type stree struct {
-	count int // Number of segments
-
 	root *node
 	base []*Interval // Interval stack
 
@@ -161,11 +161,10 @@ type stree struct {
 
 func (t *stree) Push(xmin, xmax, ymin, ymax int, data *[]byte) *Interval {
 	new_interval := &Interval{
-		Id:            t.count,
+		Id:            t.Count(),
 		Data:          data,
 		SquareSegment: SquareSegment{xmin: xmin, xmax: xmax, ymin: ymin, ymax: ymax},
 	}
-	t.count++
 
 	t.base = append(t.base, new_interval)
 	insertInterval(t.root, new_interval)
@@ -174,7 +173,18 @@ func (t *stree) Push(xmin, xmax, ymin, ymax int, data *[]byte) *Interval {
 }
 
 func (t *stree) Delete(interval *Interval) {
+	// remove interval from all the segments containing it.
 	deleteInterval(t.root, interval)
+
+	// remove interval from tree.base
+	baseLen := len(t.base)
+	for idx, ival := range t.base {
+		if ival == interval {
+			t.base[baseLen-1], t.base =
+				nil, append(t.base[:idx], t.base[idx+1:]...)
+			break
+		}
+	}
 }
 
 func deleteInterval(node *node, interval *Interval) {
@@ -198,7 +208,11 @@ func deleteInterval(node *node, interval *Interval) {
 	}
 }
 
-func (t *stree) Count(x, y float64) int {
+func (t *stree) Count() int {
+	return len(t.base)
+}
+
+func (t *stree) QueryCount(x, y float64) int {
 	return countSingle(t.root, x, y)
 }
 
@@ -335,7 +349,6 @@ func insertNodes(xmin, xmax, ymin, ymax, level int, parent *node) *node {
 func NewTree(xmin, xmax, ymin, ymax int) Tree {
 	t := new(stree)
 
-	t.count = 0
 	t.base = make([]*Interval, 0)
 
 	t.xmin = xmin

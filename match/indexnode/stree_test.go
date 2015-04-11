@@ -113,7 +113,7 @@ func TestPushAndQuery(t *testing.T) {
 	if len(intervals) != len(expected) {
 		t.Errorf("error query result for (0.5, 0.5)")
 	}
-	if count := tree.Count(0.5, 0.5); count != len(expected) {
+	if count := tree.QueryCount(0.5, 0.5); count != len(expected) {
 		t.Errorf("error query count result %d for (0.5, 0.5), expected %d", count, len(expected))
 	}
 	for _, interval := range intervals {
@@ -134,7 +134,7 @@ func TestPushAndQuery(t *testing.T) {
 	if len(intervals) != len(expected) {
 		t.Errorf("error query result for (1, 1)")
 	}
-	if count := tree.Count(1, 1); count != len(expected) {
+	if count := tree.QueryCount(1, 1); count != len(expected) {
 		t.Errorf("error query count result %d for (1, 1), expected %d", count, len(expected))
 	}
 	for _, interval := range intervals {
@@ -153,7 +153,7 @@ func TestPushAndQuery(t *testing.T) {
 	if len(intervals) != len(expected) {
 		t.Errorf("error query result for (2.5, 2.5)")
 	}
-	if count := tree.Count(2.5, 2.5); count != len(expected) {
+	if count := tree.QueryCount(2.5, 2.5); count != len(expected) {
 		t.Errorf("error query count result %d for (2.5, 2.5), expected %d", count, len(expected))
 	}
 	for _, interval := range intervals {
@@ -169,7 +169,7 @@ func TestPushAndQuery(t *testing.T) {
 	if len(intervals) != len(expected) {
 		t.Errorf("error query result for (5, 5)")
 	}
-	if count := tree.Count(5, 5); count != len(expected) {
+	if count := tree.QueryCount(5, 5); count != len(expected) {
 		t.Errorf("error query count result %d for (5, 5), expected %d", count, len(expected))
 	}
 }
@@ -185,8 +185,13 @@ func TestDelete(t *testing.T) {
 	intervals = append(intervals, tree.Push(2, 4, 1, 4, nil))
 	intervals = append(intervals, tree.Push(0, 3, 0, 2, nil))
 	tree.Print()
+	cnt := tree.Count()
 	for _, interval := range intervals {
 		tree.Delete(interval)
+		cnt--
+		if tree.Count() != cnt {
+			t.Errorf("interval count %d, should be %d", tree.Count(), cnt)
+		}
 		tree.Print()
 	}
 }
