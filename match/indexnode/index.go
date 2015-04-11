@@ -6,7 +6,8 @@ import (
 
 type IndexBase struct {
 	dimension int
-	attrbases []*AttrBase
+	// mapping from attribute name to this attribute's information(AttrBase)
+	attrbases map[string]*AttrBase
 }
 
 type AttrBase struct {
@@ -16,6 +17,7 @@ type AttrBase struct {
 	sigval    []string
 }
 
+// A standalone segment tree index structure, including two dimension's attribute.
 type AttrIndex struct {
 	tree  Tree
 	xname string
@@ -32,11 +34,33 @@ type Attribute struct {
 	extra  string
 }
 
-func AttrCombine(xattr, yattr string) string {
+type SubCliInfo struct {
+	Cid    []byte               // subscribe client's Id
+	Attrs  []*Attribute         // subscription attribute array
+	Intval map[string]*Interval // mapping from attr-combine name to interval stores in segment tree
+}
+
+func AttrNameCombine(xattr, yattr string) string {
 	if xattr < yattr {
 		return fmt.Sprintf("%s-%s", xattr, yattr)
 	} else {
 		return fmt.Sprintf("%s-%s", yattr, xattr)
+	}
+}
+
+func AttrSort(xattr, yattr *Attribute) (*Attribute, *Attribute) {
+	if xattr.name < yattr.name {
+		return xattr, yattr
+	} else {
+		return yattr, xattr
+	}
+}
+
+func AttrBaseSort(xab, yab *AttrBase) (*AttrBase, *AttrBase) {
+	if xab.name < yab.name {
+		return xab, yab
+	} else {
+		return yab, xab
 	}
 }
 
@@ -58,14 +82,23 @@ func InitIndex(attridxes map[string]*AttrIndex, idxbase *IndexBase) error {
 		return err
 	}
 
-	idxNum := len(idxbase.attrbases)
+	attrbasesArray := make([]*AttrBase, 0)
+	for _, ab := range idxbase.attrbases {
+		attrbasesArray = append(attrbasesArray, ab)
+	}
+	idxNum := len(attrbasesArray)
 	for i := 0; i < idxNum-1; i++ {
 		for j := i + 1; j < idxNum; j++ {
 			attrindex := buildSigleAttrIndex(
-				idxbase.attrbases[i], idxbase.attrbases[j])
-			ackey := AttrCombine(idxbase.attrbases[i].name, idxbase.attrbases[j].name)
+				AttrBaseSort(attrbasesArray[i], attrbasesArray[j]))
+			ackey := AttrNameCombine(
+				attrbasesArray[i].name, attrbasesArray[j].name)
 			attridxes[ackey] = attrindex
 		}
 	}
 	return nil
+}
+
+func (aidx *AttrIndex) InsertCliAttr(xmin, xmax, ymin, ymax int, data *[]byte) *Interval {
+	return aidx.tree.Push(xmin, xmax, ymin, ymax, data)
 }

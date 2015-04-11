@@ -15,7 +15,7 @@ func GetEtcdClient(machines []string) (*etcd.Client, error) {
 
 func LoadIndexBase(c *etcd.Client, idxBase *IndexBase) error {
 	if idxBase.attrbases == nil {
-		idxBase.attrbases = make([]*AttrBase, 0)
+		idxBase.attrbases = make(map[string]*AttrBase)
 	}
 
 	// load /idx/info/dimension
@@ -79,7 +79,7 @@ func LoadIndexBase(c *etcd.Client, idxBase *IndexBase) error {
 				low:  lower,
 				high: upper,
 			}
-			idxBase.attrbases = append(idxBase.attrbases, attrbase)
+			idxBase.attrbases[attrName] = attrbase
 		}
 	}
 

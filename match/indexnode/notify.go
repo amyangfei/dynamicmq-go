@@ -6,7 +6,9 @@ import (
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"github.com/coreos/go-etcd/etcd"
+	"math"
 	"regexp"
+	"strings"
 )
 
 var (
@@ -17,6 +19,9 @@ var (
 	}
 )
 
+// extract clientid and attribute name of subscription
+// e.g. extract 5528c41448a90c1c73000015 and zcoord from
+// "/sub/attr/5528c41448a90c1c73000015/zcoord"
 func extractInfoFromSubKey(subkey string) (string, string) {
 	regStr := fmt.Sprintf("^%s$", dmq.GetSubAttrKey("([0-9a-f]{24})", "([\\S]+)"))
 	regex := regexp.MustCompile(regStr)
@@ -24,6 +29,29 @@ func extractInfoFromSubKey(subkey string) (string, string) {
 	match := regex.FindStringSubmatch(subkey)
 	if len(match) != 3 {
 		return "", ""
+	} else {
+		return match[1], match[2]
+	}
+}
+
+// extract clientid and attribute name
+// the attribute name could be empty if the client delete all its subscription
+// attribute from etcd directly.
+func extractInfoFromDelKey(delkey string) (string, string) {
+	regStr1 := fmt.Sprintf("^%s$", dmq.GetSubAttrKey("([0-9a-f]{24})", "([\\S]+)"))
+	regex1 := regexp.MustCompile(regStr1)
+
+	regStr2 := fmt.Sprintf("^%s$", dmq.GetSubAttrCliBase("([0-9a-f]{24})"))
+	regex2 := regexp.MustCompile(regStr2)
+
+	match := regex1.FindStringSubmatch(delkey)
+	if len(match) != 3 {
+		match2 := regex2.FindStringSubmatch(delkey)
+		if len(match2) != 2 {
+			return "", ""
+		} else {
+			return match2[1], ""
+		}
 	} else {
 		return match[1], match[2]
 	}
@@ -90,25 +118,54 @@ func processAttrCreate(data *etcd.Response) error {
 	}
 	attr.name = attrName
 
-	// TODO: support more attribute expression beyond 'range'
+	// TODO: support more attribute expression besides 'range'
 	if int(attr.use) != dmq.AttrUseField["range"] {
 		return nil
 	}
 
-	bid, err := hex.DecodeString(cliId)
+	cid, err := hex.DecodeString(cliId)
 	if err != nil {
 		return fmt.Errorf("invalid client id: %s", cliId)
 	}
-	cidstr := string(bid)
-	if _, ok := CliAttrs[cidstr]; !ok {
-		CliAttrs[cidstr] = make([]*Attribute, 0)
-		CliAttrs[cidstr] = append(CliAttrs[cidstr], attr)
-	} else {
-		for _, subattr := range CliAttrs[cidstr] {
-			// TODO: insert subclient to index tree
-			log.Debug("attr combine %s-%s", subattr.name, attr.name)
+	cidstr := string(cid)
+	if _, ok := ClisInfo[cidstr]; !ok {
+		ClisInfo[cidstr] = &SubCliInfo{
+			Cid:    cid,
+			Attrs:  make([]*Attribute, 0),
+			Intval: make(map[string]*Interval),
 		}
-		CliAttrs[cidstr] = append(CliAttrs[cidstr], attr)
+		ClisInfo[cidstr].Attrs = append(ClisInfo[cidstr].Attrs, attr)
+	} else {
+		for _, subattr := range ClisInfo[cidstr].Attrs {
+			xattr, yattr := AttrSort(subattr, attr)
+			xmin, xmax := int(math.Floor(xattr.low)), int(math.Ceil(xattr.high))
+			ymin, ymax := int(math.Floor(yattr.low)), int(math.Ceil(yattr.high))
+			if xmin < IdxBase.attrbases[xattr.name].low {
+				xmin = IdxBase.attrbases[xattr.name].low
+			}
+			if xmax > IdxBase.attrbases[xattr.name].high {
+				xmax = IdxBase.attrbases[xattr.name].high
+			}
+			if ymin < IdxBase.attrbases[yattr.name].low {
+				ymin = IdxBase.attrbases[yattr.name].low
+			}
+			if ymax > IdxBase.attrbases[yattr.name].high {
+				ymax = IdxBase.attrbases[yattr.name].high
+			}
+			cname := AttrNameCombine(xattr.name, yattr.name)
+			if aidx, ok := AttrIdxesMap[cname]; !ok {
+				return fmt.Errorf("attribute combine name %s not found", cname)
+			} else {
+				ival := aidx.InsertCliAttr(
+					xmin, xmax, ymin, ymax, &ClisInfo[cidstr].Cid)
+				combineName := AttrNameCombine(xattr.name, yattr.name)
+				ClisInfo[cidstr].Intval[combineName] = ival
+			}
+
+			// TODO: insert subclient to index tree
+			log.Debug("attr combine %s-%s", xattr.name, yattr.name)
+		}
+		ClisInfo[cidstr].Attrs = append(ClisInfo[cidstr].Attrs, attr)
 	}
 
 	return nil
@@ -119,6 +176,58 @@ func processAttrUpdate(data *etcd.Response) error {
 }
 
 func processAttrDelete(data *etcd.Response) error {
+	// if attrName is empty, we will delete all this client's subscription info.
+	cliId, attrName := extractInfoFromDelKey(data.Node.Key)
+	if cliId == "" {
+		return fmt.Errorf("invalid attr delete notify key: %s", data.Node.Key)
+	}
+
+	cid, err := hex.DecodeString(cliId)
+	if err != nil {
+		return fmt.Errorf("invalid client id: %s", cliId)
+	}
+	cidstr := string(cid)
+	if _, ok := ClisInfo[cidstr]; !ok {
+		return fmt.Errorf("client not exists: %s", cliId)
+	} else {
+		// remove attrName from Attrs of this subclient, if attrName is empty,
+		// remove all the attrs.
+		if attrName == "" {
+			for i := 0; i < len(ClisInfo[cidstr].Attrs); i++ {
+				ClisInfo[cidstr].Attrs[i] = nil
+			}
+			ClisInfo[cidstr].Attrs = nil
+		} else {
+			attrNum := len(ClisInfo[cidstr].Attrs)
+			for i := 0; i < attrNum; i++ {
+				if ClisInfo[cidstr].Attrs[i].name == attrName {
+					ClisInfo[cidstr].Attrs[attrNum-1], ClisInfo[cidstr].Attrs =
+						nil,
+						append(ClisInfo[cidstr].Attrs[:i],
+							ClisInfo[cidstr].Attrs[i+1:]...)
+					break
+				}
+			}
+		}
+
+		// remove all intervals containing attrName from segment tree
+		for combineName, ival := range ClisInfo[cidstr].Intval {
+			// Contains(s, substr string) always returns true if substr is ""
+			if strings.Contains(combineName, attrName) {
+				// remove inteval from segment tree index
+				AttrIdxesMap[combineName].tree.Delete(ival)
+				// delete key-value pair from ClisInfo's intval map
+				delete(ClisInfo[cidstr].Intval, combineName)
+			}
+		}
+		if len(ClisInfo[cidstr].Attrs) == 0 {
+			// TODO: memory check http://stackoverflow.com/a/23231539/1115857
+			ClisInfo[cidstr].Intval = nil
+			ClisInfo[cidstr] = nil
+			delete(ClisInfo, cidstr)
+		}
+	}
+
 	return nil
 }
 
@@ -145,7 +254,9 @@ func AttrWatcher(machines []string) {
 	for {
 		select {
 		case data := <-receiver:
-			processAttrNotify(data)
+			if err := processAttrNotify(data); err != nil {
+				log.Error("process attr notify with error: %v", err)
+			}
 		}
 	}
 }

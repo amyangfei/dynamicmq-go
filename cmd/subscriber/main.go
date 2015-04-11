@@ -4,10 +4,29 @@ import (
 	"fmt"
 	sdk "github.com/amyangfei/dynamicmq-go/sdk"
 	"gopkg.in/mgo.v2/bson"
+	"math/rand"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 )
+
+func randRange(lower, upper int) (float64, float64) {
+	low := rand.Float64()*float64(upper-lower) + float64(lower)
+	high := rand.Float64()*float64(upper-lower) + float64(lower)
+	if low > high {
+		low, high = high, low
+	}
+	low, _ = strconv.ParseFloat(fmt.Sprintf("%.1f", low), 64)
+	high, _ = strconv.ParseFloat(fmt.Sprintf("%.1f", high), 64)
+	return low, high
+}
+
+func attrGen() string {
+	tpl := `{"use": 2, "low": %.1f, "high": %.1f}`
+	low, high := randRange(0, 10)
+	return fmt.Sprintf(tpl, low, high)
+}
 
 func subscribe(cli *sdk.SubSdk) {
 	attrnames := make([]string, 0)
@@ -15,13 +34,13 @@ func subscribe(cli *sdk.SubSdk) {
 	attrnames = append(attrnames, "strval_attr")
 	attrvals = append(attrvals, `{"use": 1, "strval": "hello"}`)
 	attrnames = append(attrnames, "xcoord")
-	attrvals = append(attrvals, `{"use": 2, "low": 2.5, "high": 4.7}`)
+	attrvals = append(attrvals, attrGen())
 	attrnames = append(attrnames, "ycoord")
-	attrvals = append(attrvals, `{"use": 2, "low": 0.4, "high": 1.2}`)
+	attrvals = append(attrvals, attrGen())
 	attrnames = append(attrnames, "zcoord")
-	attrvals = append(attrvals, `{"use": 2, "low": 7, "high": 9.9}`)
+	attrvals = append(attrvals, attrGen())
 	attrnames = append(attrnames, "time")
-	attrvals = append(attrvals, `{"use": 2, "low": 3, "high": 6.2}`)
+	attrvals = append(attrvals, attrGen())
 
 	cli.Subscribe(attrnames, attrvals)
 }
