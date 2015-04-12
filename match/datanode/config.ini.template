@@ -23,3 +23,6 @@ rpc_port = 5500
 num_vnodes = 16
 num_successors = 3
 hash_bits = 160
+
+[etcd]
+machines = http://localhost:4001

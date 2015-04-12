@@ -31,3 +31,11 @@
     * each dimension attribute's lower and upper bound
         * /idx/info/bound/<attr-name>/lower
         * /idx/info/bound/<attr-name>/upper
+
+## datanode chord information
+    * datanode
+        * /datn/pnode/<node-id>/status new/active/offline
+        * /datn/pnode/<node-id>/pub_addr
+
+    * vnode
+        * /datn/vnode/<vnode-hash> node-id

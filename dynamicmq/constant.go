@@ -10,6 +10,7 @@ var (
 	EtcdDispatcherType = "disp"
 	EtcdSubscriberType = "sub"
 	EtcdIndexInfoType  = "idx"
+	EtcdDataNodeType   = "datn"
 )
 
 // Etcd name mapping
@@ -24,6 +25,16 @@ var (
 
 	IdxAttrLower = "lower"
 	IdxAttrUpper = "upper"
+
+	DataPnodeStatus  = "status"
+	DataPnodePubAddr = "pub_addr"
+
+	DataPnode = "pnode"
+	DataVnode = "vnode"
+
+	DataNodeStatusNew     = "new"
+	DataNodeStatusActive  = "active"
+	DataNodeStatusOffline = "offline"
 )
 
 // Action name mapping in etcd

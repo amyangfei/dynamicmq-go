@@ -50,6 +50,14 @@ func GetIndexBaseBoundKey(attrname, lowerOrUpper string) string {
 	return fmt.Sprintf("%s/%s/%s", GetIndexBaseBound(), attrname, lowerOrUpper)
 }
 
+func GetDataPNodeKey(nodeId string) string {
+	return fmt.Sprintf("/%s/%s/%s", EtcdDataNodeType, DataPnode, nodeId)
+}
+
+func GetDataVnodeKey() string {
+	return fmt.Sprintf("/%s/%s", EtcdDataNodeType, DataVnode)
+}
+
 func GetWaitingLockMgr(machines []string, owner string) *sherlock.EtcdLock {
 	client := etcd.NewClient(machines)
 	l := sherlock.NewEtcdLock("WaitingConnector", client)

@@ -34,4 +34,7 @@ type SrvConfig struct {
 	HashBits      int
 	StartHash     []byte
 	Entrypoint    string
+
+	// etcd
+	EtcdMachines []string
 }

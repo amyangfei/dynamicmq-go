@@ -13,12 +13,14 @@ import (
 	"os/signal"
 	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 )
 
 var Config *SrvConfig
 var log = logging.MustGetLogger("dynamicmq-match-datanode")
 var serfLog *os.File
+var ChordNode *chord.Node
 
 // InitSignal register signals handler.
 func InitSignal() chan os.Signal {
@@ -78,9 +80,13 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 	chordFlagSet.Int("num_successors", 3, "chord successor node numbers")
 	chordFlagSet.Int("hash_bits", 160, "chord hash bits")
 
+	etcdFlagSet := flag.NewFlagSet("etcd", flag.PanicOnError)
+	etcdFlagSet.String("machines", "http://localhost:4001", "etcd machines")
+
 	globalconf.Register("basic", basicFlagSet)
 	globalconf.Register("serf", serfFlagSet)
 	globalconf.Register("chord", chordFlagSet)
+	globalconf.Register("etcd", etcdFlagSet)
 
 	conf.ParseAll()
 
@@ -121,6 +127,9 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 		strconv.Atoi(chordFlagSet.Lookup("num_successors").Value.String())
 	Config.HashBits, err =
 		strconv.Atoi(chordFlagSet.Lookup("hash_bits").Value.String())
+
+	machines := etcdFlagSet.Lookup("machines").Value.String()
+	Config.EtcdMachines = strings.Split(machines, ",")
 
 	Config.Entrypoint = entrypoint
 	if len(starthash)%2 == 1 {
@@ -167,6 +176,7 @@ func InitServer() error {
 
 func ShutdownServer() {
 	log.Info("Datanode stop...")
+	UnregisterDN(Config, ChordNode)
 	os.Exit(0)
 }
 
@@ -196,12 +206,22 @@ func chordRoutine() {
 	}
 
 	c := make(chan chord.Notification)
-	n, err := chord.Create(conf, c, serfLog)
+	var err error
+	ChordNode, err = chord.Create(conf)
 	if err != nil {
 		panic(err)
 	}
-	n.SetLogger(log)
-	n.StartStatusTcp()
+	ChordNode.SetLogger(log)
+	ChordNode.StartStatusTcp()
+	ChordNode.SerfSchdule(c, serfLog)
+
+	// FIXME: register datanode and vnode in a more accruacy time
+	if err := RegisterDataNode(Config); err != nil {
+		panic(err)
+	}
+	if err := RegisterVnodes(Config, ChordNode); err != nil {
+		panic(err)
+	}
 
 	go func() {
 		for {
