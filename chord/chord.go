@@ -84,7 +84,7 @@ type PeerNode struct {
 }
 
 func DefaultConfig(hostname, serfname string) *NodeConfig {
-	return &NodeConfig{
+	conf := &NodeConfig{
 		Serf: &SerfConfig{
 			BinPath:    "/usr/local/bin/serf",
 			NodeName:   serfname,
@@ -107,6 +107,9 @@ func DefaultConfig(hostname, serfname string) *NodeConfig {
 		TCPBufInsNum:   runtime.NumCPU(),
 		TCPBufioNum:    64,
 	}
+	initHashConstant(conf)
+
+	return conf
 }
 
 func initHashConstant(conf *NodeConfig) {
