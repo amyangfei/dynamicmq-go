@@ -9,7 +9,7 @@ import (
 
 func GetEtcdClient(cfg *SrvConfig) (*etcd.Client, error) {
 	// TODO: client buffer
-	c := etcd.NewClient(cfg.EtcdMachiens)
+	c := etcd.NewClient(cfg.EtcdMachines)
 	return c, nil
 }
 
@@ -72,7 +72,7 @@ func RegisterWaiting(c *etcd.Client, cfg *SrvConfig) error {
 			return err
 		}
 	}
-	l := dmq.GetWaitingLockMgr(cfg.EtcdMachiens, cfg.NodeId)
+	l := dmq.GetWaitingLockMgr(cfg.EtcdMachines, cfg.NodeId)
 	_, err := l.Acquire(true)
 	defer l.Release()
 	if err != nil {
@@ -94,7 +94,7 @@ func UnregisterWaiting(c *etcd.Client, cfg *SrvConfig) error {
 			return err
 		}
 	}
-	l := dmq.GetWaitingLockMgr(cfg.EtcdMachiens, cfg.NodeId)
+	l := dmq.GetWaitingLockMgr(cfg.EtcdMachines, cfg.NodeId)
 	_, err := l.Acquire(true)
 	defer l.Release()
 	if err != nil {

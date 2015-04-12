@@ -122,7 +122,7 @@ func InitConfig(configFile string) error {
 		strconv.Atoi(redisFlagSet.Lookup("timeout").Value.String())
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
-	Config.EtcdMachiens = strings.Split(machines, ",")
+	Config.EtcdMachines = strings.Split(machines, ",")
 
 	return nil
 }

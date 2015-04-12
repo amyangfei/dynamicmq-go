@@ -27,5 +27,5 @@ type SrvConfig struct {
 	RedisMaxActive   int
 
 	// etcd
-	EtcdMachiens []string
+	EtcdMachines []string
 }

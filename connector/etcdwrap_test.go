@@ -17,7 +17,7 @@ func fakeSrvConfig() *SrvConfig {
 		SubTCPBind:    "localhost:7253",
 		RouterTCPBind: "localhost:7255",
 		Capacity:      12345,
-		EtcdMachiens:  []string{"http://localhost:4001"},
+		EtcdMachines:  []string{"http://localhost:4001"},
 	}
 	return cfg
 }
