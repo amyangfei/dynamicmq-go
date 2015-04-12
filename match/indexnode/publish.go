@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"gopkg.in/mgo.v2/bson"
@@ -28,6 +29,17 @@ type DecodedMsg struct {
 	extra   uint8
 	bodyLen uint16
 	items   map[uint8]string
+}
+
+// support range attribute only
+type PubMsgAttr struct {
+	name string
+	val  float64
+}
+
+type PubMsg struct {
+	payload string
+	attrs   []*PubMsgAttr
 }
 
 type HandleMsgFunc struct {
@@ -219,7 +231,71 @@ func validatePushMsg(msg *DecodedMsg) error {
 	return nil
 }
 
+func createPubMsg(attrs map[string]interface{}, payload string) *PubMsg {
+	pmsg := &PubMsg{
+		payload: payload,
+		attrs:   make([]*PubMsgAttr, 0),
+	}
+	for name, attr := range attrs {
+		// only handling attribute defined in IndexBase
+		if ab, ok := IdxBase.attrbases[name]; ok {
+			// support range attribute only curently
+			if int(ab.use) == dmq.AttrUseField["range"] {
+				if f, ok := attr.(float64); ok {
+					pmsg.attrs = append(
+						pmsg.attrs, &PubMsgAttr{name: name, val: f})
+				}
+			}
+		}
+	}
+	return pmsg
+}
+
 func processPushMsg(msg *DecodedMsg) error {
+	// Message must have been validated before processing
 	log.Debug("recv %v from publisher", msg)
+
+	payload := msg.items[dmq.PMMsgItemPayloadId]
+	attrs := msg.items[dmq.PMMsgItemAttributeId]
+	parsedAttrs := make(map[string]interface{})
+	if err := json.Unmarshal([]byte(attrs), &parsedAttrs); err != nil {
+		return err
+	}
+	pubmsg := createPubMsg(parsedAttrs, payload)
+
+	bestAttrIdx := filterBestAttrIndex(pubmsg)
+	// TODO: send candinate subscribers to datanode
+	log.Debug("best attr idx %v", bestAttrIdx)
+
 	return nil
+}
+
+func filterBestAttrIndex(pubmsg *PubMsg) *AttrIndex {
+	minMatchCnt := len(ClisInfo)
+	bestAttrComb := ""
+
+	attrNum := len(pubmsg.attrs)
+	for i := 0; i < attrNum-1; i++ {
+		for j := i + 1; j < attrNum; j++ {
+			cname := AttrNameCombine(
+				pubmsg.attrs[i].name, pubmsg.attrs[j].name)
+			if attrIdx, ok := AttrIdxesMap[cname]; !ok {
+				log.Warning("combine-name %s not found in AttrIdxesMap", cname)
+			} else {
+				x, y := i, j
+				if !AttrNameLess(pubmsg.attrs[i].name, pubmsg.attrs[j].name) {
+					x, y = j, i
+				}
+				cnt := attrIdx.tree.QueryCount(
+					pubmsg.attrs[x].val, pubmsg.attrs[y].val)
+				if cnt < minMatchCnt {
+					minMatchCnt = cnt
+					bestAttrComb = cname
+				}
+				log.Debug("c-name %s search count %d", cname, cnt)
+			}
+		}
+	}
+
+	return AttrIdxesMap[bestAttrComb]
 }

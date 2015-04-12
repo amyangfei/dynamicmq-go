@@ -130,9 +130,10 @@ func processAttrCreate(data *etcd.Response) error {
 	cidstr := string(cid)
 	if _, ok := ClisInfo[cidstr]; !ok {
 		ClisInfo[cidstr] = &SubCliInfo{
-			Cid:    cid,
-			Attrs:  make([]*Attribute, 0),
-			Intval: make(map[string]*Interval),
+			Cid:     cid,
+			CidHash: genHash(cid),
+			Attrs:   make([]*Attribute, 0),
+			Intval:  make(map[string]*Interval),
 		}
 		ClisInfo[cidstr].Attrs = append(ClisInfo[cidstr].Attrs, attr)
 	} else {

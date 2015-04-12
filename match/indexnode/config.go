@@ -1,5 +1,9 @@
 package main
 
+import (
+	"hash"
+)
+
 type SrvConfig struct {
 	// basic config
 	NodeId         string
@@ -13,6 +17,7 @@ type SrvConfig struct {
 	TCPSendBufSize int
 	TCPBufInsNum   int
 	TCPBufioNum    int
+	HashFunc       func() hash.Hash
 
 	// etcd
 	EtcdMachines []string

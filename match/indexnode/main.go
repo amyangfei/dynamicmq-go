@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha1"
 	"flag"
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
@@ -20,7 +21,7 @@ var log = logging.MustGetLogger("dynamicmq-match-indexnode")
 // Store attribute basic information including dimension, each dimension's info.
 var IdxBase *IndexBase
 
-// mapping from attribute-combination to its corresponding segment tree index
+// mapping from attribute-name-combination to its corresponding segment tree index
 var AttrIdxesMap map[string]*AttrIndex
 
 // Mapping from subclient's id to subclient information.
@@ -97,6 +98,7 @@ func InitConfig(configFile string) error {
 	Config.TCPBufioNum, err =
 		strconv.Atoi(basicFlagSet.Lookup("tcp_bufio_num").Value.String())
 	Config.TCPBufInsNum = runtime.NumCPU()
+	Config.HashFunc = sha1.New
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
 	Config.EtcdMachines = strings.Split(machines, ",")

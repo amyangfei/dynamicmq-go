@@ -35,9 +35,14 @@ type Attribute struct {
 }
 
 type SubCliInfo struct {
-	Cid    []byte               // subscribe client's Id
-	Attrs  []*Attribute         // subscription attribute array
-	Intval map[string]*Interval // mapping from attr-combine name to interval stores in segment tree
+	Cid     []byte               // subscribe client's Id
+	CidHash []byte               // cid's hash in datanode
+	Attrs   []*Attribute         // subscription attribute array
+	Intval  map[string]*Interval // mapping from attr-combine name to interval stores in segment tree
+}
+
+func AttrNameLess(xattr, yattr string) bool {
+	return xattr < yattr
 }
 
 func AttrNameCombine(xattr, yattr string) string {
