@@ -192,7 +192,7 @@ func (n *Node) Shutdown() error {
 	return err
 }
 
-func (n *Node) serfSchdule(c chan Notification, logger io.Writer) error {
+func (n *Node) SerfSchdule(c chan Notification, logger io.Writer) error {
 	// start serf agent
 	n.SerfStart(c, logger)
 

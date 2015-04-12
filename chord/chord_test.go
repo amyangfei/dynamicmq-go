@@ -102,12 +102,7 @@ func init() {
 func TestCreateShutdown(t *testing.T) {
 	conf := fastConf()
 	c := make(chan Notification)
-	logger, err := os.OpenFile(serfLogFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
-	if err != nil {
-		t.Errorf("failed to open file %s with error: %v", serfLogFile, err)
-		return
-	}
-	n, err := Create(conf, c, logger)
+	n, err := Create(conf)
 	if err != nil {
 		t.Errorf("failed to create node %v", err)
 	}
@@ -140,13 +135,8 @@ func TestLifeCycle(t *testing.T) {
 
 	conf := fastConf()
 	conf.Entrypoint = fakeSerfBind
-	logger, err := os.OpenFile(serfLogFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
-	if err != nil {
-		t.Errorf("failed to open file %s with error: %v", serfLogFile, err)
-		return
-	}
 
-	n, err := Create(conf, c, logger)
+	n, err := Create(conf)
 	if err != nil {
 		t.Errorf("failed to create node %v", err)
 	}

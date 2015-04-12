@@ -4,7 +4,6 @@ import (
 	"crypto/sha1"
 	"github.com/op/go-logging"
 	"hash"
-	"io"
 	"math/big"
 	"runtime"
 )
@@ -128,10 +127,8 @@ func initHashConstant(conf *NodeConfig) {
 }
 
 // Create a new Chord node
-func Create(conf *NodeConfig, c chan Notification, logger io.Writer) (*Node, error) {
+func Create(conf *NodeConfig) (*Node, error) {
 	initHashConstant(conf)
 	node := CreateNode(conf)
-	// TODO: start routine running with serf agent
-	err := node.serfSchdule(c, logger)
-	return node, err
+	return node, nil
 }
