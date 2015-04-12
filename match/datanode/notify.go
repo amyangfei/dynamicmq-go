@@ -6,12 +6,10 @@ import (
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"github.com/coreos/go-etcd/etcd"
-	"math"
-	"strings"
 )
 
 var (
-	CmdTable = map[string]func(data *etcd.Response) error{
+	NotifyCmdTable = map[string]func(data *etcd.Response) error{
 		dmq.EtcdActionCreate: processAttrCreate,
 		dmq.EtcdActionUpdate: processAttrUpdate,
 		dmq.EtcdActionDelete: processAttrDelete,
@@ -69,8 +67,8 @@ func extractAttrFromSubVal(subval string) (*Attribute, error) {
 }
 
 func processAttrCreate(data *etcd.Response) error {
-	cliId, attrName := dmq.ExtractInfoFromSubKey(data.Node.Key)
-	if cliId == "" || attrName == "" {
+	cliIdHexStr, attrName := dmq.ExtractInfoFromSubKey(data.Node.Key)
+	if cliIdHexStr == "" || attrName == "" {
 		return fmt.Errorf("invalid attr craete notify key: %s", data.Node.Key)
 	}
 	attr, err := extractAttrFromSubVal(data.Node.Value)
@@ -84,9 +82,9 @@ func processAttrCreate(data *etcd.Response) error {
 		return nil
 	}
 
-	cid, err := hex.DecodeString(cliId)
+	cid, err := hex.DecodeString(cliIdHexStr)
 	if err != nil {
-		return fmt.Errorf("invalid client id: %s", cliId)
+		return fmt.Errorf("invalid client id: %s", cliIdHexStr)
 	}
 	cidstr := string(cid)
 	if _, ok := ClisInfo[cidstr]; !ok {
@@ -94,41 +92,9 @@ func processAttrCreate(data *etcd.Response) error {
 			Cid:     cid,
 			CidHash: dmq.GenHash(cid, Config.HashFunc),
 			Attrs:   make([]*Attribute, 0),
-			Intval:  make(map[string]*Interval),
 		}
-		ClisInfo[cidstr].Attrs = append(ClisInfo[cidstr].Attrs, attr)
-	} else {
-		for _, subattr := range ClisInfo[cidstr].Attrs {
-			xattr, yattr := AttrSort(subattr, attr)
-			xmin, xmax := int(math.Floor(xattr.low)), int(math.Ceil(xattr.high))
-			ymin, ymax := int(math.Floor(yattr.low)), int(math.Ceil(yattr.high))
-			if xmin < IdxBase.attrbases[xattr.name].low {
-				xmin = IdxBase.attrbases[xattr.name].low
-			}
-			if xmax > IdxBase.attrbases[xattr.name].high {
-				xmax = IdxBase.attrbases[xattr.name].high
-			}
-			if ymin < IdxBase.attrbases[yattr.name].low {
-				ymin = IdxBase.attrbases[yattr.name].low
-			}
-			if ymax > IdxBase.attrbases[yattr.name].high {
-				ymax = IdxBase.attrbases[yattr.name].high
-			}
-			cname := AttrNameCombine(xattr.name, yattr.name)
-			if aidx, ok := AttrIdxesMap[cname]; !ok {
-				return fmt.Errorf("attribute combine name %s not found", cname)
-			} else {
-				ival := aidx.InsertCliAttr(
-					xmin, xmax, ymin, ymax, &ClisInfo[cidstr].Cid)
-				combineName := AttrNameCombine(xattr.name, yattr.name)
-				ClisInfo[cidstr].Intval[combineName] = ival
-			}
-
-			// TODO: insert subclient to index tree
-			log.Debug("attr combine %s-%s", xattr.name, yattr.name)
-		}
-		ClisInfo[cidstr].Attrs = append(ClisInfo[cidstr].Attrs, attr)
 	}
+	ClisInfo[cidstr].Attrs = append(ClisInfo[cidstr].Attrs, attr)
 
 	return nil
 }
@@ -172,19 +138,8 @@ func processAttrDelete(data *etcd.Response) error {
 			}
 		}
 
-		// remove all intervals containing attrName from segment tree
-		for combineName, ival := range ClisInfo[cidstr].Intval {
-			// Contains(s, substr string) always returns true if substr is ""
-			if strings.Contains(combineName, attrName) {
-				// remove inteval from segment tree index
-				AttrIdxesMap[combineName].tree.Delete(ival)
-				// delete key-value pair from ClisInfo's intval map
-				delete(ClisInfo[cidstr].Intval, combineName)
-			}
-		}
 		if len(ClisInfo[cidstr].Attrs) == 0 {
 			// TODO: memory check http://stackoverflow.com/a/23231539/1115857
-			ClisInfo[cidstr].Intval = nil
 			ClisInfo[cidstr] = nil
 			delete(ClisInfo, cidstr)
 		}
@@ -196,7 +151,7 @@ func processAttrDelete(data *etcd.Response) error {
 func processAttrNotify(data *etcd.Response) error {
 	log.Debug("recv notify: %s %v", data.Action, data.Node)
 
-	if cmd, ok := CmdTable[data.Action]; !ok {
+	if cmd, ok := NotifyCmdTable[data.Action]; !ok {
 		return fmt.Errorf("action %s not support", data.Action)
 	} else {
 		return cmd(data)

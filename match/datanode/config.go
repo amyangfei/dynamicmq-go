@@ -1,5 +1,9 @@
 package main
 
+import (
+	"hash"
+)
+
 type SrvConfig struct {
 	// basic config
 	BindIp         string
@@ -10,6 +14,7 @@ type SrvConfig struct {
 	TCPSendBufSize int
 	TCPBufInsNum   int
 	TCPBufioNum    int
+	HashFunc       func() hash.Hash
 
 	// serf config
 	SerfBinPath   string

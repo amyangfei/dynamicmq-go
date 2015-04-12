@@ -18,9 +18,18 @@ import (
 )
 
 var Config *SrvConfig
+
+// common log
 var log = logging.MustGetLogger("dynamicmq-match-datanode")
+
+// logger used for serf daemon in chord node
 var serfLog *os.File
+
 var ChordNode *chord.Node
+
+// Mapping from subclient's id to subclient information
+// The subclient's id is in BSON format, not hex string
+var ClisInfo map[string]*SubCliInfo
 
 // InitSignal register signals handler.
 func InitSignal() chan os.Signal {
@@ -104,6 +113,7 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 	Config.TCPBufioNum, err =
 		strconv.Atoi(basicFlagSet.Lookup("tcp_bufio_num").Value.String())
 	Config.TCPBufInsNum = runtime.NumCPU()
+	Config.HashFunc = sha1.New
 
 	Config.SerfBinPath = serfFlagSet.Lookup("bin_path").Value.String()
 	Config.SerfNodeName = serfFlagSet.Lookup("node_name").Value.String()
@@ -171,6 +181,7 @@ func InitLog(logFile, serfLogFile string) error {
 
 func InitServer() error {
 	log.Info("Datanode server is starting...")
+	ClisInfo = make(map[string]*SubCliInfo)
 	return nil
 }
 
@@ -238,6 +249,10 @@ func StartChordNode() error {
 	return nil
 }
 
+func NotifyService() {
+	go AttrWatcher(Config.EtcdMachines)
+}
+
 func main() {
 	var configFile string
 	var printVer bool
@@ -282,6 +297,8 @@ func main() {
 	if err := StartChordNode(); err != nil {
 		panic(err)
 	}
+
+	NotifyService()
 
 	signalChan := InitSignal()
 	HandleSignal(signalChan)
