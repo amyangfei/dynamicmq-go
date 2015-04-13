@@ -186,7 +186,8 @@ var (
 	IDMsgMaxBodyLen     uint16 = 2000
 
 	// command
-	IDMsgCmdPushMsg uint8 = 1
+	IDMsgCmdPushMsg      uint8 = 1
+	IDMsgCmdHeartbeatMsg uint8 = 2
 
 	// Extra Field
 	IDMsgExtraNone uint8 = 0x00

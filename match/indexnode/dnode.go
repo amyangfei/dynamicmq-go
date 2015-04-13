@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"net"
 	"sort"
 )
@@ -78,4 +79,38 @@ func (rt *RTable) StoreSearch(keyhash []byte) *Vnode {
 		return compareVid(rt.vns[i].id, keyhash) >= 0
 	})
 	return rt.vns[pos%len(rt.vns)]
+}
+
+func buildDnodeConn(nid string) (net.Conn, error) {
+	pn, pok := PnodeMap[nid]
+	if !pok {
+		return nil, fmt.Errorf("pnode with id=%s not found", nid)
+	}
+	addr, err := net.ResolveTCPAddr("tcp", pn.bindAddr)
+	if err != nil {
+		return nil, err
+	}
+	return net.DialTCP("tcp", nil, addr)
+}
+
+func getDnodeConn(nid string) (*DnodeConn, error) {
+	dnconn, ok := DnConns[nid]
+	if !ok {
+		conn, err := buildDnodeConn(nid)
+		if err != nil {
+			return nil, err
+		}
+		// TODO: start connection heartbeat to datanode here.
+
+		dnconn = &DnodeConn{
+			conn: conn,
+		}
+		DnConns[nid] = dnconn
+	}
+	return dnconn, nil
+}
+
+func (dnconn *DnodeConn) WriteMsg(msg []byte) (int, error) {
+	// TODO: error handling. e.g. broken connection, write failed etc.
+	return dnconn.conn.Write(msg)
 }

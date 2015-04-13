@@ -381,6 +381,11 @@ func sendMsgToDataNode(msg *DecodedMsg, pcgroupMap map[string]*PubCliGroup) erro
 			bmsg := binaryMsgEncode(sendmsg)
 
 			log.Debug("send msg: %v to pnid: %s address: %s", bmsg, pnid, pcgroup.dnaddr)
+			if dnconn, err := getDnodeConn(pnid); err != nil {
+				return err
+			} else {
+				dnconn.WriteMsg(bmsg)
+			}
 
 			idx += maxclis
 		}

@@ -130,6 +130,9 @@
                 * Lenght equals to body length in item header
     * MaxBodyLength 2000
     * ExtraField, not use now
+    * Message command type
+        * push message      1
+        * heartbeat message 2
     * Body item id
         * AttributeId   1
         * PayloadId     2

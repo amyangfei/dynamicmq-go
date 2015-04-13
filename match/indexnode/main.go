@@ -144,6 +144,8 @@ func InitServer() error {
 		vns: make([]*Vnode, 0),
 	}
 
+	DnConns = make(map[string]*DnodeConn)
+
 	if err := InitIndex(AttrIdxesMap, IdxBase); err != nil {
 		return err
 	}

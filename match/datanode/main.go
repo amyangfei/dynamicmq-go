@@ -300,6 +300,8 @@ func main() {
 
 	NotifyService()
 
+	StartPubTCP(Config.BindAddr)
+
 	signalChan := InitSignal()
 	HandleSignal(signalChan)
 }
