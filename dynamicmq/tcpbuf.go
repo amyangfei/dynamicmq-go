@@ -49,6 +49,6 @@ func RecycleBufioReader(c chan *bufio.Reader, r *bufio.Reader) {
 	select {
 	case c <- r:
 	default:
-		panic("recycle while tcp bufioReader cache is full")
+		// discard it
 	}
 }
