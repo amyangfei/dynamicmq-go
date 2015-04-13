@@ -174,6 +174,30 @@ var (
 	PMMsgItemPayloadId   uint8 = 2
 )
 
+// Message protocol from indexnode to datanode in matching service
+var (
+	IDMsgCmdSize        uint16 = 1
+	IDMsgBodySize       uint16 = 2
+	IDMsgExtraSize      uint16 = 1
+	IDMsgHeaderSize     uint16 = IDMsgCmdSize + IDMsgBodySize + IDMsgExtraSize
+	IDMsgItemIdSize     uint16 = 1
+	IDMsgItemBodySize   uint16 = 2
+	IDMsgItemHeaderSize uint16 = IDMsgItemIdSize + IDMsgItemBodySize
+	IDMsgMaxBodyLen     uint16 = 2000
+
+	// command
+	IDMsgCmdPushMsg uint8 = 1
+
+	// Extra Field
+	IDMsgExtraNone uint8 = 0x00
+
+	// Message body item id
+	IDMsgItemAttributeId uint8 = 1
+	IDMsgItemPayloadId   uint8 = 2
+	IDMsgMessageIdId     uint8 = 3
+	IDMsgClientListIdId  uint8 = 4
+)
+
 // attribute type in subscription
 var (
 	AttrUseField = map[string]int{

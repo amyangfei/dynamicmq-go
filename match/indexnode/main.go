@@ -31,7 +31,11 @@ var ClisInfo map[string]*SubCliInfo
 // Mapping from pnode's id to pnode, pnid is in plain string.
 var PnodeMap map[string]*Pnode
 
+// stores vnodes information
 var Rtable *RTable
+
+// mapping from Pnode's id to a TCP connection with it
+var DnConns map[string]*DnodeConn
 
 // InitSignal register signals handler.
 func InitSignal() chan os.Signal {

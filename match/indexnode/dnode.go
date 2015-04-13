@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"net"
 	"sort"
 )
 
@@ -20,6 +21,10 @@ type Vnode struct {
 
 type RTable struct {
 	vns []*Vnode
+}
+
+type DnodeConn struct {
+	conn net.Conn
 }
 
 func compareVid(vid1, vid2 []byte) int {
@@ -66,6 +71,9 @@ func (rt *RTable) Search(keyhash []byte) (int, *Vnode) {
 
 // Find the vnode who stores the key with hash of keyhash
 func (rt *RTable) StoreSearch(keyhash []byte) *Vnode {
+	if len(rt.vns) == 0 {
+		return nil
+	}
 	pos := sort.Search(len(rt.vns), func(i int) bool {
 		return compareVid(rt.vns[i].id, keyhash) >= 0
 	})

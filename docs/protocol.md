@@ -116,6 +116,25 @@
         * SerfNodeId  5
         * VnodeListId 6
 
+2. Publish message, from indexnode to datanode
+    * Message binary protocol
+        * Message header
+            * 1 byte message comamnd type
+            * 2 byte message body length
+            * 1 byte message extra field
+        * Message body contains one or more items, total length equals to body length in header
+            * Item header
+                * 1 byte item id
+                * 2 byte item body length
+            * Item body
+                * Lenght equals to body length in item header
+    * MaxBodyLength 2000
+    * ExtraField, not use now
+    * Body item id
+        * AttributeId   1
+        * PayloadId     2
+        * MessageId     3
+        * ClientListId  4
 
 ## Publisher
 
