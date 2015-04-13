@@ -50,8 +50,12 @@ func GetIndexBaseBoundKey(attrname, lowerOrUpper string) string {
 	return fmt.Sprintf("%s/%s/%s", GetIndexBaseBound(), attrname, lowerOrUpper)
 }
 
+func GetDataPNodeBase() string {
+	return fmt.Sprintf("/%s/%s", EtcdDataNodeType, DataPnode)
+}
+
 func GetDataPNodeKey(nodeId string) string {
-	return fmt.Sprintf("/%s/%s/%s", EtcdDataNodeType, DataPnode, nodeId)
+	return fmt.Sprintf("%s/%s", GetDataPNodeBase(), nodeId)
 }
 
 func GetDataVnodeKey() string {

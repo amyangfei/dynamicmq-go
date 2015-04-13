@@ -28,6 +28,11 @@ var AttrIdxesMap map[string]*AttrIndex
 // The subclient's id is in BSON format, not hex string.
 var ClisInfo map[string]*SubCliInfo
 
+// Mapping from pnode's id to pnode, pnid is in plain string.
+var PnodeMap map[string]*Pnode
+
+var Rtable *RTable
+
 // InitSignal register signals handler.
 func InitSignal() chan os.Signal {
 	c := make(chan os.Signal, 1)
@@ -125,9 +130,16 @@ func InitLog(logFile string) error {
 
 func InitServer() error {
 	log.Info("Indexnode server is starting...")
+
 	IdxBase = &IndexBase{}
 	AttrIdxesMap = make(map[string]*AttrIndex)
 	ClisInfo = make(map[string]*SubCliInfo)
+
+	PnodeMap = make(map[string]*Pnode)
+	Rtable = &RTable{
+		vns: make([]*Vnode, 0),
+	}
+
 	if err := InitIndex(AttrIdxesMap, IdxBase); err != nil {
 		return err
 	}
@@ -141,6 +153,7 @@ func ShutdownServer() {
 
 func NotifyService() {
 	go AttrWatcher(Config.EtcdMachines)
+	go DataNodeWatcher(Config.EtcdMachines)
 }
 
 func main() {

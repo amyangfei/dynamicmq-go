@@ -85,3 +85,25 @@ func LoadIndexBase(c *etcd.Client, idxBase *IndexBase) error {
 
 	return nil
 }
+
+func GetPnodeBindAddr(c *etcd.Client, pnid string) (string, error) {
+	pnkey := dmq.GetDataPNodeKey(pnid)
+
+	statusKey := fmt.Sprintf("%s/%s", pnkey, dmq.DataPnodeStatus)
+	if resp, err := c.Get(statusKey, false, false); err != nil {
+		return "", err
+	} else if resp.Node.Dir {
+		return "", fmt.Errorf("%s should not be directory", statusKey)
+	} else if resp.Node.Value != dmq.DataNodeStatusActive {
+		return "", fmt.Errorf("invalid status %s of pnode", resp.Node.Value)
+	}
+
+	paddrKey := fmt.Sprintf("%s/%s", pnkey, dmq.DataPnodePubAddr)
+	if resp, err := c.Get(paddrKey, false, false); err != nil {
+		return "", err
+	} else if resp.Node.Dir {
+		return "", fmt.Errorf("%s should not be directory", paddrKey)
+	} else {
+		return resp.Node.Value, nil
+	}
+}

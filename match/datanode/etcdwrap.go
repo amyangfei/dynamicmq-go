@@ -29,7 +29,7 @@ func RegisterDataNode(cfg *SrvConfig) error {
 
 	// TODO: set status active at a more accuracy time
 	statusKey := fmt.Sprintf("%s/%s", baseKey, dmq.DataPnodeStatus)
-	if _, err := c.Set(statusKey, dmq.DataNodeStatusActive, 0); err != nil {
+	if _, err := c.Create(statusKey, dmq.DataNodeStatusActive, 0); err != nil {
 		c.Delete(baseKey, true)
 		return err
 	}
@@ -49,12 +49,13 @@ func RegisterVnodes(cfg *SrvConfig, node *chord.Node) error {
 	lvns := node.LVnodes
 	for i, lvn := range lvns {
 		vnk := fmt.Sprintf("%s/%s", vnBaseKey, hex.EncodeToString(lvn.Vnode.Id))
-		if _, err := c.Set(vnk, lvn.Vnode.Pnode.Hostname, 0); err != nil {
+		if _, err := c.Create(vnk, lvn.Vnode.Pnode.Hostname, 0); err != nil {
 			idx = i
 			verr = err
 			break
 		}
 	}
+	// if error occurs, remove vnodes already registered.
 	for i := 0; i < idx; i++ {
 		lvn := lvns[i]
 		vnk := fmt.Sprintf("%s/%s", vnBaseKey, hex.EncodeToString(lvn.Vnode.Id))

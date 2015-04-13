@@ -7,14 +7,21 @@ import (
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"github.com/coreos/go-etcd/etcd"
 	"math"
+	"regexp"
 	"strings"
 )
 
 var (
-	CmdTable = map[string]func(data *etcd.Response) error{
+	AttrCmdTable = map[string]func(data *etcd.Response) error{
 		dmq.EtcdActionCreate: processAttrCreate,
 		dmq.EtcdActionUpdate: processAttrUpdate,
 		dmq.EtcdActionDelete: processAttrDelete,
+	}
+
+	DataNodeCmdTable = map[string]func(data *etcd.Response) error{
+		dmq.EtcdActionCreate: processDataNodeCreate,
+		dmq.EtcdActionUpdate: processDataNodeUpdate,
+		dmq.EtcdActionDelete: processDataNodeDelete,
 	}
 )
 
@@ -196,7 +203,7 @@ func processAttrDelete(data *etcd.Response) error {
 func processAttrNotify(data *etcd.Response) error {
 	log.Debug("recv notify: %s %v", data.Action, data.Node)
 
-	if cmd, ok := CmdTable[data.Action]; !ok {
+	if cmd, ok := AttrCmdTable[data.Action]; !ok {
 		return fmt.Errorf("action %s not support", data.Action)
 	} else {
 		return cmd(data)
@@ -218,6 +225,118 @@ func AttrWatcher(machines []string) {
 		case data := <-receiver:
 			if err := processAttrNotify(data); err != nil {
 				log.Error("process attr notify with error: %v", err)
+			}
+		}
+	}
+}
+
+func extractVnodeKey(val string) string {
+	regstr := fmt.Sprintf("^%s/([0-9a-f]+)$", dmq.GetDataVnodeKey())
+	regex := regexp.MustCompile(regstr)
+
+	match := regex.FindStringSubmatch(val)
+
+	if len(match) != 2 {
+		return ""
+	} else {
+		return match[1]
+	}
+}
+
+func processDataNodeNotify(data *etcd.Response) error {
+	log.Debug("recv datanode notify: %s %v", data.Action, data.Node)
+
+	if cmd, ok := DataNodeCmdTable[data.Action]; !ok {
+		return fmt.Errorf("action %s not support", data.Action)
+	} else {
+		return cmd(data)
+	}
+}
+
+func processDataNodeCreate(data *etcd.Response) error {
+	vidHexStr := extractVnodeKey(data.Node.Key)
+	if vidHexStr == "" {
+		return fmt.Errorf("invalid vnode id key: %s", data.Node.Key)
+	}
+	vid, err := hex.DecodeString(vidHexStr)
+	if err != nil {
+		return fmt.Errorf("invalid vnode id: %v", err)
+	}
+	if data.Node.Dir {
+		return fmt.Errorf("%s should not be a directory", data.Node.Key)
+	}
+
+	pnid := data.Node.Value
+	pnode, ok := PnodeMap[pnid]
+	if !ok {
+		c, _ := GetEtcdClient(Config.EtcdMachines)
+		if pubAddr, err := GetPnodeBindAddr(c, pnid); err != nil {
+			return err
+		} else {
+			pnode = &Pnode{
+				id:       pnid,
+				bindAddr: pubAddr,
+				vnum:     0,
+			}
+			PnodeMap[pnid] = pnode
+		}
+	}
+	vn := &Vnode{
+		id: []byte(vid),
+		pn: pnode,
+	}
+	if Rtable.JoinVnode(vn, false) {
+		pnode.vnum++
+	}
+
+	return nil
+}
+
+func processDataNodeUpdate(data *etcd.Response) error {
+	return nil
+}
+
+func processDataNodeDelete(data *etcd.Response) error {
+	vidHexStr := extractVnodeKey(data.Node.Key)
+	if vidHexStr == "" {
+		return fmt.Errorf("invalid vnode id key: %s", data.Node.Key)
+	}
+	vid, err := hex.DecodeString(vidHexStr)
+	if err != nil {
+		return fmt.Errorf("invalid vnode id: %v", err)
+	}
+
+	if pos, vn := Rtable.Search([]byte(vid)); vn != nil {
+		vnum := len(Rtable.vns)
+		// delete this vnode from rtable vnode list
+		Rtable.vns[vnum-1], Rtable.vns =
+			nil, append(Rtable.vns[:pos], Rtable.vns[pos+1:]...)
+
+		vn.pn.vnum--
+		if vn.pn.vnum == 0 {
+			// remove pnode from PnodeMap
+			delete(PnodeMap, vn.pn.id)
+		}
+	}
+
+	return nil
+}
+
+func DataNodeWatcher(machines []string) {
+	receiver := make(chan *etcd.Response)
+	stop := make(chan bool)
+
+	c, _ := GetEtcdClient(machines)
+
+	prefix := dmq.GetDataVnodeKey()
+	recursive := true
+	go c.Watch(prefix, 0, recursive, receiver, stop)
+
+	for {
+		select {
+		case data := <-receiver:
+			if err := processDataNodeNotify(data); err != nil {
+				log.Error("process chord notify with error: %v", err)
 			}
 		}
 	}
