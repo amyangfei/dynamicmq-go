@@ -12,3 +12,5 @@ heartbeat_interval = 300
 
 [etcd]
 machines = http://localhost:4001
+pool_size = 4
+max_pool_size = 64

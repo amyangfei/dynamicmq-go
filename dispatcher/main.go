@@ -18,6 +18,8 @@ var Config *SrvConfig
 
 var RouterMgr *RouterManager = &RouterManager{}
 
+var EtcdCliPool *dmq.EtcdClientPool
+
 var log = logging.MustGetLogger("dynamicmq-dispatcher")
 
 // InitSignal register signals handler.
@@ -68,6 +70,8 @@ func InitConfig(configFile string) error {
 
 	etcdFlagSet := flag.NewFlagSet("etcd", flag.PanicOnError)
 	etcdFlagSet.String("machines", "http://localhost:4001", "etcd machines")
+	etcdFlagSet.Int("pool_size", 4, "initial etcd client pool size")
+	etcdFlagSet.Int("max_pool_size", 64, "max etcd client pool size")
 
 	globalconf.Register("server", serverFlagSet)
 	globalconf.Register("etcd", etcdFlagSet)
@@ -94,7 +98,11 @@ func InitConfig(configFile string) error {
 		strconv.Atoi(serverFlagSet.Lookup("heartbeat_interval").Value.String())
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
-	Config.EtcdMachiens = strings.Split(machines, ",")
+	Config.EtcdMachines = strings.Split(machines, ",")
+	Config.EtcdPoolSize, err =
+		strconv.Atoi(etcdFlagSet.Lookup("pool_size").Value.String())
+	Config.EtcdPoolMaxSize, err =
+		strconv.Atoi(etcdFlagSet.Lookup("max_pool_size").Value.String())
 
 	return nil
 }
@@ -116,11 +124,13 @@ func InitLog(logFile string) error {
 }
 
 func InitServer() error {
+	EtcdCliPool = dmq.NewEtcdClientPool(
+		Config.EtcdMachines, Config.EtcdPoolSize, Config.EtcdPoolMaxSize)
 	return nil
 }
 
 func ShutdownServer() {
-	UnregisterEtcd(Config)
+	UnregisterEtcd(Config, EtcdCliPool)
 }
 
 func main() {
@@ -160,10 +170,10 @@ func main() {
 	// Errors may occur if this procedure acquires the waiting lock before the
 	// expected connector registering to etcd. So try another time when error
 	// occurs. We should ensure the RegisterEtcd can be called idempotently.
-	if err := RegisterEtcd(RouterMgr, Config); err != nil {
+	if err := RegisterEtcd(RouterMgr, Config, EtcdCliPool); err != nil {
 		log.Error("first time register to etcd with error: %v", err)
 		time.Sleep(time.Second * time.Duration(1))
-		if err2 := RegisterEtcd(RouterMgr, Config); err2 != nil {
+		if err2 := RegisterEtcd(RouterMgr, Config, EtcdCliPool); err2 != nil {
 			panic(err2)
 		}
 	}

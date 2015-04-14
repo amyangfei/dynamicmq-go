@@ -9,17 +9,19 @@ import (
 )
 
 func GetEtcdClient(cfg *SrvConfig) (*etcd.Client, error) {
-	c := etcd.NewClient(cfg.EtcdMachiens)
+	c := etcd.NewClient(cfg.EtcdMachines)
 	return c, nil
 }
 
-func RegisterEtcd(rmgr *RouterManager, cfg *SrvConfig) error {
-	c, err := GetEtcdClient(cfg)
+func RegisterEtcd(rmgr *RouterManager, cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
+	ec, err := pool.GetEtcdClient()
 	if err != nil {
 		return err
 	}
+	defer pool.RecycleEtcdClient(ec.Id)
+	c := ec.Cli
 
-	l := dmq.GetWaitingLockMgr(cfg.EtcdMachiens, cfg.NodeId)
+	l := dmq.GetWaitingLockMgr(c, cfg.NodeId)
 	if validity, err := l.Acquire(true); err != nil {
 		return err
 	} else {
@@ -90,11 +92,13 @@ func RegisterEtcd(rmgr *RouterManager, cfg *SrvConfig) error {
 	return nil
 }
 
-func UnregisterEtcd(cfg *SrvConfig) error {
-	c, err := GetEtcdClient(cfg)
+func UnregisterEtcd(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
+	ec, err := pool.GetEtcdClient()
 	if err != nil {
 		return err
 	}
+	defer pool.RecycleEtcdClient(ec.Id)
+	c := ec.Cli
 
 	// Here we don't re-register connector to etcd waiting list
 	// and leaves this job to the connector

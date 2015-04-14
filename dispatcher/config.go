@@ -17,5 +17,7 @@ type SrvConfig struct {
 	HeartbeatIval  int
 
 	// etcd
-	EtcdMachiens []string
+	EtcdMachines    []string
+	EtcdPoolSize    int
+	EtcdPoolMaxSize int
 }
