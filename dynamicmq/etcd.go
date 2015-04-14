@@ -62,9 +62,8 @@ func GetDataVnodeKey() string {
 	return fmt.Sprintf("/%s/%s", EtcdDataNodeType, DataVnode)
 }
 
-func GetWaitingLockMgr(machines []string, owner string) *sherlock.EtcdLock {
-	client := etcd.NewClient(machines)
-	l := sherlock.NewEtcdLock("WaitingConnector", client)
+func GetWaitingLockMgr(c *etcd.Client, owner string) *sherlock.EtcdLock {
+	l := sherlock.NewEtcdLock("WaitingConnector", c)
 	l.SetNamespace("lock")
 	l.SetOwner(owner)
 	return l

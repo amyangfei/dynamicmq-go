@@ -11,6 +11,13 @@ import (
 	"testing"
 )
 
+var ecpool *dmq.EtcdClientPool
+
+func init() {
+	cfg := fakeSrvConfig()
+	ecpool = dmq.NewEtcdClientPool(cfg.EtcdMachines, 1, 16)
+}
+
 func fakeSrvConfig() *SrvConfig {
 	cfg := &SrvConfig{
 		NodeId:        "conn0101",
@@ -24,10 +31,10 @@ func fakeSrvConfig() *SrvConfig {
 
 func TestRegisterEtcd(t *testing.T) {
 	cfg := fakeSrvConfig()
-	if err := RegisterEtcd(cfg); err != nil {
+	if err := RegisterEtcd(cfg, ecpool); err != nil {
 		t.Errorf("RegisterEtcd error(%v)", err)
 	}
-	if resp, err := GetConnInfo(cfg); err != nil {
+	if resp, err := GetConnInfo(cfg, ecpool); err != nil {
 		t.Errorf("Get connector info error(%v)", err)
 	} else {
 		if !resp.Node.Dir {
@@ -61,7 +68,7 @@ func TestRegisterEtcd(t *testing.T) {
 
 func TestUnregisterEtcd(t *testing.T) {
 	cfg := fakeSrvConfig()
-	if err := UnregisterEtcd(cfg); err != nil {
+	if err := UnregisterEtcd(cfg, ecpool); err != nil {
 		t.Errorf("UnregisterEtcd error(%v)", err)
 	}
 }
@@ -69,16 +76,19 @@ func TestUnregisterEtcd(t *testing.T) {
 func TestUpdateEtcd(t *testing.T) {
 	cfg := fakeSrvConfig()
 
-	if err := RegisterEtcd(cfg); err != nil {
+	if err := RegisterEtcd(cfg, ecpool); err != nil {
 		t.Errorf("RegisterEtcd error(%v)", err)
 		return
 	}
 
-	c, err := GetEtcdClient(cfg)
+	ec, err := ecpool.GetEtcdClient()
 	if err != nil {
 		t.Errorf("GetEtcdClient failed(%v)", err)
 		return
 	}
+	defer ecpool.RecycleEtcdClient(ec.Id)
+	c := ec.Cli
+
 	loadKey := fmt.Sprintf("%s/%s", dmq.GetInfoKey(dmq.EtcdConnectorType, cfg.NodeId), dmq.ConnLoad)
 	for i := 0; i < 100; i++ {
 		resp, err := c.Get(loadKey, false, false)
@@ -95,7 +105,7 @@ func TestUpdateEtcd(t *testing.T) {
 		c.Update(loadKey, fmt.Sprintf("%d", load+1), 0)
 	}
 
-	if err := UnregisterEtcd(cfg); err != nil {
+	if err := UnregisterEtcd(cfg, ecpool); err != nil {
 		t.Errorf("UnregisterEtcd error(%v)", err)
 	}
 }
@@ -112,10 +122,19 @@ func TestUpdateAttr(t *testing.T) {
 	}
 	attrKey := dmq.GetSubAttrKey(cli.id.Hex(), attr.name)
 
-	if err := UpdateSubAttr(cli, attr, cfg); err != nil {
-		t.Errorf("Failed to update subscriber attribute: %v", attr)
+	if err := RegisterSub(cli, cfg, ecpool); err != nil {
+		t.Errorf("Failed to register subclient: %v", err)
 	}
-	if resp, err := GetSubAttr(cli, attr.name, cfg); err != nil {
+
+	if err := CreateSubAttr(cli, attr, cfg, ecpool); err != nil {
+		t.Errorf("Failed to create subscriber attribute %v: %v", attr, err)
+	}
+
+	if err := UpdateSubAttr(cli, attr, cfg, ecpool); err != nil {
+		t.Errorf("Failed to update subscriber attribute %v: %v", attr, err)
+	}
+
+	if resp, err := GetSubAttr(cli, attr.name, cfg, ecpool); err != nil {
 		t.Errorf("Failed to get subscriber attribute: %s", attrKey)
 	} else {
 		jsonData := make(map[string]interface{})
@@ -142,10 +161,13 @@ func TestUpdateAttr(t *testing.T) {
 		low:  12.3,
 		high: 21.7,
 	}
-	if err := UpdateSubAttr(cli, attr, cfg); err != nil {
+	if err := CreateSubAttr(cli, attr, cfg, ecpool); err != nil {
+		t.Errorf("Failed to create subscriber attribute %v: %v", attr, err)
+	}
+	if err := UpdateSubAttr(cli, attr, cfg, ecpool); err != nil {
 		t.Errorf("Failed to update subscriber attribute: %v", attr)
 	}
-	if resp, err := GetSubAttr(cli, attr.name, cfg); err != nil {
+	if resp, err := GetSubAttr(cli, attr.name, cfg, ecpool); err != nil {
 		t.Errorf("Failed to get subscriber attribute: %s", attrKey)
 	} else {
 		jsonData := make(map[string]interface{})
@@ -168,5 +190,5 @@ func TestUpdateAttr(t *testing.T) {
 		}
 	}
 
-	RemoveSub(cli, cfg)
+	RemoveSub(cli, cfg, ecpool)
 }

@@ -18,6 +18,8 @@ var Config *SrvConfig
 
 var SubcliTable map[bson.ObjectId]*SubClient
 
+var EtcdCliPool *dmq.EtcdClientPool
+
 var log = logging.MustGetLogger("dynamicmq-connector")
 
 // InitSignal register signals handler.
@@ -79,6 +81,8 @@ func InitConfig(configFile string) error {
 
 	etcdFlagSet := flag.NewFlagSet("etcd", flag.PanicOnError)
 	etcdFlagSet.String("machines", "http://localhost:4001", "etcd machines")
+	etcdFlagSet.Int("pool_size", 4, "initial etcd client pool size")
+	etcdFlagSet.Int("max_pool_size", 64, "max etcd client pool size")
 
 	globalconf.Register("server", serverFlagSet)
 	globalconf.Register("redis", redisFlagSet)
@@ -123,6 +127,10 @@ func InitConfig(configFile string) error {
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
 	Config.EtcdMachines = strings.Split(machines, ",")
+	Config.EtcdPoolSize, err =
+		strconv.Atoi(etcdFlagSet.Lookup("pool_size").Value.String())
+	Config.EtcdPoolMaxSize, err =
+		strconv.Atoi(etcdFlagSet.Lookup("max_pool_size").Value.String())
 
 	return nil
 }
@@ -145,11 +153,13 @@ func InitLog(logFile string) error {
 
 func InitServer() error {
 	SubcliTable = make(map[bson.ObjectId]*SubClient, 0)
+	EtcdCliPool = dmq.NewEtcdClientPool(
+		Config.EtcdMachines, Config.EtcdPoolSize, Config.EtcdPoolMaxSize)
 	return nil
 }
 
 func ShutdownServer() {
-	if err := UnregisterEtcd(Config); err != nil {
+	if err := UnregisterEtcd(Config, EtcdCliPool); err != nil {
 		panic(err)
 	}
 }
@@ -196,7 +206,7 @@ func main() {
 		panic(err)
 	}
 
-	if err := RegisterEtcd(Config); err != nil {
+	if err := RegisterEtcd(Config, EtcdCliPool); err != nil {
 		panic(err)
 	}
 

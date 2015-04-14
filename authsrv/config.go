@@ -12,5 +12,7 @@ type SrvConfig struct {
 	SignKey        string
 
 	// etcd config
-	EtcdMachiens []string
+	EtcdMachines    []string
+	EtcdPoolSize    int
+	EtcdPoolMaxSize int
 }

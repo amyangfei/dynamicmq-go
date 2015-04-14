@@ -131,7 +131,7 @@ func handleRouteConn(cli *DispClient, rc chan *bufio.Reader) {
 		if err != nil {
 			if err == io.EOF {
 				log.Info("addr: %s close connection", addr)
-				if err := RegisterWaiting(nil, Config); err != nil {
+				if err := RegisterWaiting(Config, EtcdCliPool); err != nil {
 					log.Error("failed re-register etcd waiting error(%v)", err)
 				}
 				return
@@ -158,7 +158,7 @@ func handleRouteConn(cli *DispClient, rc chan *bufio.Reader) {
 		log.Error("addr: %s conn.Close() error(%v)", addr, err)
 	}
 	log.Debug("addr: %s routine stop", addr)
-	if err := RegisterWaiting(nil, Config); err != nil {
+	if err := RegisterWaiting(Config, EtcdCliPool); err != nil {
 		log.Error("failed to re-register to waiting list error(%v)", err)
 	}
 }

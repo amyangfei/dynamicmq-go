@@ -3,22 +3,20 @@ package main
 import (
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
-	"github.com/coreos/go-etcd/etcd"
 	"math/rand"
 	"time"
 )
 
-func getEtcdClient(machines []string) (*etcd.Client, error) {
-	c := etcd.NewClient(machines)
-	return c, nil
-}
-
 func AllocateConnector(machines []string) (string, error) {
 	rand.Seed(time.Now().UnixNano())
-	c, err := getEtcdClient(machines)
+
+	ec, err := EtcdCliPool.GetEtcdClient()
 	if err != nil {
 		return "", err
 	}
+	defer EtcdCliPool.RecycleEtcdClient(ec.Id)
+	c := ec.Cli
+
 	infoKey := dmq.GetInfoBase(dmq.EtcdConnectorType)
 	resp, err := c.Get(infoKey, false, true)
 	if err != nil {

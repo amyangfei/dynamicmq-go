@@ -8,12 +8,15 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 )
 
 var Config *SrvConfig
+
+var EtcdCliPool *dmq.EtcdClientPool
 
 var log = logging.MustGetLogger("dynamicmq-authsrv")
 
@@ -61,6 +64,8 @@ func InitConfig(configFile string) error {
 
 	etcdFlagSet := flag.NewFlagSet("etcd", flag.PanicOnError)
 	etcdFlagSet.String("machines", "http://localhost:4001", "etcd machines")
+	etcdFlagSet.Int("pool_size", 4, "initial etcd client pool size")
+	etcdFlagSet.Int("max_pool_size", 64, "max etcd client pool size")
 
 	globalconf.Register("server", serverFlagSet)
 	globalconf.Register("etcd", etcdFlagSet)
@@ -78,7 +83,11 @@ func InitConfig(configFile string) error {
 	Config.SignKey = serverFlagSet.Lookup("sign_key").Value.String()
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
-	Config.EtcdMachiens = strings.Split(machines, ",")
+	Config.EtcdMachines = strings.Split(machines, ",")
+	Config.EtcdPoolSize, err =
+		strconv.Atoi(etcdFlagSet.Lookup("pool_size").Value.String())
+	Config.EtcdPoolMaxSize, err =
+		strconv.Atoi(etcdFlagSet.Lookup("max_pool_size").Value.String())
 
 	return nil
 }
@@ -101,6 +110,8 @@ func InitLog(logFile string) error {
 
 func InitServer() error {
 	rand.Seed(time.Now().UnixNano())
+	EtcdCliPool = dmq.NewEtcdClientPool(
+		Config.EtcdMachines, Config.EtcdPoolSize, Config.EtcdPoolMaxSize)
 	return nil
 }
 
