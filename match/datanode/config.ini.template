@@ -26,3 +26,5 @@ hash_bits = 160
 
 [etcd]
 machines = http://localhost:4001
+pool_size = 4
+max_pool_size = 64

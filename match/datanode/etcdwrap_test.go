@@ -8,6 +8,13 @@ import (
 	"testing"
 )
 
+var ecpool *dmq.EtcdClientPool
+
+func init() {
+	cfg := fakeSrvConfig()
+	ecpool = dmq.NewEtcdClientPool(cfg.EtcdMachines, 1, 16)
+}
+
 func fakeSrvConfig() *SrvConfig {
 	cfg := &SrvConfig{
 		Hostname:     "datn0101",
@@ -26,14 +33,17 @@ func TestDataNodeOperation(t *testing.T) {
 	nodeCfg := fakeChordNodeConfig()
 	node := chord.CreateNode(nodeCfg)
 
-	if err := RegisterDataNode(srvCfg); err != nil {
+	if err := RegisterDataNode(srvCfg, ecpool); err != nil {
 		t.Errorf("failed to register datanode")
 	}
 
-	c, err := GetEtcdClient(srvCfg.EtcdMachines)
+	ec, err := ecpool.GetEtcdClient()
 	if err != nil {
 		t.Errorf("failed to get etcdclient: %v", err)
+		return
 	}
+	defer ecpool.RecycleEtcdClient(ec.Id)
+	c := ec.Cli
 
 	baseKey := dmq.GetDataPNodeKey(srvCfg.Hostname)
 	pubaddrKey := fmt.Sprintf("%s/%s", baseKey, dmq.DataPnodePubAddr)
@@ -50,7 +60,7 @@ func TestDataNodeOperation(t *testing.T) {
 		t.Errorf("error datanode status result")
 	}
 
-	if err := RegisterVnodes(srvCfg, node); err != nil {
+	if err := RegisterVnodes(srvCfg, node, ecpool); err != nil {
 		t.Errorf("failed to RegisterVnodes: %v", err)
 	}
 
@@ -64,7 +74,7 @@ func TestDataNodeOperation(t *testing.T) {
 		}
 	}
 
-	if err := UnregisterDN(srvCfg, node); err != nil {
+	if err := UnregisterDN(srvCfg, node, ecpool); err != nil {
 		t.Errorf("failed to UnregisterEtcd: %v", err)
 	}
 }

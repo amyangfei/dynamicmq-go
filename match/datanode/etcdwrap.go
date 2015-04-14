@@ -13,11 +13,13 @@ func GetEtcdClient(machines []string) (*etcd.Client, error) {
 	return c, nil
 }
 
-func RegisterDataNode(cfg *SrvConfig) error {
-	c, err := GetEtcdClient(cfg.EtcdMachines)
+func RegisterDataNode(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
+	ec, err := pool.GetEtcdClient()
 	if err != nil {
 		return err
 	}
+	defer pool.RecycleEtcdClient(ec.Id)
+	c := ec.Cli
 
 	baseKey := dmq.GetDataPNodeKey(cfg.Hostname)
 
@@ -37,11 +39,13 @@ func RegisterDataNode(cfg *SrvConfig) error {
 	return nil
 }
 
-func RegisterVnodes(cfg *SrvConfig, node *chord.Node) error {
-	c, err := GetEtcdClient(cfg.EtcdMachines)
+func RegisterVnodes(cfg *SrvConfig, node *chord.Node, pool *dmq.EtcdClientPool) error {
+	ec, err := pool.GetEtcdClient()
 	if err != nil {
 		return err
 	}
+	defer pool.RecycleEtcdClient(ec.Id)
+	c := ec.Cli
 
 	vnBaseKey := dmq.GetDataVnodeKey()
 	var idx int = -1
@@ -64,11 +68,13 @@ func RegisterVnodes(cfg *SrvConfig, node *chord.Node) error {
 	return verr
 }
 
-func UnregisterDN(cfg *SrvConfig, node *chord.Node) error {
-	c, err := GetEtcdClient(cfg.EtcdMachines)
+func UnregisterDN(cfg *SrvConfig, node *chord.Node, pool *dmq.EtcdClientPool) error {
+	ec, err := pool.GetEtcdClient()
 	if err != nil {
 		return err
 	}
+	defer pool.RecycleEtcdClient(ec.Id)
+	c := ec.Cli
 
 	var reterr error = nil
 

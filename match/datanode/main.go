@@ -19,6 +19,9 @@ import (
 
 var Config *SrvConfig
 
+// Etcd client pool
+var EtcdCliPool *dmq.EtcdClientPool
+
 // common log
 var log = logging.MustGetLogger("dynamicmq-match-datanode")
 
@@ -91,6 +94,8 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 
 	etcdFlagSet := flag.NewFlagSet("etcd", flag.PanicOnError)
 	etcdFlagSet.String("machines", "http://localhost:4001", "etcd machines")
+	etcdFlagSet.Int("pool_size", 4, "initial etcd client pool size")
+	etcdFlagSet.Int("max_pool_size", 64, "max etcd client pool size")
 
 	globalconf.Register("basic", basicFlagSet)
 	globalconf.Register("serf", serfFlagSet)
@@ -140,6 +145,10 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
 	Config.EtcdMachines = strings.Split(machines, ",")
+	Config.EtcdPoolSize, err =
+		strconv.Atoi(etcdFlagSet.Lookup("pool_size").Value.String())
+	Config.EtcdPoolMaxSize, err =
+		strconv.Atoi(etcdFlagSet.Lookup("max_pool_size").Value.String())
 
 	Config.Entrypoint = entrypoint
 	if len(starthash)%2 == 1 {
@@ -182,12 +191,14 @@ func InitLog(logFile, serfLogFile string) error {
 func InitServer() error {
 	log.Info("Datanode server is starting...")
 	ClisInfo = make(map[string]*SubCliInfo)
+	EtcdCliPool = dmq.NewEtcdClientPool(
+		Config.EtcdMachines, Config.EtcdPoolSize, Config.EtcdPoolMaxSize)
 	return nil
 }
 
 func ShutdownServer() {
 	log.Info("Datanode stop...")
-	UnregisterDN(Config, ChordNode)
+	UnregisterDN(Config, ChordNode, EtcdCliPool)
 	os.Exit(0)
 }
 
@@ -227,10 +238,10 @@ func chordRoutine() {
 	ChordNode.SerfSchdule(c, serfLog)
 
 	// FIXME: register datanode and vnode in a more accruacy time
-	if err := RegisterDataNode(Config); err != nil {
+	if err := RegisterDataNode(Config, EtcdCliPool); err != nil {
 		panic(err)
 	}
-	if err := RegisterVnodes(Config, ChordNode); err != nil {
+	if err := RegisterVnodes(Config, ChordNode, EtcdCliPool); err != nil {
 		panic(err)
 	}
 

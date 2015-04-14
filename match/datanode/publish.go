@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"io"
@@ -249,7 +250,16 @@ func validatePushMsg(msg *DecodedMsg) error {
 
 func processPushMsg(msg *DecodedMsg, cli *IdxNodeClient) error {
 	// Message must have been validated before processing
-	log.Debug("recv %v from indexnode", msg)
+	bits := 12
+	bclis := []byte(msg.items[dmq.IDMsgClientListIdId])
+	strclis := ""
+	for i := 0; (i + bits) <= len(bclis); i += bits {
+		strcli := hex.EncodeToString(bclis[i : i+bits])
+		strclis += (strcli + ",")
+	}
+	log.Debug("recv msg from indexnode payload: %s, attribute: %s, clis: %s",
+		msg.items[dmq.IDMsgItemPayloadId], msg.items[dmq.IDMsgItemAttributeId],
+		strclis)
 	// TODO: message processing
 
 	return nil

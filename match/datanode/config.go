@@ -41,5 +41,7 @@ type SrvConfig struct {
 	Entrypoint    string
 
 	// etcd
-	EtcdMachines []string
+	EtcdMachines    []string
+	EtcdPoolSize    int
+	EtcdPoolMaxSize int
 }
