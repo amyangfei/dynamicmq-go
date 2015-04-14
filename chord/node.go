@@ -82,8 +82,8 @@ func createSerfevHelper(conf *NodeConfig) error {
 
 func CreateNode(conf *NodeConfig) *Node {
 	node := &Node{
-		config: conf,
-		rtable: &RTable{
+		Config: conf,
+		Rtable: &RTable{
 			vnodes: make([]*Vnode, 0),
 			peers:  make([]*PeerNode, 0),
 		},
@@ -93,30 +93,30 @@ func CreateNode(conf *NodeConfig) *Node {
 }
 
 func (n *Node) init() {
-	n.LVnodes = make([]*localVnode, n.config.NumVnodes)
+	n.LVnodes = make([]*localVnode, n.Config.NumVnodes)
 
 	// change working dir
-	chgWorkdir(n.config.WorkDir)
+	chgWorkdir(n.Config.WorkDir)
 
-	createSerfevHelper(n.config)
+	createSerfevHelper(n.Config)
 
 	peerNode := &PeerNode{
-		Hostname:  n.config.Hostname,
-		SerfNode:  n.config.Serf.NodeName,
-		BindAddr:  n.config.BindAddr,
-		RPCAddr:   n.config.RPCAddr,
-		StartHash: n.config.StartHash,
+		Hostname:  n.Config.Hostname,
+		SerfNode:  n.Config.Serf.NodeName,
+		BindAddr:  n.Config.BindAddr,
+		RPCAddr:   n.Config.RPCAddr,
+		StartHash: n.Config.StartHash,
 	}
-	n.rtable.peers = append(n.rtable.peers, peerNode)
-	curHash := n.config.StartHash[:]
-	for i := 0; i < n.config.NumVnodes; i++ {
+	n.Rtable.peers = append(n.Rtable.peers, peerNode)
+	curHash := n.Config.StartHash[:]
+	for i := 0; i < n.Config.NumVnodes; i++ {
 		lvn := &localVnode{
 			node: n,
 		}
 		n.LVnodes[i] = lvn
 		lvn.init(peerNode, curHash)
-		n.rtable.JoinVnode(&lvn.Vnode)
-		curHash = HashJump(curHash, n.config.step, n.config.maxhash)
+		n.Rtable.JoinVnode(&lvn.Vnode)
+		curHash = HashJump(curHash, n.Config.step, n.Config.maxhash)
 	}
 }
 
@@ -142,33 +142,33 @@ func (n *Node) Swap(i, j int) {
 
 func (n *Node) SerfStart(c chan Notification, logger io.Writer) {
 	params := make(map[string]string)
-	if n.config.Serf.NodeName != "" {
-		params["node"] = n.config.Serf.NodeName
+	if n.Config.Serf.NodeName != "" {
+		params["node"] = n.Config.Serf.NodeName
 	}
-	if n.config.Serf.BindAddr != "" {
-		params["bind"] = n.config.Serf.BindAddr
+	if n.Config.Serf.BindAddr != "" {
+		params["bind"] = n.Config.Serf.BindAddr
 	}
-	if n.config.Serf.RPCAddr != "" {
-		params["rpc-addr"] = n.config.Serf.RPCAddr
+	if n.Config.Serf.RPCAddr != "" {
+		params["rpc-addr"] = n.Config.Serf.RPCAddr
 	}
-	if n.config.Serf.EvHandler != "" {
-		params["event-handler"] = n.config.Serf.EvHandler
+	if n.Config.Serf.EvHandler != "" {
+		params["event-handler"] = n.Config.Serf.EvHandler
 	}
-	if n.config.Serf.ConfigFile != "" {
-		params["config-file"] = n.config.Serf.ConfigFile
+	if n.Config.Serf.ConfigFile != "" {
+		params["config-file"] = n.Config.Serf.ConfigFile
 	}
 
-	serfStart(c, logger, n.config.Serf.BinPath, params, n.config.Serf.Args)
+	serfStart(c, logger, n.Config.Serf.BinPath, params, n.Config.Serf.Args)
 }
 
 func (n *Node) SerfStop() error {
-	return serfStop(n.config.Serf.BinPath, n.config.Serf.RPCAddr)
+	return serfStop(n.Config.Serf.BinPath, n.Config.Serf.RPCAddr)
 }
 
 // Call This function to tell serf running on this node to join the cluster
 // addr is an arbitrary serf bind address of nodes in Chord ring
 func (n *Node) SerfJoin(addr string) error {
-	return serfJoin(n.config.Serf.BinPath, n.config.Serf.RPCAddr, addr)
+	return serfJoin(n.Config.Serf.BinPath, n.Config.Serf.RPCAddr, addr)
 }
 
 // Call This function to send serf user event to serf cluster
@@ -181,10 +181,10 @@ func (n *Node) SerfJoin(addr string) error {
 func (n *Node) SerfUserEvent(evname, payload string, coalesce bool, c chan Notification) {
 	params := make(map[string]string)
 	params["coalesce"] = "false"
-	if n.config.Serf.RPCAddr != "" {
-		params["rpc-addr"] = n.config.Serf.RPCAddr
+	if n.Config.Serf.RPCAddr != "" {
+		params["rpc-addr"] = n.Config.Serf.RPCAddr
 	}
-	serfUserEvent(n.config.Serf.BinPath, evname, payload, params, c)
+	serfUserEvent(n.Config.Serf.BinPath, evname, payload, params, c)
 }
 
 func (n *Node) Shutdown() error {
@@ -199,9 +199,9 @@ func (n *Node) SerfSchdule(c chan Notification, logger io.Writer) error {
 	// try to detect member's aliveness for three times
 	retry_count := 3
 	for i := 0; i < retry_count; i++ {
-		msg, err := checkMemberAlive(n.config.Serf.BinPath, n.config.Serf.RPCAddr)
+		msg, err := checkMemberAlive(n.Config.Serf.BinPath, n.Config.Serf.RPCAddr)
 		if err == nil {
-			if strings.Contains(msg, n.config.Serf.NodeName) &&
+			if strings.Contains(msg, n.Config.Serf.NodeName) &&
 				strings.Contains(msg, serf_agent_alive) {
 				break
 			}
@@ -216,8 +216,8 @@ func (n *Node) SerfSchdule(c chan Notification, logger io.Writer) error {
 	}
 
 	// if not the first launched serf agent, join the cluster
-	if n.config.Entrypoint != "" {
-		if err := n.SerfJoin(n.config.Entrypoint); err != nil {
+	if n.Config.Entrypoint != "" {
+		if err := n.SerfJoin(n.Config.Entrypoint); err != nil {
 			return err
 		}
 	}
@@ -242,11 +242,11 @@ func (n *Node) SerfSchdule(c chan Notification, logger io.Writer) error {
 // return a json string represents chord node information
 func (n *Node) Nodeinfo() ([]byte, error) {
 	info := make(map[string]string)
-	info["hostname"] = n.config.Hostname
-	info["serf"] = n.config.Serf.NodeName
-	info["bindaddr"] = n.config.BindAddr
-	info["rpcaddr"] = n.config.RPCAddr
-	info["starthash"] = hex.EncodeToString(n.config.StartHash)
+	info["hostname"] = n.Config.Hostname
+	info["serf"] = n.Config.Serf.NodeName
+	info["bindaddr"] = n.Config.BindAddr
+	info["rpcaddr"] = n.Config.RPCAddr
+	info["starthash"] = hex.EncodeToString(n.Config.StartHash)
 
 	return json.Marshal(&info)
 }
@@ -256,8 +256,8 @@ func (n *Node) Nodeinfo() ([]byte, error) {
 // because serf has data size limitation with UserEventSizeLimit = 512 byte
 func (n *Node) Vnodeinfo() ([]byte, error) {
 	info := make(map[string][]byte)
-	info["hostname"] = []byte(n.config.Hostname)
-	info["serf"] = []byte(n.config.Serf.NodeName)
+	info["hostname"] = []byte(n.Config.Hostname)
+	info["serf"] = []byte(n.Config.Serf.NodeName)
 	ids := make([]byte, 0)
 	for _, vnode := range n.LVnodes {
 		ids = append(ids, vnode.Id...)
@@ -275,7 +275,7 @@ func (n *Node) StartStatusTcp() {
 
 func (n *Node) statusTcpListen() {
 	log := n.log
-	bind := n.config.RPCAddr
+	bind := n.Config.RPCAddr
 	addr, err := net.ResolveTCPAddr("tcp", bind)
 	if err != nil {
 		log.Error("net.ResolveTCPAddr(%s) error", bind)
@@ -296,29 +296,29 @@ func (n *Node) statusTcpListen() {
 	}()
 
 	// init reader buffer instance
-	recvTcpBufCache := dmq.NewTcpBufCache(n.config.TCPBufInsNum, n.config.TCPBufioNum)
+	recvTcpBufCache := dmq.NewTcpBufCache(n.Config.TCPBufInsNum, n.Config.TCPBufioNum)
 	for {
 		conn, err := l.AcceptTCP()
 		if err != nil {
 			log.Error("listener.AcceptTCP() error(%v)", err)
 			continue
 		}
-		if err = conn.SetReadBuffer(n.config.TCPRecvBufSize * 2); err != nil {
+		if err = conn.SetReadBuffer(n.Config.TCPRecvBufSize * 2); err != nil {
 			log.Error("conn.SetReadBuffer(%d) error(%v)",
-				n.config.TCPRecvBufSize, err)
+				n.Config.TCPRecvBufSize, err)
 			conn.Close()
 			continue
 		}
-		if err = conn.SetWriteBuffer(n.config.TCPSendBufSize * 2); err != nil {
+		if err = conn.SetWriteBuffer(n.Config.TCPSendBufSize * 2); err != nil {
 			log.Error("conn.SetWriteBuffer(%d) error(%v)",
-				n.config.TCPSendBufSize, err)
+				n.Config.TCPSendBufSize, err)
 			conn.Close()
 			continue
 		}
 		statusCli := &StatusClient{
 			expire:     time.Now().Unix() + DfltExpire,
 			conn:       conn,
-			processBuf: make([]byte, n.config.TCPRecvBufSize*2),
+			processBuf: make([]byte, n.Config.TCPRecvBufSize*2),
 			processEnd: 0,
 		}
 		rc := recvTcpBufCache.Get()
@@ -337,7 +337,7 @@ func (n *Node) handleStatusTCPconn(cli *StatusClient, rc chan *bufio.Reader) {
 			log.Error("StatusClient set timeout error(%v)", err)
 			break
 		}
-		rd := dmq.NewBufioReader(rc, cli.conn, n.config.TCPRecvBufSize)
+		rd := dmq.NewBufioReader(rc, cli.conn, n.Config.TCPRecvBufSize)
 		rlen, err := rd.Read(cli.processBuf[cli.processEnd:])
 		dmq.RecycleBufioReader(rc, rd)
 		if err != nil {
@@ -463,7 +463,7 @@ func processNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 
 	log.Debug("recv nodeinfo msg: %v from %s", msg, hostname)
 
-	_, peer := n.rtable.FindPeer(hostname)
+	_, peer := n.Rtable.FindPeer(hostname)
 	if peer != nil {
 		// TODO: update both peer information and vnodes information
 	} else {
@@ -475,7 +475,7 @@ func processNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 			RPCAddr:   msg.items[dmq.SDDMsgItemRPCAddrId],
 			StartHash: []byte(msg.items[dmq.SDDMsgItemStartHashId]),
 		}
-		n.rtable.peers = append(n.rtable.peers, peerNode)
+		n.Rtable.peers = append(n.Rtable.peers, peerNode)
 
 		// send node and vnode info directly to newly joined node
 		go n.sendNodeInfo(peerNode.RPCAddr)
@@ -518,8 +518,8 @@ func processVNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 		return err
 	}
 	vnodeIds := make([][]byte, 0)
-	for i := 0; i < len(vnodes); i += n.config.HashBits / 8 {
-		if i+n.config.HashBits/8 <= len(vnodes) {
+	for i := 0; i < len(vnodes); i += n.Config.HashBits / 8 {
+		if i+n.Config.HashBits/8 <= len(vnodes) {
 			vnodeIds = append(vnodeIds, vnodes[i:i+20])
 		}
 	}
@@ -529,12 +529,12 @@ func processVNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 	var peer *PeerNode
 	var retry_count int = 5
 	for i := 0; i < retry_count; i++ {
-		_, peer = n.rtable.FindPeer(string(hostname))
+		_, peer = n.Rtable.FindPeer(string(hostname))
 		if peer == nil {
 			// wait a short time
 			log.Warning("waiting for node %s's nodeinfo", string(hostname))
 			time.Sleep(time.Millisecond * time.Duration(100))
-			_, peer = n.rtable.FindPeer(string(hostname))
+			_, peer = n.Rtable.FindPeer(string(hostname))
 		} else {
 			break
 		}
@@ -549,7 +549,7 @@ func processVNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 			Id:    nid,
 			Pnode: peer,
 		}
-		n.rtable.JoinVnode(vnode)
+		n.Rtable.JoinVnode(vnode)
 	}
 
 	return nil
@@ -598,11 +598,11 @@ func (n *Node) sendNodeInfo(rpcAddr string) {
 		bodyLen: 0,
 		extra:   0,
 		items: map[uint8]string{
-			dmq.SDDMsgItemHostnameId:  n.config.Hostname,
-			dmq.SDDMsgItemBindAddrId:  n.config.BindAddr,
-			dmq.SDDMsgItemRPCAddrId:   n.config.RPCAddr,
-			dmq.SDDMsgItemSerfNodeId:  n.config.Serf.NodeName,
-			dmq.SDDMsgItemStartHashId: hex.EncodeToString(n.config.StartHash),
+			dmq.SDDMsgItemHostnameId:  n.Config.Hostname,
+			dmq.SDDMsgItemBindAddrId:  n.Config.BindAddr,
+			dmq.SDDMsgItemRPCAddrId:   n.Config.RPCAddr,
+			dmq.SDDMsgItemSerfNodeId:  n.Config.Serf.NodeName,
+			dmq.SDDMsgItemStartHashId: hex.EncodeToString(n.Config.StartHash),
 		},
 	}
 	bmsg := binaryMsgEncode(basicMsg)
@@ -624,8 +624,8 @@ func (n *Node) sendVnodeInfo(rpcAddr string) {
 		bodyLen: 0,
 		extra:   0,
 		items: map[uint8]string{
-			dmq.SDDMsgItemHostnameId:  base64.StdEncoding.EncodeToString([]byte(n.config.Hostname)),
-			dmq.SDDMsgItemSerfNodeId:  base64.StdEncoding.EncodeToString([]byte(n.config.Serf.NodeName)),
+			dmq.SDDMsgItemHostnameId:  base64.StdEncoding.EncodeToString([]byte(n.Config.Hostname)),
+			dmq.SDDMsgItemSerfNodeId:  base64.StdEncoding.EncodeToString([]byte(n.Config.Serf.NodeName)),
 			dmq.SDDMsgItemVNodeListId: base64.StdEncoding.EncodeToString(ids),
 		},
 	}

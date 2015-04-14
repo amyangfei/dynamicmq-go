@@ -6,6 +6,7 @@ import (
 	"github.com/amyangfei/dynamicmq-go/chord"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"github.com/coreos/go-etcd/etcd"
+	"math/rand"
 )
 
 func GetEtcdClient(machines []string) (*etcd.Client, error) {
@@ -92,4 +93,56 @@ func UnregisterDN(cfg *SrvConfig, node *chord.Node, pool *dmq.EtcdClientPool) er
 	}
 
 	return reterr
+}
+
+func GetSubCliConnId(cliId string, pool *dmq.EtcdClientPool) (string, error) {
+	ec, err := pool.GetEtcdClient()
+	if err != nil {
+		return "", err
+	}
+	defer pool.RecycleEtcdClient(ec.Id)
+	c := ec.Cli
+
+	subCliConnKey := dmq.GetSubConnKey(cliId)
+
+	if resp, err := c.Get(subCliConnKey, false, false); err != nil {
+		return "", err
+	} else if resp.Node.Dir {
+		return "", fmt.Errorf("%s should not be a directory", resp.Node.Key)
+	} else {
+		return resp.Node.Value, nil
+	}
+}
+
+func AllocateDispNode(pool *dmq.EtcdClientPool) (string, error) {
+	ec, err := pool.GetEtcdClient()
+	if err != nil {
+		return "", err
+	}
+	defer pool.RecycleEtcdClient(ec.Id)
+	c := ec.Cli
+
+	infoKey := dmq.GetInfoBase(dmq.EtcdDispatcherType)
+	resp, err := c.Get(infoKey, false, true)
+	if err != nil {
+		return "", err
+	}
+	if !resp.Node.Dir {
+		return "", fmt.Errorf("%s is not a directory", resp.Node.Key)
+	}
+	dispNum := len(resp.Node.Nodes)
+	if dispNum > 0 {
+		idx := rand.Intn(dispNum)
+		dispInfo := resp.Node.Nodes[idx]
+		if !dispInfo.Dir {
+			return "", fmt.Errorf("%s is not a directory", dispInfo.Key)
+		}
+		dispBindKey := fmt.Sprintf("%s/%s", dispInfo.Key, dmq.DispBindAddr)
+		for _, info := range dispInfo.Nodes {
+			if info.Key == dispBindKey {
+				return info.Value, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("dispatcher not found")
 }

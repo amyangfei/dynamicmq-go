@@ -7,7 +7,7 @@ import (
 func (lvn *localVnode) init(pnode *PeerNode, curHash []byte) {
 	lvn.Id = curHash[:]
 	lvn.Pnode = pnode
-	lvn.successors = make([]*Vnode, lvn.node.config.NumSuccessors)
+	lvn.successors = make([]*Vnode, lvn.node.Config.NumSuccessors)
 }
 
 func HashJump(start []byte, step, maxhash *big.Int) []byte {

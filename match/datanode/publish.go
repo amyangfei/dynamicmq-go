@@ -24,6 +24,7 @@ type Attribute struct {
 type SubCliInfo struct {
 	Cid     []byte       // subscribe client's Id
 	CidHash []byte       // cid's hash in datanode
+	ConnId  string       // id of connector the subclient connecting with
 	Attrs   []*Attribute // subscription attribute array
 }
 

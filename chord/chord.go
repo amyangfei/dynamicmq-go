@@ -67,10 +67,10 @@ type localVnode struct {
 
 // Node represents a physical node. It has NumVnodes of vnodes.
 type Node struct {
-	config  *NodeConfig
+	Config  *NodeConfig
 	LVnodes []*localVnode
 	log     *logging.Logger
-	rtable  *RTable
+	Rtable  *RTable
 }
 
 // represents for peer physical node

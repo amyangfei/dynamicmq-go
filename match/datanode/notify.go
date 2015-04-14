@@ -86,11 +86,25 @@ func processAttrCreate(data *etcd.Response) error {
 	if err != nil {
 		return fmt.Errorf("invalid client id: %s", cliIdHexStr)
 	}
+
+	// check whether is stored on this datanode
+	cidHash := dmq.GenHash(cid, Config.HashFunc)
+	candvn := ChordNode.Rtable.Search(cidHash)
+	if candvn.Pnode.Hostname != ChordNode.Config.Hostname {
+		// ignore
+		return nil
+	}
+
 	cidstr := string(cid)
 	if _, ok := ClisInfo[cidstr]; !ok {
+		connId, err := GetSubCliConnId(cliIdHexStr, EtcdCliPool)
+		if err != nil {
+			return err
+		}
 		ClisInfo[cidstr] = &SubCliInfo{
 			Cid:     cid,
-			CidHash: dmq.GenHash(cid, Config.HashFunc),
+			CidHash: cidHash,
+			ConnId:  connId,
 			Attrs:   make([]*Attribute, 0),
 		}
 	}

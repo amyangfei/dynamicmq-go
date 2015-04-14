@@ -24,13 +24,13 @@ func init() {
 
 func makeVnode() *localVnode {
 	conf := DefaultConfig("localhost", "serf0101")
-	node := &Node{config: conf}
+	node := &Node{Config: conf}
 	return &localVnode{node: node}
 }
 
 func TestVnodeInit(t *testing.T) {
 	vn := makeVnode()
-	vn.init(nil, vn.node.config.StartHash)
+	vn.init(nil, vn.node.Config.StartHash)
 	if len(vn.Id) != sha1.New().Size() {
 		t.Errorf("wrong virtual node id %v", vn.Id)
 	}
