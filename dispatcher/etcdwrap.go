@@ -75,10 +75,17 @@ func RegisterEtcd(rmgr *RouterManager, cfg *SrvConfig, pool *dmq.EtcdClientPool)
 		}
 
 		// register to etcd
-		dispInfoConnIdKey := fmt.Sprintf("%s/%s",
-			dmq.GetInfoKey(dmq.EtcdDispatcherType, cfg.NodeId), dmq.DispConnId)
+		dispInfoBase := dmq.GetInfoKey(dmq.EtcdDispatcherType, cfg.NodeId)
+		dispInfoConnIdKey := fmt.Sprintf("%s/%s", dispInfoBase, dmq.DispConnId)
 		if _, err := c.Set(dispInfoConnIdKey, connNodeId, 0); err != nil {
-			c.Delete(dispInfoConnIdKey, false)
+			c.Delete(dispInfoBase, true)
+			return err
+		}
+
+		dispInfoBindKey := fmt.Sprintf("%s/%s", dispInfoBase, dmq.DispBindAddr)
+		tcpBind := fmt.Sprintf("%s:%d", cfg.BindIp, cfg.MatchTCPPort)
+		if _, err := c.Set(dispInfoBindKey, tcpBind, 0); err != nil {
+			c.Delete(dispInfoBase, true)
 			return err
 		}
 

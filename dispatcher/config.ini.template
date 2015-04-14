@@ -1,6 +1,7 @@
 [server]
 node_id = disp0101
-match_tcp_bind = 0.0.0.0:6000
+bind_ip = 127.0.0.1
+match_tcp_port = 6000
 working_dir = '.'
 log_level = DEBUG
 log_file = ./dispatcher.log

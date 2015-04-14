@@ -83,7 +83,7 @@ start_dispatcher_single() {
     sed -i "s/^node_id.*/node_id = ${nodeid}/g" $cfg
 
     match_port=$(port_shift 6000 $seq_id)
-    sed -i "s/^match_tcp_bind.*/match_tcp_bind = 0.0.0.0:${match_port}/g" $cfg
+    sed -i "s/^match_tcp_port.*/match_tcp_port = ${match_port}/g" $cfg
 
     parsed_wdir=$(echo $wdir|sed 's/\//\\\//g')
     sed -i "s/^working_dir.*/working_dir = ${parsed_wdir}/g" $cfg

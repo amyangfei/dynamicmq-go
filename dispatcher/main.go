@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"github.com/op/go-logging"
 	"github.com/rakyll/globalconf"
@@ -57,8 +58,9 @@ func InitConfig(configFile string) error {
 
 	serverFlagSet := flag.NewFlagSet("server", flag.PanicOnError)
 	serverFlagSet.String("node_id", "disp0101", "server node id")
-	serverFlagSet.String("match_tcp_bind", "localhost:6500", "bind address for matcher")
-	serverFlagSet.String("conn_tcp_bind", "localhost:6000", "bind address for connector")
+	serverFlagSet.String("bind_ip", "127.0.0.1", "bind ip of this dispatcher")
+	serverFlagSet.Int("match_tcp_port", 6000, "tcp port for matching service")
+	serverFlagSet.String("match_tcp_bind", "localhost:6000", "bind address for matcher")
 	serverFlagSet.String("working_dir", ".", "working dir")
 	serverFlagSet.String("log_level", "DEBUG", "log level")
 	serverFlagSet.String("log_file", "./dispatcher.log", "log file path")
@@ -81,8 +83,10 @@ func InitConfig(configFile string) error {
 	Config = &SrvConfig{}
 
 	Config.NodeId = serverFlagSet.Lookup("node_id").Value.String()
-	Config.MatchTCPBind = serverFlagSet.Lookup("match_tcp_bind").Value.String()
-	Config.ConnTCPBind = serverFlagSet.Lookup("conn_tcp_bind").Value.String()
+	Config.BindIp = serverFlagSet.Lookup("bind_ip").Value.String()
+	Config.MatchTCPPort, err =
+		strconv.Atoi(serverFlagSet.Lookup("match_tcp_port").Value.String())
+	Config.MatchTCPBind = fmt.Sprintf("0.0.0.0:%d", Config.MatchTCPPort)
 	Config.WorkingDir = serverFlagSet.Lookup("working_dir").Value.String()
 	Config.LogLevel = serverFlagSet.Lookup("log_level").Value.String()
 	Config.LogFile = serverFlagSet.Lookup("log_file").Value.String()

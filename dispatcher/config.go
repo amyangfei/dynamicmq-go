@@ -3,8 +3,9 @@ package main
 type SrvConfig struct {
 	// server config
 	NodeId         string
+	BindIp         string
+	MatchTCPPort   int
 	MatchTCPBind   string
-	ConnTCPBind    string
 	MaxProc        int
 	WorkingDir     string
 	LogLevel       string

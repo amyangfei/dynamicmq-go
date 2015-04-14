@@ -21,7 +21,8 @@ var (
 	ConnLoad      = "load"
 	ConnStatus    = "status"
 
-	DispConnId = "conn_id"
+	DispConnId   = "conn_id"
+	DispBindAddr = "bind_addr"
 
 	IdxAttrLower = "lower"
 	IdxAttrUpper = "upper"
