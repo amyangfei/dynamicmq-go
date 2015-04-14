@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 )
 
 type IndexBase struct {
@@ -78,11 +79,14 @@ func buildSigleAttrIndex(xattr, yattr *AttrBase) *AttrIndex {
 	return aidx
 }
 
-func InitIndex(attridxes map[string]*AttrIndex, idxbase *IndexBase) error {
-	c, err := GetEtcdClient(Config.EtcdMachines)
+func InitIndex(attridxes map[string]*AttrIndex, idxbase *IndexBase, pool *dmq.EtcdClientPool) error {
+	ec, err := pool.GetEtcdClient()
 	if err != nil {
 		return err
 	}
+	defer pool.RecycleEtcdClient(ec.Id)
+	c := ec.Cli
+
 	if err := LoadIndexBase(c, idxbase); err != nil {
 		return err
 	}

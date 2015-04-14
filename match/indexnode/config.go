@@ -20,5 +20,7 @@ type SrvConfig struct {
 	HashFunc       func() hash.Hash
 
 	// etcd
-	EtcdMachines []string
+	EtcdMachines    []string
+	EtcdPoolSize    int
+	EtcdPoolMaxSize int
 }

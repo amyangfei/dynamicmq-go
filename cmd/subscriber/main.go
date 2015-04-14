@@ -24,7 +24,7 @@ func randRange(lower, upper int) (float64, float64) {
 
 func attrGen() string {
 	tpl := `{"use": 2, "low": %.1f, "high": %.1f}`
-	low, high := randRange(0, 10)
+	low, high := randRange(0, 20)
 	return fmt.Sprintf(tpl, low, high)
 }
 

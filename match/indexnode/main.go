@@ -18,6 +18,9 @@ import (
 var Config *SrvConfig
 var log = logging.MustGetLogger("dynamicmq-match-indexnode")
 
+// Etcd client pool
+var EtcdCliPool *dmq.EtcdClientPool
+
 // Store attribute basic information including dimension, each dimension's info.
 var IdxBase *IndexBase
 
@@ -83,6 +86,8 @@ func InitConfig(configFile string) error {
 
 	etcdFlagSet := flag.NewFlagSet("etcd", flag.PanicOnError)
 	etcdFlagSet.String("machines", "http://localhost:4001", "etcd machine list")
+	etcdFlagSet.Int("pool_size", 4, "initial etcd client pool size")
+	etcdFlagSet.Int("max_pool_size", 64, "max etcd client pool size")
 
 	globalconf.Register("basic", basicFlagSet)
 	globalconf.Register("etcd", etcdFlagSet)
@@ -111,6 +116,10 @@ func InitConfig(configFile string) error {
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
 	Config.EtcdMachines = strings.Split(machines, ",")
+	Config.EtcdPoolSize, err =
+		strconv.Atoi(etcdFlagSet.Lookup("pool_size").Value.String())
+	Config.EtcdPoolMaxSize, err =
+		strconv.Atoi(etcdFlagSet.Lookup("max_pool_size").Value.String())
 
 	return nil
 }
@@ -135,6 +144,9 @@ func InitLog(logFile string) error {
 func InitServer() error {
 	log.Info("Indexnode server is starting...")
 
+	EtcdCliPool = dmq.NewEtcdClientPool(
+		Config.EtcdMachines, Config.EtcdPoolSize, Config.EtcdPoolMaxSize)
+
 	IdxBase = &IndexBase{}
 	AttrIdxesMap = make(map[string]*AttrIndex)
 	ClisInfo = make(map[string]*SubCliInfo)
@@ -146,7 +158,7 @@ func InitServer() error {
 
 	DnConns = make(map[string]*DnodeConn)
 
-	if err := InitIndex(AttrIdxesMap, IdxBase); err != nil {
+	if err := InitIndex(AttrIdxesMap, IdxBase, EtcdCliPool); err != nil {
 		return err
 	}
 	return nil

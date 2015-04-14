@@ -269,7 +269,13 @@ func processDataNodeCreate(data *etcd.Response) error {
 	pnid := data.Node.Value
 	pnode, ok := PnodeMap[pnid]
 	if !ok {
-		c, _ := GetEtcdClient(Config.EtcdMachines)
+		ec, err := EtcdCliPool.GetEtcdClient()
+		if err != nil {
+			return err
+		}
+		defer EtcdCliPool.RecycleEtcdClient(ec.Id)
+		c := ec.Cli
+
 		if pubAddr, err := GetPnodeBindAddr(c, pnid); err != nil {
 			return err
 		} else {
