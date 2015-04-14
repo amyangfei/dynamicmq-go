@@ -262,5 +262,6 @@ func validateHeartbeat(msg *DecodedMsg) error {
 func processHeartbeat(msg *DecodedMsg, cli *IdxNodeClient) error {
 	log.Debug("recv heartbeat %v from indexnode", msg)
 	setIdxNodeTimeout(cli)
+	cli.conn.Write([]byte("heartbeat received"))
 	return nil
 }

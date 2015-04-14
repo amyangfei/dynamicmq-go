@@ -13,10 +13,6 @@ import (
 	"time"
 )
 
-var (
-	DfltExpire int64 = 3 * 60
-)
-
 type PubClient struct {
 	id         bson.ObjectId // used as client identity in internal system
 	token      bson.ObjectId // used as client identity in external system
@@ -115,7 +111,7 @@ func pubTCPListen(bind string) {
 		}
 		pubCli := &PubClient{
 			id:         bson.NewObjectId(),
-			expire:     time.Now().Unix() + DfltExpire,
+			expire:     time.Now().Unix() + PubDfltExpire,
 			conn:       conn,
 			processBuf: make([]byte, Config.TCPRecvBufSize*2),
 			processEnd: 0,
@@ -127,7 +123,7 @@ func pubTCPListen(bind string) {
 
 func setPubTimeout(cli *PubClient) error {
 	var timeout time.Time = time.Now()
-	timeout = timeout.Add(time.Second * time.Duration(DfltExpire))
+	timeout = timeout.Add(time.Second * time.Duration(PubDfltExpire))
 	return cli.conn.SetReadDeadline(timeout)
 }
 
@@ -381,10 +377,8 @@ func sendMsgToDataNode(msg *DecodedMsg, pcgroupMap map[string]*PubCliGroup) erro
 			bmsg := binaryMsgEncode(sendmsg)
 
 			log.Debug("send msg: %v to pnid: %s address: %s", bmsg, pnid, pcgroup.dnaddr)
-			if dnconn, err := getDnodeConn(pnid); err != nil {
-				return err
-			} else {
-				dnconn.WriteMsg(bmsg)
+			if err := DnodeMsgSender(pnid, bmsg); err != nil {
+				log.Error("sendmsg to dnode error: %v", err)
 			}
 
 			idx += maxclis

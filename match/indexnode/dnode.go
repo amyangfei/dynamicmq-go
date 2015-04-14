@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	"fmt"
+	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"net"
 	"sort"
+	"time"
 )
 
 // physical node in datanode cluster
@@ -24,8 +26,16 @@ type RTable struct {
 	vns []*Vnode
 }
 
+type Response struct {
+	msg string
+	err error
+}
+
 type DnodeConn struct {
-	conn net.Conn
+	dnid     string
+	conn     net.Conn
+	sender   chan []byte
+	receiver chan *Response
 }
 
 func compareVid(vid1, vid2 []byte) int {
@@ -93,6 +103,16 @@ func buildDnodeConn(nid string) (net.Conn, error) {
 	return net.DialTCP("tcp", nil, addr)
 }
 
+func DnodeMsgSender(dnid string, msg []byte) error {
+	if dnconn, err := getDnodeConn(dnid); err != nil {
+		return err
+	} else {
+		// TODO: error handling. e.g. broken connection, write failed etc.
+		dnconn.sender <- msg
+	}
+	return nil
+}
+
 func getDnodeConn(nid string) (*DnodeConn, error) {
 	dnconn, ok := DnConns[nid]
 	if !ok {
@@ -100,17 +120,69 @@ func getDnodeConn(nid string) (*DnodeConn, error) {
 		if err != nil {
 			return nil, err
 		}
-		// TODO: start connection heartbeat to datanode here.
 
 		dnconn = &DnodeConn{
-			conn: conn,
+			dnid:     nid,
+			conn:     conn,
+			sender:   make(chan []byte),
+			receiver: make(chan *Response),
 		}
 		DnConns[nid] = dnconn
+		dnconn.LifeCycle()
 	}
 	return dnconn, nil
 }
 
-func (dnconn *DnodeConn) WriteMsg(msg []byte) (int, error) {
-	// TODO: error handling. e.g. broken connection, write failed etc.
-	return dnconn.conn.Write(msg)
+func (dnconn *DnodeConn) heartbeat() {
+	rawmsg := &BasicMsg{
+		cmdType: dmq.IDMsgCmdHeartbeatMsg,
+		bodyLen: 0,
+		extra:   dmq.IDMsgExtraNone,
+		items:   make(map[uint8]string),
+	}
+	bmsg := binaryMsgEncode(rawmsg)
+	dnconn.sender <- bmsg
+}
+
+func (dnconn *DnodeConn) HeartbeatRoutine(interval int) {
+	ticker := time.NewTicker(time.Second * time.Duration(interval))
+	for {
+		<-ticker.C
+		dnconn.heartbeat()
+	}
+}
+
+func (dnconn *DnodeConn) LifeCycle() {
+	go dnconn.HeartbeatRoutine(HbIntervalToDN)
+
+	go func() {
+		for {
+			select {
+			case msg := <-dnconn.sender:
+				dnconn.conn.Write(msg)
+			case resp := <-dnconn.receiver:
+				if resp.err != nil {
+					log.Debug("dnconn to %s receive err: %v", dnconn.dnid, resp.err)
+
+					// ignore TCP connection close error
+					dnconn.conn.Close()
+					delete(DnConns, dnconn.dnid)
+					return
+				} else {
+					log.Debug("receive msg: '%s' from dnconn %s", resp.msg, dnconn.dnid)
+				}
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			b := make([]byte, 2048)
+			_, err := dnconn.conn.Read(b)
+			dnconn.receiver <- &Response{msg: string(b), err: err}
+			if err != nil {
+				return
+			}
+		}
+	}()
 }
