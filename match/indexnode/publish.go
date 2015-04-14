@@ -279,6 +279,11 @@ func processPushMsg(msg *DecodedMsg) error {
 	// find minimal intervals via segment tree index
 	candIntervals := findCandIntervals(pubmsg)
 
+	if candIntervals == nil {
+		log.Debug("no candinate sub clients found")
+		return nil
+	}
+
 	// Group subclients by their belonging datanode, mapping key is id of datanode
 	pcgroupMap := make(map[string]*PubCliGroup)
 	for _, ival := range candIntervals {
@@ -388,7 +393,7 @@ func sendMsgToDataNode(msg *DecodedMsg, pcgroupMap map[string]*PubCliGroup) erro
 }
 
 func findCandIntervals(pubmsg *PubMsg) []*Interval {
-	minMatchCnt := len(ClisInfo)
+	minMatchCnt := len(ClisInfo) + 1
 	bestAttrComb := ""
 	var candx, candy float64
 
@@ -416,5 +421,8 @@ func findCandIntervals(pubmsg *PubMsg) []*Interval {
 		}
 	}
 
-	return AttrIdxesMap[bestAttrComb].tree.Query(candx, candy)
+	if aidx, ok := AttrIdxesMap[bestAttrComb]; ok {
+		return aidx.tree.Query(candx, candy)
+	}
+	return nil
 }
