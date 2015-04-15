@@ -378,7 +378,7 @@ func processPushMsg(msg *DecodedMsg, cli *IdxNodeClient) error {
 		bmsg := binaryMsgEncode(sendmsg)
 
 		log.Debug("send msg: %v to disp (with %d subclis)",
-			bmsg, len(cliIdList)/dmq.SubClientIdSize)
+			bmsg, len(cliIdList)/(dmq.SubClientIdSize+dmq.ConnectorNodeIdSize))
 
 		if err := DispMsgSender(CurDispNode, bmsg); err != nil {
 			log.Error("sendmsg to dispnode error: %v", err)

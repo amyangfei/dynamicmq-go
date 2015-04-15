@@ -102,6 +102,27 @@ start_dispatcher() {
     done
 }
 
+start_indexnode() {
+    cd $wdir
+    cp $src/match/indexnode/indexnode $wdir
+    cp $src/match/indexnode/config.ini.template $wdir/indexnode.ini
+
+    echo "starting indexnode..."
+    $wdir/indexnode -c $wdir/indexnode.ini &
+}
+
+start_datanode_single() {
+    echo "not implement"
+}
+
+start_datanode() {
+    echo "starting datanode..."
+    cp $src/match/datanode/datanode $wdir
+    for i in $(seq $1); do
+        start_datanode_single $i
+    done
+}
+
 stop_etcd() {
     echo "stopping Etcd..."
     etcd_pid=$(cat "${wdir}/etcd.pid")
@@ -143,9 +164,31 @@ stop_dispatcher() {
     done
 }
 
+stop_indexnode() {
+    echo "killing indexnode..."
+    pids=$(cat $wdir/indexnode.pid)
+    for pid in $pids; do
+        echo "killing indexnode with pid=$pid"
+        kill $pid
+    done
+}
+
+stop_datanode() {
+    echo "killing datanode..."
+    pids=$(cat $wdir/datanode_*.pid)
+    for pid in $pids; do
+        echo "killing datanode with pid=$pid"
+        kill $pid
+    done
+}
+
 build_x() {
     x=$1
-    cd $cur/../$x
+    if [ "$x" == "indexnode" ] || [ "$x" == "datanode" ]; then
+        cd $cur/../match/$x
+    else
+        cd $cur/../$x
+    fi
     echo "building $x..."
     go build
 }
@@ -155,6 +198,8 @@ build() {
         build_x "connector"
         build_x "dispatcher"
         build_x "authsrv"
+        build_x "indexnode"
+        build_x "datanode"
     else
         for x in "$@"; do
             build_x $x
@@ -186,6 +231,8 @@ start() {
     start_authsrv $*
     start_connector $*
     start_dispatcher $*
+    start_indexnode $*
+    # start_datanode $(($1 + 1))
 }
 
 stop() {
@@ -195,6 +242,8 @@ stop() {
         stop_dispatcher
         stop_connector
         stop_authsrv
+        # stop_datanode
+        stop_indexnode
     else
         for x in "$@"; do
             stop_$x
@@ -208,6 +257,8 @@ status() {
     ps aux|grep '[/]authsrv'
     ps aux|grep '[/]connector'
     ps aux|grep '[/]dispatcher'
+    ps aux|grep '[/]indexnode'
+    ps aux|grep '[/]datanode'
 }
 
 show_help() {

@@ -9,7 +9,7 @@ tcp_sendbuf_size = 2048
 tcp_bufio_num = 64
 
 [serf]
-bin_path = /usr/local/bin/template
+bin_path = /usr/local/bin/serf
 node_name = serf0101
 bind_port = 7946
 rpc_addr = 127.0.0.1:7373
