@@ -217,17 +217,22 @@ func RemoveSub(cli *SubClient, cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
 
 	key := dmq.GetInfoKey(dmq.EtcdSubscriberType, cli.id.Hex())
 	attrKey := dmq.GetSubAttrCliBase(cli.id.Hex())
+	connSubKey := dmq.GetConnSubKey(cfg.NodeId, cli.id.Hex())
 
 	_, infoErr := c.Delete(key, true)
 	_, attrErr := c.Delete(attrKey, true)
+	_, subErr := c.Delete(connSubKey, true)
 
-	if infoErr != nil && attrErr != nil {
-		return fmt.Errorf(
-			"remove subinfo err: %v; remove subattr err: %v", infoErr, attrErr)
-	} else if infoErr != nil {
-		return infoErr
-	} else if attrErr != nil {
-		return attrErr
+	err = nil
+	if infoErr != nil {
+		err = fmt.Errorf("remove subinfo err: %v", infoErr)
 	}
-	return nil
+	if attrErr != nil {
+		err = fmt.Errorf("%v: remove subattr err: %v", attrErr)
+	}
+	if subErr != nil {
+		err = fmt.Errorf("%v: remove conn subid err: %v", subErr)
+	}
+
+	return err
 }
