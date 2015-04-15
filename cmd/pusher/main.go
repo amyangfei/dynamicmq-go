@@ -88,16 +88,13 @@ func getAllSubcli() []SubConn {
 func SendOneMsg(conn net.Conn) {
 	subConns := getAllSubcli()
 	sublist := make([]byte, 0)
-	for i, sc := range subConns {
+	for _, sc := range subConns {
 		if d, err := hex.DecodeString(sc.subId); err != nil {
 			fmt.Printf("error format of subid %s", sc.subId)
 		} else {
 			sublist = append(sublist, d...)
 			sublist = append(sublist, []byte(sc.connId)...)
 			fmt.Println(len(sublist))
-			if i != len(subConns)-1 {
-				sublist = append(sublist, []byte(dmq.MDMsgSubInfoSep)...)
-			}
 		}
 	}
 

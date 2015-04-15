@@ -10,7 +10,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"net"
-	"strings"
 )
 
 type MatchClient struct {
@@ -229,23 +228,15 @@ func processPushMsg(msg *DecodedMsg) error {
 
 	cliGroup := map[string][]byte{}
 	subInfoList, _ := msg.items[dmq.MDMsgItemSubListId]
-	subInfos := strings.Split(subInfoList, dmq.MDMsgSubInfoSep)
-	for _, subInfo := range subInfos {
-		if len(subInfo) != dmq.SubClientIdSize+dmq.ConnectorNodeIdSize {
-			log.Warning("invalid subclient info length %d", len(subInfo))
-		} else {
-			subId := subInfo[:dmq.SubClientIdSize]
-			connId := subInfo[dmq.SubClientIdSize:]
-			cliGroup[connId] = append(cliGroup[connId], []byte(subId)...)
-			cliGroup[connId] = append(cliGroup[connId], dmq.DRMsgSubInfoSep[0])
-		}
+	step := dmq.SubClientIdSize + dmq.ConnectorNodeIdSize
+	for i := 0; i+step <= len(subInfoList); i += step {
+		subId := subInfoList[i : i+dmq.SubClientIdSize]
+		connId := subInfoList[i+dmq.SubClientIdSize : i+step]
+		cliGroup[connId] = append(cliGroup[connId], []byte(subId)...)
 	}
 
 	log.Debug("msgId: %s, msgPayload: %s", hexMsgId, msgPayload)
 	for cid, subIds := range cliGroup {
-		if len(subIds) > 0 && subIds[len(subIds)-1] == dmq.DRMsgSubInfoSep[0] {
-			subIds = subIds[:len(subIds)-1]
-		}
 		log.Debug("connid: %s, subids: %v", cid, hex.EncodeToString(subIds))
 
 		msg := &BasicMsg{

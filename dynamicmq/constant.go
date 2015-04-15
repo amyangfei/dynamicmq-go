@@ -85,8 +85,6 @@ var (
 	// Message body item size restriction
 	MDMsgItemMsgidSize  uint16 = 12
 	MDMsgItemMaxPayload uint16 = 256
-
-	MDMsgSubInfoSep = ","
 )
 
 // Message protocol from Dispatcher to Connector-Router or
@@ -125,8 +123,6 @@ var (
 	DRMsgItemMaxPayload uint16 = 256
 	DRMsgItemTsSize     uint16 = 8
 	DRMsgItemDispIdSize uint16 = uint16(DispatcherNodeIdSize)
-
-	DRMsgSubInfoSep = ","
 )
 
 // Message protocol from local serf handler or datanode to datanode

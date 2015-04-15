@@ -10,7 +10,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"net"
-	"strings"
 	"time"
 )
 
@@ -286,7 +285,6 @@ func processPushMsg(msg *DecodedMsg, cli *DispClient) error {
 	msgId, _ := msg.items[dmq.DRMsgItemMsgidId]
 	payload, _ := msg.items[dmq.DRMsgItemPayloadId]
 	subListStr, _ := msg.items[dmq.DRMsgItemSubListId]
-	subIds := strings.Split(subListStr, dmq.DRMsgSubInfoSep)
 
 	log.Debug("process msg id: %s extra: %d, bodyLen: %d",
 		hex.EncodeToString([]byte(msgId)), msg.extra, msg.bodyLen)
@@ -300,11 +298,8 @@ func processPushMsg(msg *DecodedMsg, cli *DispClient) error {
 		return err
 	}
 
-	for _, subId := range subIds {
-		if len(subId) != dmq.SubClientIdSize {
-			log.Error("error sub client id size %d", len(subId))
-			continue
-		}
+	for i := 0; i+dmq.SubClientIdSize <= len(subListStr); i += dmq.SubClientIdSize {
+		subId := subListStr[i : i+dmq.SubClientIdSize]
 		oid := bson.ObjectId(subId)
 		if cli, ok := SubcliTable[oid]; !ok {
 			log.Error("subclient with id %s not found", oid.Hex())

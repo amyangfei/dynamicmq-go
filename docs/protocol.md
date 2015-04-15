@@ -22,6 +22,7 @@
         * MsgId         1
         * PayloadId     2
         * ClientListId  3
+            * client list format: [subcliId+connId][subcliId+connId]...[subcliId+connId]
 
 2. Message from one Dispatcher to another Dispatcher
     * This message can be sent to corresponding Connector directly
@@ -51,6 +52,11 @@
         * handshake    = 1 # used for exchanging node information
         * heartbeat    = 2
         * push message = 3
+    * Body item id
+        * MsgId         1
+        * PayloadId     2
+        * ClientListId  3
+            * client list format: [subcliId][subcliId]...[subcliId]
 
 
 ## sdk
