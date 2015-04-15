@@ -68,7 +68,8 @@ var (
 	MDMsgMaxBodyLen     uint16 = 2000
 
 	// command
-	MDMsgCmdPushMsg uint8 = 1
+	MDMsgCmdPushMsg   uint8 = 1
+	MDMsgCmdHeartbeat uint8 = 2
 
 	// Extra Field
 	MDMsgExtraNone        uint8 = 0x00
@@ -203,4 +204,7 @@ var (
 		"range":  2,
 		"extra":  3,
 	}
+	AttrUseStr   string = "strval"
+	AttrUseRange string = "range"
+	AttrUseExtra string = "extra"
 )

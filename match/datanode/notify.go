@@ -106,9 +106,11 @@ func processAttrCreate(data *etcd.Response) error {
 			CidHash: cidHash,
 			ConnId:  connId,
 			Attrs:   make([]*Attribute, 0),
+			AttrMap: make(map[string]*Attribute),
 		}
 	}
 	ClisInfo[cidstr].Attrs = append(ClisInfo[cidstr].Attrs, attr)
+	ClisInfo[cidstr].AttrMap[attr.name] = attr
 
 	return nil
 }
@@ -136,13 +138,16 @@ func processAttrDelete(data *etcd.Response) error {
 		// remove all the attrs.
 		if attrName == "" {
 			for i := 0; i < len(ClisInfo[cidstr].Attrs); i++ {
+				delete(ClisInfo[cidstr].AttrMap, ClisInfo[cidstr].Attrs[i].name)
 				ClisInfo[cidstr].Attrs[i] = nil
 			}
+			ClisInfo[cidstr].AttrMap = nil
 			ClisInfo[cidstr].Attrs = nil
 		} else {
 			attrNum := len(ClisInfo[cidstr].Attrs)
 			for i := 0; i < attrNum; i++ {
 				if ClisInfo[cidstr].Attrs[i].name == attrName {
+					delete(ClisInfo[cidstr].AttrMap, attrName)
 					ClisInfo[cidstr].Attrs[attrNum-1], ClisInfo[cidstr].Attrs =
 						nil,
 						append(ClisInfo[cidstr].Attrs[:i],

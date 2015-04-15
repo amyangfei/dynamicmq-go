@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
+	"gopkg.in/mgo.v2/bson"
 	"io"
 	"net"
 	"time"
@@ -21,11 +23,19 @@ type Attribute struct {
 	extra  string
 }
 
+type PubAttr struct {
+	name   string
+	use    int
+	strval string
+	val    float64
+}
+
 type SubCliInfo struct {
-	Cid     []byte       // subscribe client's Id
-	CidHash []byte       // cid's hash in datanode
-	ConnId  string       // id of connector the subclient connecting with
-	Attrs   []*Attribute // subscription attribute array
+	Cid     []byte                // subscribe client's Id
+	CidHash []byte                // cid's hash in datanode
+	ConnId  string                // id of connector the subclient connecting with
+	Attrs   []*Attribute          // subscription attribute array
+	AttrMap map[string]*Attribute // used for accelerating matching
 }
 
 type IdxNodeClient struct {
@@ -249,19 +259,133 @@ func validatePushMsg(msg *DecodedMsg) error {
 	return nil
 }
 
+// cliId is in BSON format, not hex string
+func checkSubCliMatchingMsg(pattrs []*PubAttr, cliId string) bool {
+	if cli, ok := ClisInfo[cliId]; !ok {
+		log.Warning("subclient %s not found in ClisInfo",
+			hex.EncodeToString([]byte(cliId)))
+		return false
+	} else {
+		for _, pattr := range pattrs {
+			if attr, ok := cli.AttrMap[pattr.name]; !ok {
+				// ignore if the subclient has no interest on this attribute
+			} else {
+				if int(attr.use) != pattr.use {
+					log.Warning("different attr type for cli %s: %d expetted %d",
+						hex.EncodeToString([]byte(cliId)), attr.use, pattr.use)
+					return false
+				}
+				if pattr.val < attr.low || pattr.val > attr.high {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+func extractMsgAttr(msg *DecodedMsg) ([]*PubAttr, error) {
+	// Message must have been validated
+	attrs := msg.items[dmq.IDMsgItemAttributeId]
+	parsedAttrrs := make(map[string]interface{})
+	if err := json.Unmarshal([]byte(attrs), &parsedAttrrs); err != nil {
+		return nil, err
+	}
+	pattrs := make([]*PubAttr, 0)
+	for aname, attr := range parsedAttrrs {
+		if v, ok := attr.(string); ok {
+			pattrs = append(pattrs, &PubAttr{
+				name:   aname,
+				use:    dmq.AttrUseField[dmq.AttrUseStr],
+				strval: v,
+			})
+		}
+		if v, ok := attr.(float64); ok {
+			pattrs = append(pattrs, &PubAttr{
+				name: aname,
+				use:  dmq.AttrUseField[dmq.AttrUseRange],
+				val:  v,
+			})
+		}
+	}
+	return pattrs, nil
+}
+
+func chooseMaxSubCliNum(msg *DecodedMsg) int {
+	tmsg := &BasicMsg{
+		cmdType: dmq.MDMsgCmdPushMsg,
+		bodyLen: 0,
+		extra:   dmq.MDMsgExtraNone,
+		items: map[uint8]string{
+			dmq.MDMsgItemMsgidId:   string(bson.NewObjectId()),
+			dmq.MDMsgItemPayloadId: msg.items[dmq.IDMsgItemPayloadId],
+		},
+	}
+	bmsg := binaryMsgEncode(tmsg)
+	oneIdSize := dmq.SubClientIdSize + dmq.ConnectorNodeIdSize +
+		int(dmq.IDMsgItemIdSize+dmq.IDMsgItemHeaderSize)
+	return (int(dmq.MDMsgMaxBodyLen+dmq.MDMsgHeaderSize) - len(bmsg)) / oneIdSize
+}
+
 func processPushMsg(msg *DecodedMsg, cli *IdxNodeClient) error {
 	// Message must have been validated before processing
-	bits := 12
-	bclis := []byte(msg.items[dmq.IDMsgClientListIdId])
-	strclis := ""
-	for i := 0; (i + bits) <= len(bclis); i += bits {
-		strcli := hex.EncodeToString(bclis[i : i+bits])
-		strclis += (strcli + ",")
+
+	pattrs, err := extractMsgAttr(msg)
+	if err != nil {
+		return err
 	}
-	log.Debug("recv msg from indexnode payload: %s, attribute: %s, clis: %s",
-		msg.items[dmq.IDMsgItemPayloadId], msg.items[dmq.IDMsgItemAttributeId],
-		strclis)
-	// TODO: message processing
+
+	bits := dmq.SubClientIdSize
+	bclis := []byte(msg.items[dmq.IDMsgClientListIdId])
+	candClis := make([][]byte, 0)
+	for i := 0; (i + bits) <= len(bclis); i += bits {
+		if checkSubCliMatchingMsg(pattrs, string(bclis[i:i+bits])) {
+			candClis = append(candClis, bclis[i:i+bits])
+		}
+	}
+
+	maxclis := chooseMaxSubCliNum(msg)
+	idx, clinum := 0, len(candClis)
+	for idx < clinum {
+		var end int
+		if (idx + maxclis) < clinum {
+			end = idx + maxclis
+		} else {
+			end = clinum
+		}
+		cliIdList := make([]byte, 0)
+		for i := idx; i < end; i++ {
+			cliId := candClis[i]
+			cli, ok := ClisInfo[string(cliId)]
+			if !ok {
+				log.Error("subclient %s not in ClisInfo", hex.EncodeToString(cliId))
+				continue
+			}
+			cliIdList = append(cliIdList, cliId...)
+			cliIdList = append(cliIdList, []byte(cli.ConnId)...)
+		}
+
+		sendmsg := &BasicMsg{
+			cmdType: dmq.MDMsgCmdPushMsg,
+			bodyLen: 0,
+			extra:   dmq.MDMsgExtraNone,
+			items: map[uint8]string{
+				dmq.MDMsgItemMsgidId:   string(bson.NewObjectId()),
+				dmq.MDMsgItemPayloadId: msg.items[dmq.IDMsgItemPayloadId],
+				dmq.MDMsgItemSubListId: string(cliIdList),
+			},
+		}
+		bmsg := binaryMsgEncode(sendmsg)
+
+		log.Debug("send msg: %v to disp (with %d subclis)",
+			bmsg, len(cliIdList)/dmq.SubClientIdSize)
+
+		if err := DispMsgSender(CurDispNode, bmsg); err != nil {
+			log.Error("sendmsg to dispnode error: %v", err)
+		}
+
+		idx = end
+	}
 
 	return nil
 }

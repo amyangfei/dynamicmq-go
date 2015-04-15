@@ -354,7 +354,7 @@ func chooseMaxSubCliNum(msg *DecodedMsg, clidSize int) int {
 }
 
 func sendMsgToDataNode(msg *DecodedMsg, pcgroupMap map[string]*PubCliGroup) error {
-	maxclis := chooseMaxSubCliNum(msg, 12)
+	maxclis := chooseMaxSubCliNum(msg, dmq.SubClientIdSize)
 	// send message to different datanode
 	for pnid, pcgroup := range pcgroupMap {
 		idx, clinum := 0, len(pcgroup.cids)

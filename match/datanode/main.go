@@ -34,6 +34,11 @@ var ChordNode *chord.Node
 // The subclient's id is in BSON format, not hex string
 var ClisInfo map[string]*SubCliInfo
 
+// mapping from dispatcher's id(disp name) to a DispConn struct with it
+var DispConns map[string]*DispConn
+
+var CurDispNode *DispNode
+
 // InitSignal register signals handler.
 func InitSignal() chan os.Signal {
 	c := make(chan os.Signal, 1)
@@ -193,6 +198,14 @@ func InitServer() error {
 	ClisInfo = make(map[string]*SubCliInfo)
 	EtcdCliPool = dmq.NewEtcdClientPool(
 		Config.EtcdMachines, Config.EtcdPoolSize, Config.EtcdPoolMaxSize)
+
+	DispConns = make(map[string]*DispConn)
+	var err error
+	CurDispNode, err = AllocateDispNode(EtcdCliPool)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

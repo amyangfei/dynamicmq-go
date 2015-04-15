@@ -82,10 +82,10 @@ func TestDataNodeOperation(t *testing.T) {
 // FIXME: to run this function properity, we should start at least one dispatch
 // node. In future work we will separate the dispatcher into a standalone module.
 func TestAllocateDispNode(t *testing.T) {
-	if addr, err := AllocateDispNode(ecpool); err != nil {
+	if dnode, err := AllocateDispNode(ecpool); err != nil {
 		// t.Errorf("failed to AllocateDispNode: %v", err)
 		t.Logf("failed to allocate disp node: %v", err)
 	} else {
-		t.Logf("allocate disp node: %s", addr)
+		t.Logf("allocate disp node: %s %s", dnode.dispid, dnode.bindAddr)
 	}
 }

@@ -6,3 +6,7 @@ const (
 	RmStatusOk
 	RmStatusError
 )
+
+var (
+	MatchNodeDfltExpire = 15 * 60
+)

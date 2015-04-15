@@ -10,6 +10,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"net"
+	"time"
 )
 
 type MatchClient struct {
@@ -31,11 +32,12 @@ var (
 
 type HandleMsgFunc struct {
 	validate func(msg *DecodedMsg) error
-	process  func(msg *DecodedMsg) error
+	process  func(msg *DecodedMsg, cli *MatchClient) error
 }
 
 var DispCmdTable = map[uint8]HandleMsgFunc{
-	dmq.MDMsgCmdPushMsg: HandleMsgFunc{validate: validatePushMsg, process: processPushMsg},
+	dmq.MDMsgCmdPushMsg:   HandleMsgFunc{validate: validatePushMsg, process: processPushMsg},
+	dmq.MDMsgCmdHeartbeat: HandleMsgFunc{validate: validateHeartbeat, process: processHeartbeat},
 }
 
 func StartMatchTCP(bind string) error {
@@ -98,11 +100,22 @@ func tcpListen(bind string) {
 	}
 }
 
+func setMatchNodeTimeout(cli *MatchClient) error {
+	var timeout time.Time = time.Now()
+	timeout = timeout.Add(time.Second * time.Duration(MatchNodeDfltExpire))
+	return cli.conn.SetReadDeadline(timeout)
+}
+
 func handleTCPConn(cli *MatchClient, rc chan *bufio.Reader) {
 	addr := cli.conn.RemoteAddr().String()
 	log.Debug("MatcherClient handleTcpConn(%s) routine start", addr)
 
 	for {
+		if err := setMatchNodeTimeout(cli); err != nil {
+			log.Error("MatchNodeClient set timeout error(%v)", err)
+			break
+		}
+
 		rd := dmq.NewBufioReader(rc, cli.conn, Config.TCPRecvBufSize)
 		rlen, err := rd.Read(cli.processBuf[cli.processEnd:])
 		dmq.RecycleBufioReader(rc, rd)
@@ -161,7 +174,7 @@ func processReadbuf(cli *MatchClient, buf []byte) error {
 				if err := processFunc.validate(decMsg); err != nil {
 					log.Error("request valid error(%v)", err)
 				} else {
-					processFunc.process(decMsg)
+					processFunc.process(decMsg, cli)
 				}
 			} else {
 				log.Error("cmd: %d not support", cmd)
@@ -220,7 +233,7 @@ func validatePushMsg(msg *DecodedMsg) error {
 	return nil
 }
 
-func processPushMsg(msg *DecodedMsg) error {
+func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 	// Message must have been validated before processing
 	msgId, _ := msg.items[dmq.MDMsgItemMsgidId]
 	hexMsgId := hex.EncodeToString([]byte(msgId))
@@ -260,5 +273,16 @@ func processPushMsg(msg *DecodedMsg) error {
 		}
 	}
 
+	return nil
+}
+
+func validateHeartbeat(msg *DecodedMsg) error {
+	return nil
+}
+
+func processHeartbeat(msg *DecodedMsg, cli *MatchClient) error {
+	log.Debug("recv heartbeat %v from match service datanode", msg)
+	setMatchNodeTimeout(cli)
+	cli.conn.Write([]byte("heartbeat received"))
 	return nil
 }
