@@ -13,10 +13,26 @@ red='\e[0;31m'
 NC='\e[0m' # No Color
 
 start_etcd() {
-    cd $wdir
-    echo "starting etcd..."
-    $etcd_bin >>etcd.log 2>&1 &
-    echo $! > etcd.pid
+    if [ ! -d "$wdir/etcd_meta" ]; then
+        mkdir -p $wdir/etcd_meta
+    fi
+
+    cd $wdir/etcd_meta
+    echo "starting meta etcd..."
+    $etcd_bin --listen-client-urls 'http://localhost:2379,http://localhost:4001' \
+        --listen-peer-urls 'http://localhost:2380,http://localhost:7001' \
+        >>../etcd_meta.log 2>&1 &
+    echo $! > ../etcd_meta.pid
+
+    if [ ! -d "$wdir/etcd_attr" ]; then
+        mkdir -p $wdir/etcd_attr
+    fi
+    cd $wdir/etcd_attr
+    echo "starting attr etcd..."
+    $etcd_bin --listen-client-urls 'http://localhost:2479,http://localhost:4101' \
+        --listen-peer-urls 'http://localhost:2480,http://localhost:7101' \
+        >>../etcd_attr.log 2>&1 &
+    echo $! > ../etcd_attr.pid
 }
 
 start_redis() {
@@ -125,9 +141,11 @@ start_datanode() {
 
 stop_etcd() {
     echo "stopping Etcd..."
-    etcd_pid=$(cat "${wdir}/etcd.pid")
-    echo "killing etcd with pid ${etcd_pid}"
-    kill $etcd_pid
+    etcd_pids=$(cat $wdir/etcd_*.pid)
+    for pid in $etcd_pids; do
+        echo "killing etcd with pid=$pid"
+        kill $pid
+    done
 }
 
 stop_redis() {

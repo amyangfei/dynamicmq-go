@@ -99,6 +99,8 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 
 	etcdFlagSet := flag.NewFlagSet("etcd", flag.PanicOnError)
 	etcdFlagSet.String("machines", "http://localhost:4001", "etcd machines")
+	etcdFlagSet.String("attr_machines", "http://localhost:4101",
+		"attr etcd machine list, same cluster is filtered by ',', different group is filtered by ';'")
 	etcdFlagSet.Int("pool_size", 4, "initial etcd client pool size")
 	etcdFlagSet.Int("max_pool_size", 64, "max etcd client pool size")
 
@@ -150,6 +152,12 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
 	Config.EtcdMachines = strings.Split(machines, ",")
+	etcdMachGroup := strings.Split(etcdFlagSet.Lookup("attr_machines").Value.String(), ";")
+	attrEtcdMach := make([][]string, 0)
+	for _, emg := range etcdMachGroup {
+		attrEtcdMach = append(attrEtcdMach, strings.Split(emg, ";"))
+	}
+	Config.AttrEtcdMachines = attrEtcdMach
 	Config.EtcdPoolSize, err =
 		strconv.Atoi(etcdFlagSet.Lookup("pool_size").Value.String())
 	Config.EtcdPoolMaxSize, err =
@@ -274,7 +282,9 @@ func StartChordNode() error {
 }
 
 func NotifyService() {
-	go AttrWatcher(Config.EtcdMachines)
+	for _, machines := range Config.AttrEtcdMachines {
+		go AttrWatcher(machines)
+	}
 }
 
 func main() {

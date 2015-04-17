@@ -20,6 +20,8 @@ var SubcliTable map[bson.ObjectId]*SubClient
 
 var EtcdCliPool *dmq.EtcdClientPool
 
+var AttrEtcdCliPool *dmq.EtcdClientPool
+
 var log = logging.MustGetLogger("dynamicmq-connector")
 
 // InitSignal register signals handler.
@@ -81,6 +83,7 @@ func InitConfig(configFile string) error {
 
 	etcdFlagSet := flag.NewFlagSet("etcd", flag.PanicOnError)
 	etcdFlagSet.String("machines", "http://localhost:4001", "etcd machines")
+	etcdFlagSet.String("attr_machines", "http://localhost:4101", "etcd machines for attribute")
 	etcdFlagSet.Int("pool_size", 4, "initial etcd client pool size")
 	etcdFlagSet.Int("max_pool_size", 64, "max etcd client pool size")
 
@@ -127,6 +130,8 @@ func InitConfig(configFile string) error {
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
 	Config.EtcdMachines = strings.Split(machines, ",")
+	attr_machines := etcdFlagSet.Lookup("attr_machines").Value.String()
+	Config.AttrEtcdMachines = strings.Split(attr_machines, ",")
 	Config.EtcdPoolSize, err =
 		strconv.Atoi(etcdFlagSet.Lookup("pool_size").Value.String())
 	Config.EtcdPoolMaxSize, err =
@@ -155,6 +160,8 @@ func InitServer() error {
 	SubcliTable = make(map[bson.ObjectId]*SubClient, 0)
 	EtcdCliPool = dmq.NewEtcdClientPool(
 		Config.EtcdMachines, Config.EtcdPoolSize, Config.EtcdPoolMaxSize)
+	AttrEtcdCliPool = dmq.NewEtcdClientPool(
+		Config.AttrEtcdMachines, Config.EtcdPoolSize, Config.EtcdPoolMaxSize)
 	return nil
 }
 
