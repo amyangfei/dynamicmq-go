@@ -8,7 +8,9 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 	"math"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -141,6 +143,27 @@ func processAttrCreate(data *etcd.Response) error {
 }
 
 func processAttrUpdate(data *etcd.Response) error {
+	cliId, attrName := dmq.ExtractInfoFromSubKey(data.Node.Key)
+	if cliId == "" || attrName == "" {
+		return fmt.Errorf("invalid attr craete notify key: %s", data.Node.Key)
+	}
+	attr, err := extractAttrFromSubVal(data.Node.Value)
+	if err != nil {
+		return err
+	}
+	attr.name = attrName
+
+	if int(attr.use) == dmq.AttrUseField[dmq.AttrUseStr] {
+		if ts, err := strconv.ParseInt(attr.strval, 10, 0); err != nil {
+			return err
+		} else {
+			now := time.Now().UnixNano()
+			latency := now - ts
+			log.Debug("recv attr strval update with latency: %d", latency)
+		}
+		return nil
+	}
+
 	return nil
 }
 
