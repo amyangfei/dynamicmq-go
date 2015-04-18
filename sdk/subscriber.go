@@ -84,7 +84,7 @@ func (sub *SubSdk) connect(dst string) error {
 		return err
 	}
 	if err := conn.SetKeepAlive(true); err != nil {
-		conn.Close()
+		sub.Close()
 		return err
 	}
 	sub.conn = conn
@@ -258,7 +258,10 @@ func (sub *SubSdk) recvMsg(dataChan chan []byte, errChan chan error) {
 }
 
 func (sub *SubSdk) Close() error {
-	return sub.conn.Close()
+	if sub.conn != nil {
+		return sub.conn.Close()
+	}
+	return nil
 }
 
 func isJSONString(s string) bool {

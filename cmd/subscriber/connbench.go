@@ -86,13 +86,8 @@ func createSubSdk() (*sdk.SubSdk, error) {
 		cli.SetLaddr(Addrs[AddrIdx])
 		AddrIdx++
 		if err := cli.Auth(); err != nil {
-			defer func() {
-				cli = nil
-				if err := recover(); err != nil {
-					fmt.Printf("auth error: %v\n", err)
-				}
-			}()
 			cli.Close()
+			cli = nil
 		}
 	}
 	return cli, nil
