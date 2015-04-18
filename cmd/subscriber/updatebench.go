@@ -61,7 +61,7 @@ func attrUpdater(cli *sdk.SubSdk, freq float64) {
 }
 
 func cliRoutine(stop chan bool, freq float64) {
-	cli, err := sdk.NewSubSdk(bson.NewObjectId().Hex())
+	cli, err := sdk.NewSubSdk(bson.NewObjectId().Hex(), "127.0.0.1:9000")
 	if err != nil {
 		panic(err)
 	}

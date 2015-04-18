@@ -63,7 +63,7 @@ func handleSignal(sigChan chan os.Signal) {
 }
 
 func main() {
-	cli, err := sdk.NewSubSdk(bson.NewObjectId().Hex())
+	cli, err := sdk.NewSubSdk(bson.NewObjectId().Hex(), "127.0.0.1:9000")
 	if err != nil {
 		panic(err)
 	}

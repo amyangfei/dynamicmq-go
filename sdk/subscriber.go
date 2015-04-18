@@ -16,9 +16,11 @@ type SubSdk struct {
 	// cliId is a 12-byte hex string as identity used in external system, among
 	// clients using sdk. The system doesn't care about how it is generated. It
 	// is reserved for external interface.
-	cliId string
-	token string
-	conn  net.Conn
+	cliId       string
+	token       string
+	preAuthAddr string
+	laddr       string
+	conn        net.Conn
 }
 
 var (
@@ -35,11 +37,15 @@ func validSubClientId(cliId string) bool {
 	return r.MatchString(cliId)
 }
 
-func NewSubSdk(cliId string) (*SubSdk, error) {
+func NewSubSdk(cliId, preAuth string) (*SubSdk, error) {
 	if !validSubClientId(cliId) {
 		return nil, errors.New("invalid sub client id")
 	}
-	return &SubSdk{cliId: cliId}, nil
+	return &SubSdk{cliId: cliId, preAuthAddr: preAuth}, nil
+}
+
+func (sdk *SubSdk) SetLaddr(laddr string) {
+	sdk.laddr = laddr
 }
 
 func (sub *SubSdk) sendMessage(msgs []string) error {
@@ -66,7 +72,14 @@ func (sub *SubSdk) connect(dst string) error {
 	if err != nil {
 		return err
 	}
-	conn, err := net.DialTCP("tcp", nil, addr)
+	var laddr *net.TCPAddr = nil
+	if sub.laddr != "" {
+		var err error
+		if laddr, err = net.ResolveTCPAddr("tcp", sub.laddr); err != nil {
+			return err
+		}
+	}
+	conn, err := net.DialTCP("tcp", laddr, addr)
 	if err != nil {
 		return err
 	}
@@ -80,8 +93,7 @@ func (sub *SubSdk) connect(dst string) error {
 
 func (sub *SubSdk) getPreAuthHost() (string, error) {
 	// TODO: get preauth addr from global config service like etcd
-	preAuthHost := "localhost:9000"
-	return preAuthHost, nil
+	return sub.preAuthAddr, nil
 }
 
 func (sub *SubSdk) preAuth() (map[string]string, error) {
