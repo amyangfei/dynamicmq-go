@@ -165,10 +165,7 @@ func handleTCPConn(cli *SubClient, rc chan *bufio.Reader) {
 		if err != nil {
 			if err == io.EOF {
 				log.Info("addr: %s close connection", addr)
-				if err := cleanSubCli(cli); err != nil {
-					log.Error("clear subcli with error(%v)", err)
-				}
-				return
+				break
 			} else {
 				log.Error("addr: %s read with error(%v)", addr, err)
 				break
@@ -182,14 +179,12 @@ func handleTCPConn(cli *SubClient, rc chan *bufio.Reader) {
 		}
 	}
 
-	// close the connection
-	if err := cli.conn.Close(); err != nil {
-		log.Error("addr: %s conn.Close() error(%v)", addr, err)
-	}
-	if err := cleanSubCli(cli); err != nil {
-		log.Error("clear subcli with error(%v)", err)
-	}
-	log.Debug("addr: %s handleTcpConn routine stop", addr)
+	defer func() {
+		if err := cleanSubCli(cli); err != nil {
+			log.Error("clear subcli with error(%v)", err)
+		}
+		log.Debug("addr: %s handleTcpConn routine stop", addr)
+	}()
 }
 
 func processAuth(cli *SubClient, args []string) error {
@@ -465,6 +460,14 @@ func parseData(msg []byte, pos *int, dataLen int) ([]byte, error) {
 
 // TODO: other clean work
 func cleanSubCli(cli *SubClient) error {
+	defer func() {
+		// close the connection
+		if err := cli.conn.Close(); err != nil {
+			log.Error("addr: %s conn.Close() error(%v)",
+				cli.conn.LocalAddr().String(), err)
+		}
+		cli = nil
+	}()
 	if err := RemoveSub(cli, Config, EtcdCliPool, AttrEtcdCliPool); err != nil {
 		return err
 	}
