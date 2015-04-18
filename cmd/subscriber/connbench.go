@@ -15,6 +15,7 @@ import (
 )
 
 var NumClis = flag.Int("n", 4, "Number of concurrent clients")
+var HbInterval = flag.Int("b", 60, "heartbeat interval in second")
 var UpdateFrequency = flag.Float64("r", 5.0, "msg frequency of per client")
 var RunTime = flag.Int("t", 30, "run time in second")
 var IpList = flag.String("i", "127.0.0.1", "bind ip list for sdk, seperated by ';'")
@@ -97,15 +98,15 @@ func createSubSdk() (*sdk.SubSdk, error) {
 	return cli, nil
 }
 
-func cliRoutine(stop chan bool, freq float64) {
+func cliRoutine(stop chan bool, freq float64, hbInterval int) {
 	cli, err := createSubSdk()
 	if err != nil {
 		panic(err)
 	}
 
-	go cli.HeartbeatRoutine(300)
+	go cli.HeartbeatRoutine(hbInterval)
 	go cli.RecvMsgRoutine()
-	go msgSendRoutine(cli, freq)
+	// go msgSendRoutine(cli, freq)
 
 	for {
 		select {
@@ -118,7 +119,7 @@ func cliRoutine(stop chan bool, freq float64) {
 	}
 }
 
-func connBencher(numClis int, freq float64, runTime int) {
+func connBencher(numClis, hbInterval int, freq float64, runTime int) {
 	fmt.Printf("start benchmark...\n")
 	timer := time.NewTimer(time.Second * time.Duration(runTime))
 
@@ -127,8 +128,10 @@ func connBencher(numClis int, freq float64, runTime int) {
 		stops = append(stops, make(chan bool))
 	}
 
+	startInterval := hbInterval * 1e6 / numClis
 	for i := 0; i < numClis; i++ {
-		go cliRoutine(stops[i], freq)
+		go cliRoutine(stops[i], freq, hbInterval)
+		time.Sleep(time.Microsecond * time.Duration(startInterval))
 	}
 
 	<-timer.C
@@ -147,5 +150,5 @@ func main() {
 		syscall.SIGINT, syscall.SIGSTOP)
 	go handleSignal(c)
 
-	connBencher(*NumClis, *UpdateFrequency, *RunTime)
+	connBencher(*NumClis, *HbInterval, *UpdateFrequency, *RunTime)
 }
