@@ -234,6 +234,26 @@ func validatePushMsg(msg *DecodedMsg) error {
 }
 
 func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
+	// Message redirected from other dispatcher
+	if msg.extra&dmq.DRMsgExtraRedirect > 0 {
+		rmsg := &BasicMsg{
+			cmdType: dmq.DRMsgCmdPushMsg,
+			bodyLen: 0,
+			extra:   dmq.DRMsgExtraNone,
+			items: map[uint8]string{
+				dmq.DRMsgItemMsgidId:   msg.items[dmq.MDMsgItemMsgidId],
+				dmq.DRMsgItemPayloadId: msg.items[dmq.MDMsgItemPayloadId],
+				dmq.DRMsgItemSubListId: msg.items[dmq.MDMsgItemSubListId],
+			},
+		}
+		bmsg := binaryMsgEncode(rmsg)
+		log.Debug("send redirect msg to connector: %v", bmsg)
+		if err := RmSendMsg2Conn(RouterMgr, bmsg); err != nil {
+			log.Error("send msg to connector error(%v)", err)
+		}
+		return nil
+	}
+
 	// Message must have been validated before processing
 	msgId, _ := msg.items[dmq.MDMsgItemMsgidId]
 	hexMsgId := hex.EncodeToString([]byte(msgId))
@@ -253,6 +273,7 @@ func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 		log.Debug("connid: %s, subids: %v", cid, hex.EncodeToString(subIds))
 
 		msg := &BasicMsg{
+			cmdType: dmq.DRMsgCmdPushMsg,
 			bodyLen: 0,
 			extra:   dmq.DRMsgExtraNone,
 			items: map[uint8]string{
@@ -263,12 +284,14 @@ func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 		}
 
 		if cid == RouterMgr.cid {
-			msg.cmdType = dmq.DRMsgCmdPushMsg
 			bmsg := binaryMsgEncode(msg)
 			if err := RmSendMsg2Conn(RouterMgr, bmsg); err != nil {
 				log.Error("send msg to connector error(%v)", err)
 			}
 		} else {
+			msg.extra |= dmq.DRMsgExtraRedirect
+			bmsg := binaryMsgEncode(msg)
+			DispMsgSender(cid, bmsg)
 			// TODO: pack msg and redirect to other dispatcher
 		}
 	}

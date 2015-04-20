@@ -8,6 +8,15 @@ import (
 	"time"
 )
 
+func getEtcdKeyLastKSep(key string, k int) string {
+	klist := strings.Split(key, "/")
+	if len(klist) < k {
+		return ""
+	} else {
+		return klist[len(klist)-k]
+	}
+}
+
 func GetEtcdClient(cfg *SrvConfig) (*etcd.Client, error) {
 	c := etcd.NewClient(cfg.EtcdMachines)
 	return c, nil
@@ -115,4 +124,47 @@ func UnregisterEtcd(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
 	c.Delete(infoKey, true)
 
 	return nil
+}
+
+func GetConnRelatedDispInfo(connid string, pool *dmq.EtcdClientPool) (map[string]string, error) {
+	ec, err := pool.GetEtcdClient()
+	if err != nil {
+		return nil, err
+	}
+	defer pool.RecycleEtcdClient(ec.Id)
+	c := ec.Cli
+
+	dispInfoBase := dmq.GetInfoBase(dmq.EtcdDispatcherType)
+	if resp, err := c.Get(dispInfoBase, false, true); err != nil {
+		return nil, err
+	} else if !resp.Node.Dir {
+		return nil, fmt.Errorf("%s should be a directory", resp.Node.Key)
+	} else {
+		for _, disp := range resp.Node.Nodes {
+			if !disp.Dir {
+				log.Warning("%s should be a directory", disp.Key)
+				continue
+			}
+			addr := ""
+			dispid := getEtcdKeyLastKSep(disp.Key, 1)
+			found := false
+			for _, v := range disp.Nodes {
+				if getEtcdKeyLastKSep(v.Key, 1) == dmq.DispConnId &&
+					!v.Dir && v.Value == connid {
+					found = true
+				}
+				if getEtcdKeyLastKSep(v.Key, 1) == dmq.DispBindAddr && !v.Dir {
+					addr = v.Value
+				}
+			}
+			if found && addr != "" {
+				info := map[string]string{
+					"dispid": dispid,
+					"addr":   addr,
+				}
+				return info, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("no dispatcher connected with %s", connid)
 }

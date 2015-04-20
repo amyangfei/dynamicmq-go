@@ -101,9 +101,9 @@ var (
 	DRMsgMaxBodyLen     uint16 = 2000
 
 	// command
-	DRMsgCmdHandshake uint8 = 1
-	DRMsgCmdHeartbeat uint8 = 2
-	DRMsgCmdPushMsg   uint8 = 3
+	DRMsgCmdPushMsg   uint8 = MDMsgCmdPushMsg   // 1
+	DRMsgCmdHeartbeat uint8 = MDMsgCmdHeartbeat // 2
+	DRMsgCmdHandshake uint8 = 3
 
 	// Extra Field
 	DRMsgExtraNone        uint8 = 0x00
@@ -111,6 +111,7 @@ var (
 	DRMsgExtraSendMulHead uint8 = 0x02
 	DRMsgExtraSendMulMid  uint8 = 0x04
 	DRMsgExtraSendMulTail uint8 = 0x08
+	DRMsgExtraRedirect    uint8 = 0x10
 
 	// Message body item id
 	DRMsgItemMsgidId     uint8 = 1

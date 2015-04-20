@@ -19,6 +19,8 @@ var Config *SrvConfig
 
 var RouterMgr *RouterManager = &RouterManager{}
 
+var DispConns map[string]*DispConn
+
 var EtcdCliPool *dmq.EtcdClientPool
 
 var log = logging.MustGetLogger("dynamicmq-dispatcher")
@@ -128,6 +130,7 @@ func InitLog(logFile string) error {
 }
 
 func InitServer() error {
+	DispConns = make(map[string]*DispConn)
 	EtcdCliPool = dmq.NewEtcdClientPool(
 		Config.EtcdMachines, Config.EtcdPoolSize, Config.EtcdPoolMaxSize)
 	return nil
