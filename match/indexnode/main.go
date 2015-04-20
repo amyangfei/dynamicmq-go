@@ -221,6 +221,12 @@ func main() {
 		os.Exit(0)
 	}
 
+    np := runtime.NumCPU()
+    if np > 6 {
+        np = 6
+    }
+    runtime.GOMAXPROCS(np)
+
 	if err := InitConfig(configFile); err != nil {
 		panic(err)
 	}

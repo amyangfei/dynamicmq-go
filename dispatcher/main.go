@@ -154,6 +154,12 @@ func main() {
 		os.Exit(0)
 	}
 
+    np := runtime.NumCPU()
+    if np > 4 {
+        np = 4
+    }
+    runtime.GOMAXPROCS(np)
+
 	if err := InitConfig(configFile); err != nil {
 		panic(err)
 	}

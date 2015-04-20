@@ -10,6 +10,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"net"
+    "strconv"
 	"time"
 )
 
@@ -286,8 +287,12 @@ func processPushMsg(msg *DecodedMsg, cli *DispClient) error {
 	payload, _ := msg.items[dmq.DRMsgItemPayloadId]
 	subListStr, _ := msg.items[dmq.DRMsgItemSubListId]
 
-	log.Debug("process msg id: %s extra: %d, bodyLen: %d",
-		hex.EncodeToString([]byte(msgId)), msg.extra, msg.bodyLen)
+    start, err := strconv.Atoi(payload)
+    end := float64(time.Now().UnixNano()) / 1e6
+    latency := end - float64(start)/1e3
+
+	// log.Debug("process msg id: %s extra: %d, bodyLen: %d, latency: %.3f", hex.EncodeToString([]byte(msgId)), msg.extra, msg.bodyLen, latency)
+	log.Info("process msg id: %s latency: %.3f clinum: %d", hex.EncodeToString([]byte(msgId)), latency, len(subListStr)/dmq.SubClientIdSize)
 
 	m := map[string]interface{}{
 		"type":    PushMsg,

@@ -308,6 +308,12 @@ func main() {
 		os.Exit(0)
 	}
 
+    np := runtime.NumCPU()
+    if np > 4 {
+        np = 4
+    }
+    runtime.GOMAXPROCS(np)
+
 	if starthash == "" {
 		fmt.Println("Warning: starthash must be provided!")
 		flag.Usage()

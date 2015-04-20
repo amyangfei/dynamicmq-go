@@ -9,6 +9,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"net"
+    "strconv"
 	"time"
 )
 
@@ -241,8 +242,11 @@ func validatePushMsg(msg *DecodedMsg) error {
 func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 	// Message redirected from other dispatcher
 	if msg.extra&dmq.DRMsgExtraRedirect > 0 {
-		log.Debug("send %d redirected msg to connector",
-			len(msg.items[dmq.MDMsgItemSubListId])/dmq.SubClientIdSize)
+        start, _ := strconv.Atoi(msg.items[dmq.MDMsgItemPayloadId])
+        end := float64(time.Now().UnixNano()) / 1e6
+        latency := end - float64(start)/1e3
+		log.Info("send %d redirected msg to connector xxx latency: %.3f",
+			len(msg.items[dmq.MDMsgItemSubListId])/dmq.SubClientIdSize, latency)
 		rmsg := &BasicMsg{
 			cmdType: dmq.DRMsgCmdPushMsg,
 			bodyLen: 0,
@@ -284,8 +288,11 @@ func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 		}
 
 		if cid == RouterMgr.cid {
-			log.Debug("send %d direct msg to connector %s",
-				len(subIds)/dmq.SubClientIdSize, cid)
+            start, _ := strconv.Atoi(msg.items[dmq.MDMsgItemPayloadId])
+            end := float64(time.Now().UnixNano()) / 1e6
+            latency := end - float64(start)/1e3
+			log.Info("send %d direct msg to connector %s latency: %.3f",
+				len(subIds)/dmq.SubClientIdSize, cid, latency)
 			bmsg := binaryMsgEncode(msg)
 			RmSendMsg2Conn(RouterMgr, bmsg)
 		} else {

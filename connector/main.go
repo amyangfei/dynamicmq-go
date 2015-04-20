@@ -183,6 +183,12 @@ func main() {
 
 	flag.Parse()
 
+    np := runtime.NumCPU()
+    if np > 8 {
+        np = 8
+    }
+    runtime.GOMAXPROCS(np)
+
 	if printVer {
 		dmq.PrintVersion()
 		os.Exit(0)

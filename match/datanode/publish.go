@@ -10,6 +10,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"net"
+    "strconv"
 	"sync"
 	"time"
 )
@@ -388,9 +389,13 @@ func processPushMsg(msg *DecodedMsg, cli *IdxNodeClient) error {
 			},
 		}
 		bmsg := binaryMsgEncode(sendmsg)
+        
+        start, _ := strconv.Atoi(msg.items[dmq.IDMsgItemPayloadId])
+        endt := float64(time.Now().UnixNano()) / 1e6
+        latency := endt - float64(start)/1e3
 
-		log.Debug("send msg: %v to disp (with %d subclis)",
-			bmsg, len(cliIdList)/(dmq.SubClientIdSize+dmq.ConnectorNodeIdSize))
+		log.Info("send msg: to disp (with %d subclis) latency: %.3f",
+			len(cliIdList)/(dmq.SubClientIdSize+dmq.ConnectorNodeIdSize), latency)
 
 		if err := DispMsgSender(CurDispNode, bmsg); err != nil {
 			log.Error("sendmsg to dispnode error: %v", err)

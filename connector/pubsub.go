@@ -9,10 +9,7 @@ import (
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"gopkg.in/mgo.v2/bson"
 	"io"
-	"io/ioutil"
 	"net"
-	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -188,66 +185,6 @@ func handleTCPConn(cli *SubClient, rc chan *bufio.Reader) {
 }
 
 func processAuth(cli *SubClient, args []string) error {
-	commonErr := errors.New("processAuth error")
-	if len(args) < 2 {
-		log.Error("error auth cmd length: %d", len(args))
-		return commonErr
-	}
-	authData := map[string]string{}
-	if err := json.Unmarshal([]byte(args[1]), &authData); err != nil {
-		log.Error("unmarshal auth info error(%v)", err)
-		return commonErr
-	}
-
-	client_id, ok := authData["client_id"]
-	if !ok {
-		log.Error("client_id not found")
-		return commonErr
-	}
-	timestamp, ok := authData["timestamp"]
-	if !ok {
-		log.Error("timestamp not found")
-		return commonErr
-	}
-	token, ok := authData["token"]
-	if !ok {
-		log.Error("token not found")
-		return commonErr
-	}
-
-	authUrl := fmt.Sprintf("http://%s/conn/sub/auth", Config.AuthSrvAddr)
-	postData := url.Values{}
-	postData.Add("client_id", client_id)
-	postData.Add("timestamp", timestamp)
-	postData.Add("token", token)
-
-	client := &http.Client{}
-	r, _ := http.NewRequest("POST", authUrl, bytes.NewBufferString(postData.Encode()))
-	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	r.Header.Add("Content-Length", strconv.Itoa(len(postData.Encode())))
-
-	// send http request to authsrv to do real auth
-	resp, err := client.Do(r)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	parsed := map[string]string{}
-	if err := json.Unmarshal(body, &parsed); err != nil {
-		return err
-	}
-	if status, ok := parsed["status"]; !ok {
-		return fmt.Errorf("status field not in auth response")
-	} else if status != "ok" {
-		log.Info("client %s auth failed", cli.id.Hex())
-		return fmt.Errorf("auth failed")
-	}
-
 	if err := RegisterSub(cli, Config, EtcdCliPool); err != nil {
 		return err
 	}

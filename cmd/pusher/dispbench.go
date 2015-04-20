@@ -167,7 +167,11 @@ func chooseMaxSubCliNum() int {
 	return (int(dmq.IDMsgMaxBodyLen+dmq.IDMsgHeaderSize) - len(bmsg)) / oneIdSize
 }
 
+<<<<<<< HEAD
 func sendMsg(percent int) {
+=======
+func sendMsg(percent int, payload string) {
+>>>>>>> Simple client for dispatcher benchmark.
 	disp := DispNodes[rand.Intn(len(DispNodes))]
 	if disp.conn == nil {
 		addr, err := net.ResolveTCPAddr("tcp", disp.baddr)

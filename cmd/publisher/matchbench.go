@@ -165,7 +165,7 @@ func sendOneMsg(conn net.Conn, idxbase *IndexBase) {
 		panic(err)
 	}
 
-	payload := "matching benchmark"
+	payload := fmt.Sprintf("%d", time.Now().UnixNano()/1e3)
 	msg := &BasicMsg{
 		cmdType: dmq.PMMsgCmdPushMsg,
 		bodyLen: 0,
@@ -203,7 +203,9 @@ func matchBencher(cliNum, runTime int, pubAddr string, freq float64) {
 	fmt.Printf("start benchmark...\n")
 	timer := time.NewTimer(time.Second * time.Duration(runTime))
 
+    sleepIval := int(freq * 1e3 / float64(cliNum))
 	for i := 0; i < cliNum; i++ {
+        time.Sleep(time.Millisecond * time.Duration(sleepIval))
 		go cliRoutine(pubAddr, freq)
 	}
 
