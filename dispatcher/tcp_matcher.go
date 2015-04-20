@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
@@ -236,6 +235,8 @@ func validatePushMsg(msg *DecodedMsg) error {
 func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 	// Message redirected from other dispatcher
 	if msg.extra&dmq.DRMsgExtraRedirect > 0 {
+		log.Debug("send %d redirected msg to connector",
+			len(msg.items[dmq.MDMsgItemSubListId])/dmq.SubClientIdSize)
 		rmsg := &BasicMsg{
 			cmdType: dmq.DRMsgCmdPushMsg,
 			bodyLen: 0,
@@ -247,7 +248,6 @@ func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 			},
 		}
 		bmsg := binaryMsgEncode(rmsg)
-		log.Debug("send redirect msg to connector: %v", bmsg)
 		if err := RmSendMsg2Conn(RouterMgr, bmsg); err != nil {
 			log.Error("send msg to connector error(%v)", err)
 		}
@@ -256,7 +256,6 @@ func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 
 	// Message must have been validated before processing
 	msgId, _ := msg.items[dmq.MDMsgItemMsgidId]
-	hexMsgId := hex.EncodeToString([]byte(msgId))
 	msgPayload, _ := msg.items[dmq.MDMsgItemPayloadId]
 
 	cliGroup := map[string][]byte{}
@@ -268,10 +267,7 @@ func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 		cliGroup[connId] = append(cliGroup[connId], []byte(subId)...)
 	}
 
-	log.Debug("msgId: %s, msgPayload: %s", hexMsgId, msgPayload)
 	for cid, subIds := range cliGroup {
-		log.Debug("connid: %s, subids: %v", cid, hex.EncodeToString(subIds))
-
 		msg := &BasicMsg{
 			cmdType: dmq.DRMsgCmdPushMsg,
 			bodyLen: 0,
@@ -284,6 +280,8 @@ func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 		}
 
 		if cid == RouterMgr.cid {
+			log.Debug("send %d direct msg to connector %s",
+				len(subIds)/dmq.SubClientIdSize, cid)
 			bmsg := binaryMsgEncode(msg)
 			if err := RmSendMsg2Conn(RouterMgr, bmsg); err != nil {
 				log.Error("send msg to connector error(%v)", err)
@@ -292,7 +290,6 @@ func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 			msg.extra |= dmq.DRMsgExtraRedirect
 			bmsg := binaryMsgEncode(msg)
 			DispMsgSender(cid, bmsg)
-			// TODO: pack msg and redirect to other dispatcher
 		}
 	}
 
