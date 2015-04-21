@@ -474,13 +474,14 @@ func cleanSubCli(cli *SubClient) error {
 	return nil
 }
 
-func (cli *SubClient) SendMsg(msg []byte) error {
-	wlen, err := cli.conn.Write(msg)
-	if err != nil {
-		return err
-	}
-	if wlen != len(msg) {
-		return fmt.Errorf("send msg with length %d should be %d", wlen, len(msg))
-	}
-	return nil
+func (cli *SubClient) SendMsg(msg []byte) {
+	go func() {
+		wlen, err := cli.conn.Write(msg)
+		if err != nil {
+			log.Error("send msg to cli %d with error: %v", cli.id.Hex(), err)
+		}
+		if wlen != len(msg) {
+			log.Error("send msg with length %d should be %d", wlen, len(msg))
+		}
+	}()
 }
