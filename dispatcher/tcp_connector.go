@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/binary"
-	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"net"
 	"time"
@@ -62,13 +61,16 @@ func RmHeartbeat2Conn(rmgr *RouterManager, cfg *SrvConfig) {
 	}
 }
 
-func RmSendMsg2Conn(rmgr *RouterManager, msg []byte) error {
-	wlen, err := rmgr.conn.Write(msg)
-	if err != nil {
-		return err
-	}
-	if wlen != len(msg) {
-		return fmt.Errorf("rm send msg with length %d should be %d", wlen, len(msg))
-	}
-	return nil
+func RmSendMsg2Conn(rmgr *RouterManager, msg []byte) {
+	go func() {
+		// From golang document: http://golang.org/pkg/net/
+		// Multiple goroutines may invoke methods on a Conn simultaneously.
+		wlen, err := rmgr.conn.Write(msg)
+		if err != nil {
+			log.Error("rm send msg with error: %v", err)
+		}
+		if wlen != len(msg) {
+			log.Error("rm send msg with length %d should be %d", wlen, len(msg))
+		}
+	}()
 }

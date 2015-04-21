@@ -254,9 +254,7 @@ func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 			},
 		}
 		bmsg := binaryMsgEncode(rmsg)
-		if err := RmSendMsg2Conn(RouterMgr, bmsg); err != nil {
-			log.Error("send msg to connector error(%v)", err)
-		}
+		RmSendMsg2Conn(RouterMgr, bmsg)
 		return nil
 	}
 
@@ -289,9 +287,7 @@ func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 			log.Debug("send %d direct msg to connector %s",
 				len(subIds)/dmq.SubClientIdSize, cid)
 			bmsg := binaryMsgEncode(msg)
-			if err := RmSendMsg2Conn(RouterMgr, bmsg); err != nil {
-				log.Error("send msg to connector error(%v)", err)
-			}
+			RmSendMsg2Conn(RouterMgr, bmsg)
 		} else {
 			msg.extra |= dmq.DRMsgExtraRedirect
 			bmsg := binaryMsgEncode(msg)
