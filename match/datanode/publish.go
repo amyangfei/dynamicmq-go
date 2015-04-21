@@ -205,9 +205,12 @@ func processReadbuf(cli *IdxNodeClient, buf []byte) error {
 	var remaining uint16 = uint16(len(buf))
 	for {
 		if remaining == 0 {
+			cli.processEnd = 0
 			return nil
 		}
 		if remaining < dmq.IDMsgHeaderSize {
+			cli.processEnd = int(remaining)
+			copy(buf[:cli.processEnd], buf[len(buf)-int(remaining):])
 			return ProcessLater
 		}
 		start := uint16(len(buf)) - remaining
@@ -237,9 +240,12 @@ func processReadbuf(cli *IdxNodeClient, buf []byte) error {
 				log.Error("cmd: %d not support", cmd)
 			}
 		} else {
+			cli.processEnd = int(remaining)
+			copy(buf[:cli.processEnd], buf[len(buf)-int(remaining):])
 			return ProcessLater
 		}
 	}
+	cli.processEnd = 0
 	return nil
 }
 
