@@ -126,7 +126,7 @@ func tcpListen(bind string) {
 		}
 		subCli := &SubClient{
 			id:         bson.NewObjectId(),
-			expire:     time.Now().Unix() + DfltExpire,
+			expire:     time.Now().Unix() + int64(Config.SubKeepalive),
 			conn:       conn,
 			status:     SubcliIsPending,
 			processBuf: make([]byte, Config.TCPRecvBufSize*2),
@@ -145,7 +145,7 @@ func setSubTimeout(cli *SubClient) error {
 	if cli.status&SubcliIsPending > 0 {
 		timeout = timeout.Add(time.Second * time.Duration(PendingExpire))
 	} else {
-		timeout = timeout.Add(time.Second * time.Duration(DfltExpire))
+		timeout = timeout.Add(time.Second * time.Duration(Config.SubKeepalive))
 	}
 	return cli.conn.SetReadDeadline(timeout)
 }
