@@ -185,14 +185,15 @@ func sendMsg(percent int) {
 				if _, err := disp.conn.Read(buf); err != nil {
 					disp.conn.Close()
 					disp.conn = nil
+					return
 				}
 			}
 		}(disp)
 	}
 
-	idx := 0
-	msgnums := int(float64(len(SubClis)) * float64(percent) / 100)
-	if msgnums < len(SubClis) {
+	idx, msgnums := 0, len(SubClis)
+	if percent < 100 {
+		msgnums = int(float64(len(SubClis)) * float64(percent) / 100)
 		idx = rand.Intn(len(SubClis) - msgnums)
 		msgnums = idx + msgnums
 	}
