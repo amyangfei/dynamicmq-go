@@ -36,6 +36,8 @@ type SubClient struct {
 	processBuf []byte
 	processEnd int
 	attrs      map[string]*Attribute
+	sender     chan []byte
+	stop       chan bool
 }
 
 var (
@@ -132,6 +134,8 @@ func tcpListen(bind string) {
 			processBuf: make([]byte, Config.TCPRecvBufSize*2),
 			processEnd: 0,
 			attrs:      make(map[string]*Attribute, 0),
+			sender:     make(chan []byte),
+			stop:       make(chan bool),
 		}
 		SubcliTable[subCli.id] = subCli
 		rc := recvTcpBufCache.Get()
@@ -256,7 +260,8 @@ func processAuth(cli *SubClient, args []string) error {
 	cli.status |= SubcliIsAuthed
 	log.Info("sub client %s auth successfully", cli.id.Hex())
 
-	cli.conn.Write(AuthSuccessReply)
+	cli.MsgSenderRoutine()
+	cli.SendMsg(AuthSuccessReply)
 
 	return nil
 }
@@ -458,9 +463,9 @@ func parseData(msg []byte, pos *int, dataLen int) ([]byte, error) {
 	}
 }
 
-// TODO: other clean work
 func cleanSubCli(cli *SubClient) error {
 	defer func() {
+		cli.stop <- true
 		// close the connection
 		if err := cli.conn.Close(); err != nil {
 			log.Error("addr: %s conn.Close() error(%v)",
@@ -474,14 +479,19 @@ func cleanSubCli(cli *SubClient) error {
 	return nil
 }
 
-func (cli *SubClient) SendMsg(msg []byte) {
+func (cli *SubClient) MsgSenderRoutine() {
 	go func() {
-		wlen, err := cli.conn.Write(msg)
-		if err != nil {
-			log.Error("send msg to cli %d with error: %v", cli.id.Hex(), err)
-		}
-		if wlen != len(msg) {
-			log.Error("send msg with length %d should be %d", wlen, len(msg))
+		for {
+			select {
+			case msg := <-cli.sender:
+				cli.conn.Write(msg)
+			case <-cli.stop:
+				return
+			}
 		}
 	}()
+}
+
+func (cli *SubClient) SendMsg(msg []byte) {
+	cli.sender <- msg
 }
