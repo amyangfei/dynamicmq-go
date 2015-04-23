@@ -140,7 +140,7 @@ func InitConfig(configFile string) error {
 	return nil
 }
 
-func InitLog(logFile string) error {
+func InitLog(logFile, logLevel string) error {
 	var format = logging.MustStringFormatter(
 		"%{time:2006-01-02 15:04:05.000} [%{level:.4s}] %{id:03x} [%{shortfunc}] %{message}",
 	)
@@ -152,7 +152,10 @@ func InitLog(logFile string) error {
 
 	backend1 := logging.NewLogBackend(f, "", 0)
 	backend1Formatter := logging.NewBackendFormatter(backend1, format)
-	logging.SetBackend(backend1Formatter)
+	backend1Leveled := logging.AddModuleLevel(backend1Formatter)
+	backend1Leveled.SetLevel(dmq.LogLevelMap[logLevel], "")
+	logging.SetBackend(backend1Leveled)
+
 	return nil
 }
 
@@ -193,7 +196,7 @@ func main() {
 		panic(err)
 	}
 
-	if err := InitLog(Config.LogFile); err != nil {
+	if err := InitLog(Config.LogFile, Config.LogLevel); err != nil {
 		panic(err)
 	}
 

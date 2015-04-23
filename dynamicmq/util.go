@@ -2,11 +2,21 @@ package dynamicmq
 
 import (
 	"fmt"
+	"github.com/op/go-logging"
 	"hash"
 	"io/ioutil"
 	"os"
 	"regexp"
 )
+
+var LogLevelMap = map[string]logging.Level{
+	"CRITICAL": logging.CRITICAL,
+	"ERROR":    logging.ERROR,
+	"WARNING":  logging.WARNING,
+	"NOTICE":   logging.NOTICE,
+	"INFO":     logging.INFO,
+	"DEBUG":    logging.DEBUG,
+}
 
 func PrintVersion() {
 	fmt.Println("dynamicmq-go version", Version)
