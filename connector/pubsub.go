@@ -192,6 +192,9 @@ func handleTCPConn(cli *SubClient, rc chan *bufio.Reader) {
 }
 
 func processAuth(cli *SubClient, args []string) error {
+	if cli.status&SubcliIsAuthed > 0 {
+		return nil
+	}
 	commonErr := errors.New("processAuth error")
 	if len(args) < 2 {
 		log.Error("error auth cmd length: %d", len(args))
