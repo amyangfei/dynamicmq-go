@@ -86,7 +86,7 @@ func TestNewTree(t *testing.T) {
 	}
 }
 
-func clearMap(m *map[int]*Interval) {
+func clearMap(m *map[int64]*Interval) {
 	for k, _ := range *m {
 		delete(*m, k)
 	}
@@ -106,7 +106,7 @@ func TestPushAndQuery(t *testing.T) {
 	var intervals []*Interval
 
 	intervals = tree.Query(0.5, 0.5)
-	expected := make(map[int]*Interval, 0)
+	expected := make(map[int64]*Interval, 0)
 	expected[0] = &Interval{0, nil, SquareSegment{0, 1, 0, 1}}
 	expected[3] = &Interval{3, nil, SquareSegment{0, 2, 0, 2}}
 	expected[6] = &Interval{6, nil, SquareSegment{0, 3, 0, 2}}
@@ -193,5 +193,33 @@ func TestDelete(t *testing.T) {
 			t.Errorf("interval count %d, should be %d", tree.Count(), cnt)
 		}
 		tree.Print()
+	}
+
+	// Test for internal id's correctness
+	tree.Push(0, 1, 0, 1, nil)
+	tree.Push(1, 2, 1, 2, nil)
+	tree.Push(1, 3, 1, 3, nil)
+	tree.Push(0, 2, 0, 2, nil)
+	tree.Push(2, 4, 2, 4, nil)
+	tree.Push(2, 4, 1, 4, nil)
+	tree.Push(0, 3, 0, 2, nil)
+
+	intervals = tree.Query(0.5, 0.5)
+	expected := make(map[int64]*Interval, 0)
+	expected[7] = &Interval{7, nil, SquareSegment{0, 1, 0, 1}}
+	expected[10] = &Interval{10, nil, SquareSegment{0, 2, 0, 2}}
+	expected[13] = &Interval{13, nil, SquareSegment{0, 3, 0, 2}}
+	if len(intervals) != len(expected) {
+		t.Errorf("error query result for (0.5, 0.5)")
+	}
+	if count := tree.QueryCount(0.5, 0.5); count != len(expected) {
+		t.Errorf("error query count result %d for (0.5, 0.5), expected %d", count, len(expected))
+	}
+	for _, interval := range intervals {
+		if expect, ok := expected[interval.Id]; !ok {
+			t.Errorf("error query result %s, not expected", interval.ToString())
+		} else if !interval.SegmentEqual(expect) {
+			t.Errorf("error query result %s, wrong segment", interval.ToString())
+		}
 	}
 }

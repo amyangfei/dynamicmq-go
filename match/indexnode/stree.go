@@ -69,8 +69,8 @@ func (s *SquareSegment) ToString() string {
 
 // Interval represents elements pushed into stree
 type Interval struct {
-	Id   int // unique
-	Data *[]byte
+	Id   int64   // unique
+	Data *[]byte // stores pointer to subclient id, unique
 	SquareSegment
 }
 
@@ -150,8 +150,9 @@ func (n *node) IsLeaf() bool {
 }
 
 type stree struct {
-	root *node
-	base []*Interval // Interval stack
+	root  *node
+	base  map[int64]*Interval // mapping from Interval Id to Interval
+	maxid int64               // next available Interval id
 
 	xmin int // Min value of the first dimension of all intervals
 	xmax int // Max value of the first dimension of all intervals
@@ -161,12 +162,13 @@ type stree struct {
 
 func (t *stree) Push(xmin, xmax, ymin, ymax int, data *[]byte) *Interval {
 	new_interval := &Interval{
-		Id:            t.Count(),
+		Id:            t.maxid,
 		Data:          data,
 		SquareSegment: SquareSegment{xmin: xmin, xmax: xmax, ymin: ymin, ymax: ymax},
 	}
 
-	t.base = append(t.base, new_interval)
+	t.maxid += 1
+	t.base[new_interval.Id] = new_interval
 	insertInterval(t.root, new_interval)
 
 	return new_interval
@@ -177,14 +179,7 @@ func (t *stree) Delete(interval *Interval) {
 	deleteInterval(t.root, interval)
 
 	// remove interval from tree.base
-	baseLen := len(t.base)
-	for idx, ival := range t.base {
-		if ival == interval {
-			t.base[baseLen-1], t.base =
-				nil, append(t.base[:idx], t.base[idx+1:]...)
-			break
-		}
-	}
+	delete(t.base, interval.Id)
 }
 
 func deleteInterval(node *node, interval *Interval) {
@@ -228,7 +223,7 @@ func countSingle(node *node, x, y float64) int {
 }
 
 func (t *stree) Query(x, y float64) []*Interval {
-	result := make(map[int]*Interval)
+	result := make(map[int64]*Interval)
 	querySingle(t.root, x, y, &result)
 
 	sl := make([]*Interval, 0, len(result))
@@ -238,7 +233,7 @@ func (t *stree) Query(x, y float64) []*Interval {
 	return sl
 }
 
-func querySingle(node *node, x, y float64, result *map[int]*Interval) {
+func querySingle(node *node, x, y float64, result *map[int64]*Interval) {
 	if node.segment.CoverPoint(x, y) {
 		for _, interval := range node.overlap {
 			(*result)[(*interval).Id] = interval
@@ -349,7 +344,8 @@ func insertNodes(xmin, xmax, ymin, ymax, level int, parent *node) *node {
 func NewTree(xmin, xmax, ymin, ymax int) Tree {
 	t := new(stree)
 
-	t.base = make([]*Interval, 0)
+	t.maxid = 0
+	t.base = make(map[int64]*Interval)
 
 	t.xmin = xmin
 	t.xmax = xmax
