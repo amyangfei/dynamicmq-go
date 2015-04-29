@@ -283,24 +283,27 @@ func processPushMsg(msg *DecodedMsg) error {
 	pubmsg := createPubMsg(parsedAttrs, payload)
 
 	// find minimal intervals via segment tree index
-	candIntervals := findCandIntervals(pubmsg)
+	candIntervals, candAttrIdx := findCandIntervals(pubmsg)
 
 	if candIntervals == nil {
 		log.Debug("no candinate sub clients found")
 		return nil
 	}
 
-	// Group subclients by their belonging datanode, mapping key is id of datanode
+	// Group subclients by their belonging datanode, mapping key is the Id of datanode
 	pcgroupMap := make(map[string]*PubCliGroup)
 	for _, ival := range candIntervals {
-		subCliIdPointer := ival.Data
-		subCli, ok := ClisInfo[string(*subCliIdPointer)]
-		if !ok {
-			log.Error("failed to find client %s in ClisInfo",
-				hex.EncodeToString(*subCliIdPointer))
+		cidstr := string(*ival.Data)
+		if !candAttrIdx.FilterSubCli(cidstr, pubmsg) {
 			continue
 		}
-		vn := Rtable.StoreSearch(subCli.CidHash)
+		scInfo, ok := ClisInfo[cidstr]
+		if !ok {
+			log.Error("failed to find client %s in ClisInfo",
+				hex.EncodeToString([]byte(cidstr)))
+			continue
+		}
+		vn := Rtable.StoreSearch(scInfo.CidHash)
 		if vn == nil {
 			log.Error("couldn't find vnode")
 			continue
@@ -311,7 +314,7 @@ func processPushMsg(msg *DecodedMsg) error {
 				cids:   make([]*[]byte, 0),
 			}
 		}
-		pcgroupMap[vn.pn.id].cids = append(pcgroupMap[vn.pn.id].cids, &(subCli.Cid))
+		pcgroupMap[vn.pn.id].cids = append(pcgroupMap[vn.pn.id].cids, &(scInfo.Cid))
 	}
 
 	// send message with candinate subscribers to datanode
@@ -398,7 +401,7 @@ func sendMsgToDataNode(msg *DecodedMsg, pcgroupMap map[string]*PubCliGroup) erro
 	return nil
 }
 
-func findCandIntervals(pubmsg *PubMsg) []*Interval {
+func findCandIntervals(pubmsg *PubMsg) ([]*Interval, *AttrIndex) {
 	minMatchCnt := len(ClisInfo) + 1
 	bestAttrComb := ""
 	var candx, candy float64
@@ -428,7 +431,7 @@ func findCandIntervals(pubmsg *PubMsg) []*Interval {
 	}
 
 	if aidx, ok := AttrIdxesMap[bestAttrComb]; ok {
-		return aidx.tree.Query(candx, candy)
+		return aidx.tree.Query(candx, candy), aidx
 	}
-	return nil
+	return nil, nil
 }

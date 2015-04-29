@@ -107,6 +107,8 @@ func processAttrCreate(data *etcd.Response) error {
 		}
 		ClisInfo[cidstr].Attrs = append(ClisInfo[cidstr].Attrs, attr)
 	} else {
+		// Iterate each attribute and make up a new attribute pair with the new
+		// attrbute and insert it into corresponding AttrIndex.
 		for _, subattr := range ClisInfo[cidstr].Attrs {
 			xattr, yattr := AttrSort(subattr, attr)
 			xmin, xmax := int(math.Floor(xattr.low)), int(math.Ceil(xattr.high))
@@ -129,11 +131,9 @@ func processAttrCreate(data *etcd.Response) error {
 			} else {
 				ival := aidx.InsertCliAttr(
 					xmin, xmax, ymin, ymax, &ClisInfo[cidstr].Cid)
-				combineName := AttrNameCombine(xattr.name, yattr.name)
-				ClisInfo[cidstr].Intval[combineName] = ival
+				ClisInfo[cidstr].Intval[cname] = ival
 			}
 
-			// TODO: insert subclient to index tree
 			log.Debug("attr combine %s-%s", xattr.name, yattr.name)
 		}
 		ClisInfo[cidstr].Attrs = append(ClisInfo[cidstr].Attrs, attr)
@@ -162,6 +162,59 @@ func processAttrUpdate(data *etcd.Response) error {
 			log.Debug("recv attr strval update with latency: %d", latency)
 		}
 		return nil
+	}
+
+	// TODO: support more attribute expression besides 'range'
+	if int(attr.use) != dmq.AttrUseField[dmq.AttrUseRange] {
+		return nil
+	}
+
+	hasUpdate := false
+	cid, err := hex.DecodeString(cliId)
+	if err != nil {
+		return fmt.Errorf("invalid client id: %s", cliId)
+	}
+	cidstr := string(cid)
+	if scInfo, ok := ClisInfo[cidstr]; !ok {
+		return fmt.Errorf("client with id: %s not exists", cliId)
+	} else {
+		low, high := int(math.Floor(attr.low)), int(math.Ceil(attr.high))
+		if low < IdxBase.attrbases[attr.name].low {
+			low = IdxBase.attrbases[attr.name].low
+		}
+		if high > IdxBase.attrbases[attr.name].high {
+			high = IdxBase.attrbases[attr.name].high
+		}
+
+		for _, oldAttr := range scInfo.Attrs {
+			if oldAttr.name == attr.name && oldAttr.use == attr.use {
+				if oldAttr.low != attr.low {
+					oldAttr.low = attr.low
+					hasUpdate = true
+				}
+				if oldAttr.high != attr.high {
+					oldAttr.high = attr.high
+					hasUpdate = true
+				}
+				break
+			}
+		}
+
+		if hasUpdate {
+			// find all attribute name combination
+			for _, existAttr := range scInfo.Attrs {
+				if existAttr.name != attr.name {
+					cname := AttrNameCombine(existAttr.name, attr.name)
+					if aidx, ok := AttrIdxesMap[cname]; !ok {
+						log.Error(
+							"cname %s not found in AttrIdxesMap for subcli %s",
+							cname, cliId)
+					} else {
+						aidx.InsertWaitUpdate(cidstr)
+					}
+				}
+			}
+		}
 	}
 
 	return nil

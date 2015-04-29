@@ -185,6 +185,9 @@ func NotifyService() {
 	go DataNodeWatcher(Config.EtcdMachines)
 }
 
+func IndexUpdateService() {
+}
+
 func main() {
 	var configFile string
 	var printVer bool
