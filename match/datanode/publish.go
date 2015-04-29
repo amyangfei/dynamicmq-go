@@ -10,6 +10,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -31,6 +32,7 @@ type PubAttr struct {
 }
 
 type SubCliInfo struct {
+	lock    *sync.RWMutex
 	Cid     []byte                // subscribe client's Id
 	CidHash []byte                // cid's hash in datanode
 	ConnId  string                // id of connector the subclient connecting with
@@ -267,13 +269,15 @@ func validatePushMsg(msg *DecodedMsg) error {
 
 // cliId is in BSON format, not hex string
 func checkSubCliMatchingMsg(pattrs []*PubAttr, cliId string) bool {
-	if cli, ok := ClisInfo[cliId]; !ok {
+	if scInfo, ok := ClisInfo[cliId]; !ok {
 		log.Warning("subclient %s not found in ClisInfo",
 			hex.EncodeToString([]byte(cliId)))
 		return false
 	} else {
+		scInfo.lock.RLock()
+		defer scInfo.lock.RUnlock()
 		for _, pattr := range pattrs {
-			if attr, ok := cli.AttrMap[pattr.name]; !ok {
+			if attr, ok := scInfo.AttrMap[pattr.name]; !ok {
 				// ignore if the subclient has no interest on this attribute
 			} else {
 				if int(attr.use) != pattr.use {
@@ -362,13 +366,15 @@ func processPushMsg(msg *DecodedMsg, cli *IdxNodeClient) error {
 		cliIdList := make([]byte, 0)
 		for i := idx; i < end; i++ {
 			cliId := candClis[i]
-			cli, ok := ClisInfo[string(cliId)]
+			scInfo, ok := ClisInfo[string(cliId)]
 			if !ok {
 				log.Error("subclient %s not in ClisInfo", hex.EncodeToString(cliId))
 				continue
 			}
+			scInfo.lock.RLock()
 			cliIdList = append(cliIdList, cliId...)
-			cliIdList = append(cliIdList, []byte(cli.ConnId)...)
+			cliIdList = append(cliIdList, []byte(scInfo.ConnId)...)
+			scInfo.lock.RUnlock()
 		}
 
 		sendmsg := &BasicMsg{

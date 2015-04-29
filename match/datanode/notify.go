@@ -6,6 +6,7 @@ import (
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"github.com/coreos/go-etcd/etcd"
+	"sync"
 )
 
 var (
@@ -102,6 +103,7 @@ func processAttrCreate(data *etcd.Response) error {
 			return err
 		}
 		ClisInfo[cidstr] = &SubCliInfo{
+			lock:    new(sync.RWMutex),
 			Cid:     cid,
 			CidHash: cidHash,
 			ConnId:  connId,
@@ -153,6 +155,8 @@ func processAttrUpdate(data *etcd.Response) error {
 				attr.name, cliIdHexStr)
 		} else {
 			log.Debug("update %s's attr %s", cliIdHexStr, attr.name)
+			scInfo.lock.Lock()
+			defer scInfo.lock.Unlock()
 			if oldAttr.low != attr.low {
 				oldAttr.low = attr.low
 			}
@@ -180,6 +184,7 @@ func processAttrDelete(data *etcd.Response) error {
 	if _, ok := ClisInfo[cidstr]; !ok {
 		return fmt.Errorf("client not exists: %s", cliId)
 	} else {
+		ClisInfo[cidstr].lock.Lock()
 		// remove attrName from Attrs of this subclient, if attrName is empty,
 		// remove all the attrs.
 		if attrName == "" {
@@ -203,9 +208,11 @@ func processAttrDelete(data *etcd.Response) error {
 			}
 		}
 
+		ClisInfo[cidstr].lock.Unlock()
+
 		if len(ClisInfo[cidstr].Attrs) == 0 {
 			// TODO: memory check http://stackoverflow.com/a/23231539/1115857
-			ClisInfo[cidstr] = nil
+			// FIXME: ClisInfo[cidstr] = nil
 			delete(ClisInfo, cidstr)
 		}
 	}
