@@ -9,6 +9,9 @@ pid_file = ./indexnode.pid
 tcp_recvbuf_size = 2048
 tcp_sendbuf_size = 2048
 tcp_bufio_num = 64
+update_cache_thr = 100
+flush_interval = 60
+flush_timeout = 300
 
 [etcd]
 machines = http://localhost:4001

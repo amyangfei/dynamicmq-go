@@ -6,7 +6,6 @@ import (
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"github.com/coreos/go-etcd/etcd"
-	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -111,24 +110,11 @@ func processAttrCreate(data *etcd.Response) error {
 		// attrbute and insert it into corresponding AttrIndex.
 		for _, subattr := range ClisInfo[cidstr].Attrs {
 			xattr, yattr := AttrSort(subattr, attr)
-			xmin, xmax := int(math.Floor(xattr.low)), int(math.Ceil(xattr.high))
-			ymin, ymax := int(math.Floor(yattr.low)), int(math.Ceil(yattr.high))
-			if xmin < IdxBase.attrbases[xattr.name].low {
-				xmin = IdxBase.attrbases[xattr.name].low
-			}
-			if xmax > IdxBase.attrbases[xattr.name].high {
-				xmax = IdxBase.attrbases[xattr.name].high
-			}
-			if ymin < IdxBase.attrbases[yattr.name].low {
-				ymin = IdxBase.attrbases[yattr.name].low
-			}
-			if ymax > IdxBase.attrbases[yattr.name].high {
-				ymax = IdxBase.attrbases[yattr.name].high
-			}
 			cname := AttrNameCombine(xattr.name, yattr.name)
 			if aidx, ok := AttrIdxesMap[cname]; !ok {
 				return fmt.Errorf("attribute combine name %s not found", cname)
 			} else {
+				xmin, xmax, ymin, ymax := attrRangeFilter(xattr, yattr)
 				ival := aidx.InsertCliAttr(
 					xmin, xmax, ymin, ymax, &ClisInfo[cidstr].Cid)
 				ClisInfo[cidstr].Intval[cname] = ival
@@ -178,14 +164,6 @@ func processAttrUpdate(data *etcd.Response) error {
 	if scInfo, ok := ClisInfo[cidstr]; !ok {
 		return fmt.Errorf("client with id: %s not exists", cliId)
 	} else {
-		low, high := int(math.Floor(attr.low)), int(math.Ceil(attr.high))
-		if low < IdxBase.attrbases[attr.name].low {
-			low = IdxBase.attrbases[attr.name].low
-		}
-		if high > IdxBase.attrbases[attr.name].high {
-			high = IdxBase.attrbases[attr.name].high
-		}
-
 		for _, oldAttr := range scInfo.Attrs {
 			if oldAttr.name == attr.name && oldAttr.use == attr.use {
 				if oldAttr.low != attr.low {

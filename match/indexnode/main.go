@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 var Config *SrvConfig
@@ -83,6 +84,9 @@ func InitConfig(configFile string) error {
 	basicFlagSet.Int("tcp_recvbuf_size", 2048, "tcp receive buffer size")
 	basicFlagSet.Int("tcp_sendbuf_size", 2048, "tcp send buffer size")
 	basicFlagSet.Int("tcp_bufio_num", 64, "bufio num for each cache instance")
+	basicFlagSet.Int("update_cache_thr", 100, "update cache threshold for attribute flush")
+	basicFlagSet.Int("flush_interval", 60, "interval to run attribute flush, in second")
+	basicFlagSet.Int("flush_timeout", 300, "if during timeout no attribute flush happened, force to run attribute flush")
 
 	etcdFlagSet := flag.NewFlagSet("etcd", flag.PanicOnError)
 	etcdFlagSet.String("machines", "http://localhost:4001", "etcd machine list")
@@ -114,6 +118,12 @@ func InitConfig(configFile string) error {
 	Config.TCPBufioNum, err =
 		strconv.Atoi(basicFlagSet.Lookup("tcp_bufio_num").Value.String())
 	Config.TCPBufInsNum = runtime.NumCPU()
+	Config.UpdateCacheThr, err =
+		strconv.Atoi(basicFlagSet.Lookup("update_cache_thr").Value.String())
+	Config.FlushInterval, err =
+		strconv.Atoi(basicFlagSet.Lookup("flush_interval").Value.String())
+	Config.FlushTimeout, err =
+		strconv.Atoi(basicFlagSet.Lookup("flush_timeout").Value.String())
 	Config.HashFunc = sha1.New
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
@@ -185,7 +195,15 @@ func NotifyService() {
 	go DataNodeWatcher(Config.EtcdMachines)
 }
 
-func IndexUpdateService() {
+func AttrUpdateFlushService() {
+	go func() {
+		lastUpdate := time.Now().Unix()
+		ticker := time.NewTicker(time.Second * time.Duration(Config.FlushInterval))
+		for {
+			<-ticker.C
+			lastUpdate = ProcessAttrUpdateFlush(lastUpdate)
+		}
+	}()
 }
 
 func main() {
@@ -218,6 +236,8 @@ func main() {
 	}
 
 	NotifyService()
+
+	AttrUpdateFlushService()
 
 	StartPubTCP(Config.PubTCPBind)
 

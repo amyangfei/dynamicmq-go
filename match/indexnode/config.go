@@ -18,6 +18,9 @@ type SrvConfig struct {
 	TCPBufInsNum   int
 	TCPBufioNum    int
 	HashFunc       func() hash.Hash
+	UpdateCacheThr int
+	FlushInterval  int
+	FlushTimeout   int
 
 	// etcd
 	EtcdMachines     []string
