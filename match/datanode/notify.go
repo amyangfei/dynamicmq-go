@@ -116,6 +116,52 @@ func processAttrCreate(data *etcd.Response) error {
 }
 
 func processAttrUpdate(data *etcd.Response) error {
+	cliIdHexStr, attrName := dmq.ExtractInfoFromSubKey(data.Node.Key)
+	if cliIdHexStr == "" || attrName == "" {
+		return fmt.Errorf("invalid attr update notify key: %s", data.Node.Key)
+	}
+	attr, err := extractAttrFromSubVal(data.Node.Value)
+	if err != nil {
+		return err
+	}
+	attr.name = attrName
+
+	// TODO: support more attribute expression besides 'range'
+	if int(attr.use) != dmq.AttrUseField[dmq.AttrUseRange] {
+		return nil
+	}
+
+	cid, err := hex.DecodeString(cliIdHexStr)
+	if err != nil {
+		return fmt.Errorf("invalid client id: %s", cliIdHexStr)
+	}
+
+	// check whether is stored on this datanode
+	cidHash := dmq.GenHash(cid, Config.HashFunc)
+	candvn := ChordNode.Rtable.Search(cidHash)
+	if candvn.Pnode.Hostname != ChordNode.Config.Hostname {
+		// ignore
+		return nil
+	}
+
+	cidstr := string(cid)
+	if scInfo, ok := ClisInfo[cidstr]; !ok {
+		return fmt.Errorf("client with id: %s not exists", cliIdHexStr)
+	} else {
+		if oldAttr, ok := scInfo.AttrMap[attr.name]; !ok {
+			return fmt.Errorf("attribute %s not in %s's SubCliInfo",
+				attr.name, cliIdHexStr)
+		} else {
+			log.Debug("update %s's attr %s", cliIdHexStr, attr.name)
+			if oldAttr.low != attr.low {
+				oldAttr.low = attr.low
+			}
+			if oldAttr.high != attr.high {
+				oldAttr.high = attr.high
+			}
+		}
+	}
+
 	return nil
 }
 
