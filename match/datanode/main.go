@@ -179,7 +179,7 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 	return nil
 }
 
-func InitLog(logFile, serfLogFile string) error {
+func InitLog(logFile, serfLogFile, logLevel string) error {
 	var format = logging.MustStringFormatter(
 		"%{time:2006-01-02 15:04:05.000} [%{level:.4s}] %{id:03x} [%{shortfunc}] %{message}",
 	)
@@ -188,10 +188,12 @@ func InitLog(logFile, serfLogFile string) error {
 	if err != nil {
 		return err
 	}
+
 	backend1 := logging.NewLogBackend(f, "", 0)
 	backend1Formatter := logging.NewBackendFormatter(backend1, format)
-	logging.SetBackend(backend1Formatter)
-	logging.SetLevel(logging.DEBUG, "dynamicmq-match-datanode")
+	backend1Leveled := logging.AddModuleLevel(backend1Formatter)
+	backend1Leveled.SetLevel(dmq.LogLevelMap[logLevel], "")
+	logging.SetBackend(backend1Leveled)
 
 	serfLog, err = os.OpenFile(serfLogFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
@@ -320,7 +322,7 @@ func main() {
 		panic(err)
 	}
 
-	if err := InitLog(Config.LogFile, Config.SerfLogFile); err != nil {
+	if err := InitLog(Config.LogFile, Config.SerfLogFile, Config.LogLevel); err != nil {
 		panic(err)
 	}
 
