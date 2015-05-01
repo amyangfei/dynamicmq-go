@@ -23,10 +23,12 @@ var IpList = flag.String("i", "127.0.0.1", "bind ip list for sdk, seperated by '
 var PortRange = flag.String("P", "10000;60000", "bind port range for sdk e.g. 10000;60000")
 var AuthAddr = flag.String("a", "127.0.0.1:9000", "address of auth server")
 var RangePCT = flag.Int("p", 20, "percent of each attribute dimension")
+var UpdateRate = flag.Int("r", 60, "subcli's attribute update rate in seconds")
 var Addrs []string
 var AddrIdx int
 
 var IdxBase *IndexBase
+var RangeAttrNames []string
 
 type IndexBase struct {
 	dimension int
@@ -143,6 +145,12 @@ func LoadIndexBase(c *etcd.Client, idxBase *IndexBase) error {
 		}
 	}
 
+	for name, ib := range idxBase.attrbases {
+		if ib.use == dmq.AttrUseField[dmq.AttrUseRange] {
+			RangeAttrNames = append(RangeAttrNames, name)
+		}
+	}
+
 	return nil
 }
 
@@ -166,6 +174,26 @@ func subscribe(cli *sdk.SubSdk) {
 	cli.Subscribe(attrnames, attrvals)
 }
 
+func attrUpdater(cli *sdk.SubSdk) {
+	name := RangeAttrNames[rand.Intn(len(RangeAttrNames))]
+	ib := IdxBase.attrbases[name]
+
+	attrnames := make([]string, 0)
+	attrvals := make([]string, 0)
+	attrnames = append(attrnames, name)
+	attrvals = append(attrvals, attrGen(ib.low, ib.high))
+
+	cli.Subscribe(attrnames, attrvals)
+}
+
+func attrUpdateRoutine(cli *sdk.SubSdk, interval int) {
+	ticker := time.NewTicker(time.Second * time.Duration(interval))
+	for {
+		<-ticker.C
+		attrUpdater(cli)
+	}
+}
+
 func createSubSdk() (*sdk.SubSdk, error) {
 	var cli *sdk.SubSdk = nil
 	for cli == nil {
@@ -187,7 +215,7 @@ func createSubSdk() (*sdk.SubSdk, error) {
 	return cli, nil
 }
 
-func cliRoutine(authaddr string) {
+func cliRoutine(authaddr string, updateRate int) {
 	cli, err := createSubSdk()
 	if err != nil {
 		panic(err)
@@ -197,15 +225,16 @@ func cliRoutine(authaddr string) {
 
 	go cli.HeartbeatRoutine(300)
 	go cli.RecvMsgRoutine()
+	go attrUpdateRoutine(cli, updateRate)
 	// go attrUpdater(cli, freq)
 }
 
-func matchBencher(cliNum, runTime int, authaddr string) {
+func matchBencher(cliNum, runTime, updateRate int, authaddr string) {
 	fmt.Printf("start benchmark...\n")
 	timer := time.NewTimer(time.Second * time.Duration(runTime))
 
 	for i := 0; i < cliNum; i++ {
-		cliRoutine(authaddr)
+		cliRoutine(authaddr, updateRate)
 	}
 
 	<-timer.C
@@ -228,5 +257,5 @@ func main() {
 		syscall.SIGINT, syscall.SIGSTOP)
 	go handleSignal(ch)
 
-	matchBencher(*ClientNum, *RunTime, *AuthAddr)
+	matchBencher(*ClientNum, *RunTime, *UpdateRate, *AuthAddr)
 }
