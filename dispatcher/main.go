@@ -177,12 +177,18 @@ func main() {
 	// Errors may occur if this procedure acquires the waiting lock before the
 	// expected connector registering to etcd. So try another time when error
 	// occurs. We should ensure the RegisterEtcd can be called idempotently.
-	if err := RegisterEtcd(RouterMgr, Config, EtcdCliPool); err != nil {
-		log.Error("first time register to etcd with error: %v", err)
-		time.Sleep(time.Second * time.Duration(1))
-		if err2 := RegisterEtcd(RouterMgr, Config, EtcdCliPool); err2 != nil {
-			panic(err2)
+	retryTime := 5
+	var regerr error
+	for i := 0; i < retryTime; i++ {
+		if regerr = RegisterEtcd(RouterMgr, Config, EtcdCliPool); regerr != nil {
+			log.Error("%d time register to etcd with error: %v", i+1, regerr)
+			time.Sleep(time.Second * time.Duration(1))
+		} else {
+			break
 		}
+	}
+	if regerr != nil {
+		panic(regerr)
 	}
 
 	signalChan := InitSignal()
