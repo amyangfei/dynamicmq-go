@@ -19,8 +19,12 @@ import (
 var ClientNum = flag.Int("n", 10, "number of subscribe client")
 var RunTime = flag.Int("t", 60, "run time in second")
 var MetaEtcd = flag.String("e", "http://127.0.0.1:4001", "address of meta-storage")
+var IpList = flag.String("i", "127.0.0.1", "bind ip list for sdk, seperated by ';'")
+var PortRange = flag.String("P", "10000;60000", "bind port range for sdk e.g. 10000;60000")
 var AuthAddr = flag.String("a", "127.0.0.1:9000", "address of auth server")
 var RangePCT = flag.Int("p", 20, "percent of each attribute dimension")
+var Addrs []string
+var AddrIdx int
 
 var IdxBase *IndexBase
 
@@ -47,6 +51,24 @@ func handleSignal(sigChan chan os.Signal) {
 			os.Exit(0)
 		default:
 			return
+		}
+	}
+}
+
+func prepareAddrs(ipList, portRange string) {
+	ips := strings.Split(ipList, ";")
+	ports := strings.Split(portRange, ";")
+	pstart, err := strconv.Atoi(ports[0])
+	if err != nil {
+		panic(err)
+	}
+	pend, err := strconv.Atoi(ports[1])
+	if err != nil {
+		panic(err)
+	}
+	for _, ip := range ips {
+		for i := pstart; i <= pend; i++ {
+			Addrs = append(Addrs, fmt.Sprintf("%s:%d", ip, i))
 		}
 	}
 }
@@ -144,16 +166,32 @@ func subscribe(cli *sdk.SubSdk) {
 	cli.Subscribe(attrnames, attrvals)
 }
 
+func createSubSdk() (*sdk.SubSdk, error) {
+	var cli *sdk.SubSdk = nil
+	for cli == nil {
+		var err error
+		if cli, err = sdk.NewSubSdk(bson.NewObjectId().Hex(), *AuthAddr); err != nil {
+			cli = nil
+			continue
+		}
+		if AddrIdx > len(Addrs) {
+			return nil, fmt.Errorf("ip pool exhausted")
+		}
+		cli.SetLaddr(Addrs[AddrIdx])
+		AddrIdx++
+		if err := cli.Auth(); err != nil {
+			cli.Close()
+			cli = nil
+		}
+	}
+	return cli, nil
+}
+
 func cliRoutine(authaddr string) {
-	cli, err := sdk.NewSubSdk(bson.NewObjectId().Hex(), authaddr)
+	cli, err := createSubSdk()
 	if err != nil {
 		panic(err)
 	}
-
-	if err := cli.Auth(); err != nil {
-		panic(err)
-	}
-	// defer cli.Close()
 
 	subscribe(cli)
 
@@ -167,7 +205,7 @@ func matchBencher(cliNum, runTime int, authaddr string) {
 	timer := time.NewTimer(time.Second * time.Duration(runTime))
 
 	for i := 0; i < cliNum; i++ {
-		go cliRoutine(authaddr)
+		cliRoutine(authaddr)
 	}
 
 	<-timer.C
@@ -175,6 +213,8 @@ func matchBencher(cliNum, runTime int, authaddr string) {
 
 func main() {
 	flag.Parse()
+
+	prepareAddrs(*IpList, *PortRange)
 
 	machines := strings.Split(*MetaEtcd, ";")
 	c := etcd.NewClient(machines)
