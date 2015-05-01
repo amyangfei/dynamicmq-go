@@ -30,6 +30,7 @@ type AttrIndex struct {
 
 	// Mapping from id of subcli with unflushed attribute to its SubCliInfo
 	// subcli id is BSON format string, not hex string.
+	// TODO: access to this directory should be protected with RWLock
 	waitUpdate map[string]*SubCliInfo
 
 	tree  Tree
@@ -131,15 +132,22 @@ func compareCid(cid1, cid2 string) int {
 }
 
 func (aidx *AttrIndex) InsertWaitUpdate(cid string) {
-	if _, ok := aidx.waitUpdate[cid]; !ok {
-		scInfo := ClisInfo[cid]
-		if scInfo == nil {
-			log.Error("SubCliInfo of %s not found in ClisInfo",
-				hex.EncodeToString([]byte(cid)))
-			return
+	// FIXME: we can't modify waitUpdate while the aidx is processing attribute
+	// flush
+	go func() {
+		for aidx.updating {
+			time.Sleep(time.Millisecond * 10)
 		}
-		aidx.waitUpdate[cid] = scInfo
-	}
+		if _, ok := aidx.waitUpdate[cid]; !ok {
+			scInfo := ClisInfo[cid]
+			if scInfo == nil {
+				log.Error("SubCliInfo of %s not found in ClisInfo",
+					hex.EncodeToString([]byte(cid)))
+				return
+			}
+			aidx.waitUpdate[cid] = scInfo
+		}
+	}()
 }
 
 // If subcli's id is in aidx's waitUpdate, check the subcli's new attribute
@@ -188,6 +196,7 @@ func attrRangeFilter(xattr, yattr *Attribute) (xmin, xmax, ymin, ymax int) {
 
 func (aidx *AttrIndex) FlushAttrUpdate() {
 	cname := AttrNameCombine(aidx.xname, aidx.yname)
+	waitCount := len(aidx.waitUpdate)
 	for cid, scInfo := range aidx.waitUpdate {
 		var xattr, yattr *Attribute
 		for _, subattr := range scInfo.Attrs {
@@ -198,18 +207,25 @@ func (aidx *AttrIndex) FlushAttrUpdate() {
 				yattr = subattr
 			}
 		}
-		xmin, xmax, ymin, ymax := attrRangeFilter(xattr, yattr)
 
 		ival := scInfo.Intval[cname]
-		aidx.tree.Delete(ival)
-		delete(scInfo.Intval, cname)
+		if ival != nil {
+			aidx.tree.Delete(ival)
+			delete(scInfo.Intval, cname)
+		}
 
-		newival := aidx.InsertCliAttr(xmin, xmax, ymin, ymax, &ClisInfo[cid].Cid)
-		ClisInfo[cid].Intval[cname] = newival
+		// Sub client may have already offline before attribute flush
+		if xattr != nil && yattr != nil {
+			xmin, xmax, ymin, ymax := attrRangeFilter(xattr, yattr)
+
+			newival := aidx.InsertCliAttr(xmin, xmax, ymin, ymax, &ClisInfo[cid].Cid)
+			ClisInfo[cid].Intval[cname] = newival
+		}
 
 		delete(aidx.waitUpdate, cid)
 	}
 	aidx.updating = false
+	log.Debug("Flush %d attribute for index %s-%s", waitCount, aidx.xname, aidx.yname)
 }
 
 func ProcessAttrUpdateFlush(lastUpdate int64) int64 {

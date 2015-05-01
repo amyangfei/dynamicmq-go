@@ -414,6 +414,10 @@ func findCandIntervals(pubmsg *PubMsg) ([]*Interval, *AttrIndex) {
 			if attrIdx, ok := AttrIdxesMap[cname]; !ok {
 				log.Warning("combine-name %s not found in AttrIdxesMap", cname)
 			} else {
+				if attrIdx.updating {
+					log.Info("AttrIndex %s-%s is in updating", attrIdx.xname, attrIdx.yname)
+					continue
+				}
 				x, y := i, j
 				if !AttrNameLess(pubmsg.attrs[i].name, pubmsg.attrs[j].name) {
 					x, y = j, i
