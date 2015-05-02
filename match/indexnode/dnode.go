@@ -108,7 +108,10 @@ func DnodeMsgSender(dnid string, msg []byte) error {
 		return err
 	} else {
 		// TODO: error handling. e.g. broken connection, write failed etc.
-		dnconn.sender <- msg
+		// FIXME benchmark shows great latency using channel way: dnconn.sender <- msg
+		go func() {
+			dnconn.conn.Write(msg)
+		}()
 	}
 	return nil
 }

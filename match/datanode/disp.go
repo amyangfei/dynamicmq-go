@@ -36,7 +36,10 @@ func DispMsgSender(dnode *DispNode, msg []byte) error {
 		return err
 	} else {
 		// TODO: error handling. e.g. broken connection, write failed etc.
-		dispconn.sender <- msg
+		// FIXME benchmark shows great latency using channel way: disp.sender <- msg
+		go func() {
+			dispconn.conn.Write(msg)
+		}()
 	}
 	return nil
 }
