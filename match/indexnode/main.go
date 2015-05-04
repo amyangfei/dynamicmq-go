@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"syscall"
@@ -187,6 +188,10 @@ func InitServer() error {
 
 func ShutdownServer() {
 	log.Info("Indexnode server stop...")
+
+	fmt.Println("stop cpu profiling....")
+	pprof.StopCPUProfile()
+
 	os.Exit(0)
 }
 
@@ -211,15 +216,35 @@ func AttrUpdateFlushService() {
 func main() {
 	var configFile string
 	var printVer bool
+	var cpuProfile string
 
 	flag.BoolVar(&printVer, "version", false, "print version")
 	flag.StringVar(&configFile, "c", "config.ini", "specify config file")
+	flag.StringVar(&cpuProfile, "cpuprofile", "", "cpu profile output file")
 	flag.Parse()
 
 	if printVer {
 		dmq.PrintVersion()
 		os.Exit(0)
 	}
+
+	if cpuProfile != "" {
+		f, err := os.Create(cpuProfile)
+		if err != nil {
+			panic(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer func() {
+			fmt.Println("stop cpu profiling....")
+			pprof.StopCPUProfile()
+		}()
+	}
+
+	pcnt := runtime.NumCPU() / 2
+	if pcnt < 1 {
+		pcnt = 1
+	}
+	runtime.GOMAXPROCS(pcnt)
 
 	if err := InitConfig(configFile); err != nil {
 		panic(err)

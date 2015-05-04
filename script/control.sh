@@ -124,7 +124,7 @@ start_indexnode() {
     cp $src/match/indexnode/config.ini.template $wdir/indexnode.ini
 
     echo "starting indexnode..."
-    $wdir/indexnode -c $wdir/indexnode.ini &
+    $wdir/indexnode -c $wdir/indexnode.ini -cpuprofile $wdir/indexnode.prof &
 }
 
 start_datanode_single() {
