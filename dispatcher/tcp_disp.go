@@ -19,7 +19,10 @@ func DispMsgSender(connid string, msg []byte) error {
 	if dpconn, err := getDispConn(connid); err != nil {
 		return err
 	} else {
-		dpconn.sender <- msg
+		// FIXME: benchmark shows great latency using channel way: dpconn.sender <- msg
+		go func() {
+			dpconn.conn.Write(msg)
+		}()
 	}
 	return nil
 }
