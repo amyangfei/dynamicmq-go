@@ -240,12 +240,20 @@ func AttrWatcher(machines []string) {
 	recursive := true
 	go c.Watch(prefix, 0, recursive, receiver, stop)
 
+RecvLoop:
 	for {
 		select {
 		case data := <-receiver:
+			if data == nil {
+				log.Warning("receive nil notification in attribute watcher")
+				break RecvLoop
+			}
 			if err := processAttrNotify(data); err != nil {
 				log.Error("process attr notify with error: %v", err)
 			}
 		}
 	}
+
+	log.Info("restart attribute watcher with %v", machines)
+	go AttrWatcher(machines)
 }
