@@ -10,6 +10,7 @@ authsrv/authsrv
 dispatcher/dispatcher
 match/datanode/datanode
 match/indexnode/indexnode
+match/scannode/scannode
 cmd/subscriber/subscriber
 cmd/pusher/pusher
 cmd/publisher/publisher
