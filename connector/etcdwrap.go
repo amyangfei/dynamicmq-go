@@ -129,10 +129,6 @@ func RegisterSub(cli *SubClient, cfg *SrvConfig, pool *dmq.EtcdClientPool) error
 	if _, err := c.Set(subConnKey, cfg.NodeId, 0); err != nil {
 		return err
 	}
-	connSubKey := dmq.GetConnSubKey(cfg.NodeId, cli.id.Hex())
-	if _, err := c.SetDir(connSubKey, 0); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -224,11 +220,9 @@ func RemoveSub(cli *SubClient, cfg *SrvConfig, pool, attrPool *dmq.EtcdClientPoo
 
 	key := dmq.GetInfoKey(dmq.EtcdSubscriberType, cli.id.Hex())
 	attrKey := dmq.GetSubAttrCliBase(cli.id.Hex())
-	connSubKey := dmq.GetConnSubKey(cfg.NodeId, cli.id.Hex())
 
 	_, infoErr := c.Delete(key, true)
 	_, attrErr := attrC.Delete(attrKey, true)
-	_, subErr := c.Delete(connSubKey, true)
 
 	err = nil
 	if infoErr != nil {
@@ -236,9 +230,6 @@ func RemoveSub(cli *SubClient, cfg *SrvConfig, pool, attrPool *dmq.EtcdClientPoo
 	}
 	if attrErr != nil {
 		err = fmt.Errorf("%v: remove subattr err: %v", err, attrErr)
-	}
-	if subErr != nil {
-		err = fmt.Errorf("%v: remove conn subid err: %v", err, subErr)
 	}
 
 	return err

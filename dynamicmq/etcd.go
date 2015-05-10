@@ -18,10 +18,6 @@ func GetWaitingBase(nodeType string) string {
 	return fmt.Sprintf("/%s/waiting", nodeType)
 }
 
-func GetConnSubKey(connId, subId string) string {
-	return fmt.Sprintf("/%s/info/%s/sub/%s", EtcdConnectorType, connId, subId)
-}
-
 func GetSubConnKey(clientId string) string {
 	return fmt.Sprintf("/%s/info/%s/conn_id", EtcdSubscriberType, clientId)
 }
