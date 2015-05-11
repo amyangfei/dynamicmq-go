@@ -18,6 +18,7 @@ func GetWaitingBase(nodeType string) string {
 	return fmt.Sprintf("/%s/waiting", nodeType)
 }
 
+// TODO: migrate from etcd to redis
 func GetSubConnKey(clientId string) string {
 	return fmt.Sprintf("/%s/info/%s/conn_id", EtcdSubscriberType, clientId)
 }
