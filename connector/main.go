@@ -204,10 +204,6 @@ func main() {
 		panic(err)
 	}
 
-	if err := InitRawMsgCache(); err != nil {
-		panic(err)
-	}
-
 	if err := StartSubTCP(Config.SubTCPBind); err != nil {
 		panic(err)
 	}
