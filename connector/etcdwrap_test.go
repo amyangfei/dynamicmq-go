@@ -11,20 +11,22 @@ import (
 	"testing"
 )
 
-var ecpool *dmq.EtcdClientPool
+var ecpool, attrpool *dmq.EtcdClientPool
 
 func init() {
 	cfg := fakeSrvConfig()
 	ecpool = dmq.NewEtcdClientPool(cfg.EtcdMachines, 1, 16)
+	attrpool = dmq.NewEtcdClientPool(cfg.AttrEtcdMachines, 1, 16)
 }
 
 func fakeSrvConfig() *SrvConfig {
 	cfg := &SrvConfig{
-		NodeId:        "conn0101",
-		SubTCPBind:    "localhost:7253",
-		RouterTCPBind: "localhost:7255",
-		Capacity:      12345,
-		EtcdMachines:  []string{"http://localhost:4001"},
+		NodeId:           "conn0101",
+		SubTCPBind:       "localhost:7253",
+		RouterTCPBind:    "localhost:7255",
+		Capacity:         12345,
+		EtcdMachines:     []string{"http://localhost:4001"},
+		AttrEtcdMachines: []string{"http://localhost:4101"},
 	}
 	return cfg
 }
@@ -190,5 +192,5 @@ func TestUpdateAttr(t *testing.T) {
 		}
 	}
 
-	RemoveSub(cli, cfg, ecpool)
+	RemoveSub(cli, cfg, ecpool, attrpool)
 }
