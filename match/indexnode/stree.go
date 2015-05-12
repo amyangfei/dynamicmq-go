@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 )
 
 // Main interface to access the segment tree
@@ -150,6 +151,7 @@ func (n *node) IsLeaf() bool {
 }
 
 type stree struct {
+	lock  *sync.RWMutex
 	root  *node
 	base  map[int64]*Interval // mapping from Interval Id to Interval
 	maxid int64               // next available Interval id
@@ -161,6 +163,8 @@ type stree struct {
 }
 
 func (t *stree) Push(xmin, xmax, ymin, ymax int, data *[]byte) *Interval {
+	t.lock.Lock()
+	defer t.lock.Unlock()
 	new_interval := &Interval{
 		Id:            t.maxid,
 		Data:          data,
@@ -175,6 +179,8 @@ func (t *stree) Push(xmin, xmax, ymin, ymax int, data *[]byte) *Interval {
 }
 
 func (t *stree) Delete(interval *Interval) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
 	// remove interval from all the segments containing it.
 	deleteInterval(t.root, interval)
 
@@ -204,10 +210,14 @@ func deleteInterval(node *node, interval *Interval) {
 }
 
 func (t *stree) Count() int {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 	return len(t.base)
 }
 
 func (t *stree) QueryCount(x, y float64) int {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 	return countSingle(t.root, x, y)
 }
 
@@ -223,6 +233,8 @@ func countSingle(node *node, x, y float64) int {
 }
 
 func (t *stree) Query(x, y float64) []*Interval {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 	result := make(map[int64]*Interval)
 	querySingle(t.root, x, y, &result)
 
@@ -342,16 +354,15 @@ func insertNodes(xmin, xmax, ymin, ymax, level int, parent *node) *node {
 }
 
 func NewTree(xmin, xmax, ymin, ymax int) Tree {
-	t := new(stree)
-
-	t.maxid = 0
-	t.base = make(map[int64]*Interval)
-
-	t.xmin = xmin
-	t.xmax = xmax
-	t.ymin = ymin
-	t.ymax = ymax
-
+	t := &stree{
+		lock:  new(sync.RWMutex),
+		maxid: 0,
+		base:  make(map[int64]*Interval),
+		xmin:  xmin,
+		xmax:  xmax,
+		ymin:  ymin,
+		ymax:  ymax,
+	}
 	t.root = insertNodes(xmin, xmax, ymin, ymax, 0, nil)
 
 	return t
