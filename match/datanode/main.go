@@ -22,6 +22,9 @@ var Config *SrvConfig
 // Etcd client pool
 var EtcdCliPool *dmq.EtcdClientPool
 
+// Redis client pool
+var RCPool *dmq.RedisCliPool
+
 // common log
 var log = logging.MustGetLogger("dynamicmq-match-datanode")
 
@@ -104,10 +107,17 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 	etcdFlagSet.Int("pool_size", 4, "initial etcd client pool size")
 	etcdFlagSet.Int("max_pool_size", 64, "max etcd client pool size")
 
+	redisFlagSet := flag.NewFlagSet("redis", flag.PanicOnError)
+	redisFlagSet.String("redis_endpoint", "localhost:6379", "redis endpoint")
+	redisFlagSet.String("max_idle", "50", "redis pool max idle clients")
+	redisFlagSet.String("max_active", "100", "redis pool max active clients")
+	redisFlagSet.String("timeout", "3600", "close idle redis client after timeout")
+
 	globalconf.Register("basic", basicFlagSet)
 	globalconf.Register("serf", serfFlagSet)
 	globalconf.Register("chord", chordFlagSet)
 	globalconf.Register("etcd", etcdFlagSet)
+	globalconf.Register("redis", redisFlagSet)
 
 	conf.ParseAll()
 
@@ -163,6 +173,14 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 	Config.EtcdPoolMaxSize, err =
 		strconv.Atoi(etcdFlagSet.Lookup("max_pool_size").Value.String())
 
+	Config.RedisEndPoint = redisFlagSet.Lookup("redis_endpoint").Value.String()
+	Config.RedisMaxIdle, err =
+		strconv.Atoi(redisFlagSet.Lookup("max_idle").Value.String())
+	Config.RedisMaxActive, err =
+		strconv.Atoi(redisFlagSet.Lookup("max_active").Value.String())
+	Config.RedisIdleTimeout, err =
+		strconv.Atoi(redisFlagSet.Lookup("timeout").Value.String())
+
 	Config.Entrypoint = entrypoint
 	if len(starthash)%2 == 1 {
 		starthash = "0" + starthash
@@ -212,6 +230,13 @@ func InitServer() error {
 	DispConns = make(map[string]*DispConn)
 	var err error
 	CurDispNode, err = AllocateDispNode(EtcdCliPool)
+	if err != nil {
+		return err
+	}
+
+	rcfg := dmq.NewRedisConfig(Config.RedisEndPoint, Config.RedisMaxIdle,
+		Config.RedisMaxActive, Config.RedisIdleTimeout)
+	RCPool, err = dmq.NewRedisCliPool(rcfg)
 	if err != nil {
 		return err
 	}

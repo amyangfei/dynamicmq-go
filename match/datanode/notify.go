@@ -98,7 +98,7 @@ func processAttrCreate(data *etcd.Response) error {
 
 	cidstr := string(cid)
 	if _, ok := ClisInfo[cidstr]; !ok {
-		connId, err := GetSubCliConnId(cliIdHexStr, EtcdCliPool)
+		connId, err := dmq.GetSubConnId(RCPool, cliIdHexStr)
 		if err != nil {
 			return err
 		}

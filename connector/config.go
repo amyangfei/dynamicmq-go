@@ -20,7 +20,7 @@ type SrvConfig struct {
 	DispKeepalive  int
 	Capacity       int
 
-	// redis for message cache
+	// redis
 	RedisEndPoint    string
 	RedisIdleTimeout int // in second
 	RedisMaxIdle     int

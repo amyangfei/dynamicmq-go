@@ -204,33 +204,18 @@ func RemoveSubAttr(cli *SubClient, attrname string, cfg *SrvConfig, pool *dmq.Et
 }
 
 func RemoveSub(cli *SubClient, cfg *SrvConfig, pool, attrPool *dmq.EtcdClientPool) error {
-	ec, err := pool.GetEtcdClient()
-	if err != nil {
-		return err
-	}
-	defer pool.RecycleEtcdClient(ec.Id)
-	c := ec.Cli
-
 	attrEc, err := attrPool.GetEtcdClient()
 	if err != nil {
 		return err
 	}
-	defer pool.RecycleEtcdClient(attrEc.Id)
+	defer attrPool.RecycleEtcdClient(attrEc.Id)
 	attrC := attrEc.Cli
 
-	key := dmq.GetInfoKey(dmq.EtcdSubscriberType, cli.id.Hex())
 	attrKey := dmq.GetSubAttrCliBase(cli.id.Hex())
 
-	_, infoErr := c.Delete(key, true)
-	_, attrErr := attrC.Delete(attrKey, true)
-
-	err = nil
-	if infoErr != nil {
-		err = fmt.Errorf("remove subinfo err: %v", infoErr)
-	}
-	if attrErr != nil {
-		err = fmt.Errorf("%v: remove subattr err: %v", err, attrErr)
+	if _, err := attrC.Delete(attrKey, true); err != nil {
+		return err
 	}
 
-	return err
+	return nil
 }

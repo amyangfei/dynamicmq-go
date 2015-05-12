@@ -1,44 +1,43 @@
 package main
 
 import (
+	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"testing"
 )
 
-func testRedisConfig() *RedisConfig {
-	cfg := &SrvConfig{
-		NodeId:           "conn0125",
-		RedisEndPoint:    "tcp@127.0.0.1:6379",
-		RedisIdleTimeout: 3600,
-		RedisMaxIdle:     50,
-		RedisMaxActive:   100,
-	}
-	return NewRedisConfig(cfg)
+func testRedisConfig() *dmq.RedisConfig {
+	endpoint := "tcp@127.0.0.1:6379"
+	idle := 50
+	active := 100
+	timeout := 3600
+	return dmq.NewRedisConfig(endpoint, idle, active, timeout)
 }
 
 func TestRedisCRUD(t *testing.T) {
+	var testConnId string = "conn0123"
 	var testCliId string = "507f191e810c19729de860ea"
 	rcfg := testRedisConfig()
-	rc, err := NewRedisCliPool(rcfg)
+	rc, err := dmq.NewRedisCliPool(rcfg)
 	if err != nil {
 		t.Errorf("NewRedisCliPool with error: %v", err)
 	}
 
 	iterTime := 100
 	for i := 0; i < iterTime; i++ {
-		if err := rc.RegisterSubCli(testCliId); err != nil {
+		if err := RegisterSubCli(rc, testCliId, testConnId); err != nil {
 			t.Errorf("failed to RegisterSubCli: %v", err)
 		}
 	}
 
-	if r, err := rc.GetSubConnId(testCliId); err != nil {
+	if r, err := dmq.GetSubConnId(rc, testCliId); err != nil {
 		t.Errorf("failed to GetSubConn: %v", err)
 	} else {
-		if r != rcfg.connId {
-			t.Errorf("get conn nodeid %s expected %s", r, rcfg.connId)
+		if r != testConnId {
+			t.Errorf("get conn nodeid %s expected %s", r, testConnId)
 		}
 	}
 
-	if err := rc.UnRegisterSubCli(testCliId); err != nil {
+	if err := UnRegisterSubCli(rc, testCliId); err != nil {
 		t.Errorf("failed to UnRegisterSubCli: %v", err)
 	}
 }

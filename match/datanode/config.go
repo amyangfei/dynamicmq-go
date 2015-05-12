@@ -45,4 +45,10 @@ type SrvConfig struct {
 	AttrEtcdMachines [][]string
 	EtcdPoolSize     int
 	EtcdPoolMaxSize  int
+
+	// redis
+	RedisEndPoint    string
+	RedisIdleTimeout int // in second
+	RedisMaxIdle     int
+	RedisMaxActive   int
 }

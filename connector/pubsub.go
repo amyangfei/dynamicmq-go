@@ -248,7 +248,7 @@ func processAuth(cli *SubClient, args []string) error {
 		return fmt.Errorf("auth failed")
 	}
 
-	if err := RegisterSub(cli, Config, EtcdCliPool); err != nil {
+	if err := RegisterSubCli(RCPool, cli.id.Hex(), Config.NodeId); err != nil {
 		return err
 	}
 
@@ -468,6 +468,9 @@ func cleanSubCli(cli *SubClient) error {
 		cli = nil
 	}()
 	if err := RemoveSub(cli, Config, EtcdCliPool, AttrEtcdCliPool); err != nil {
+		return err
+	}
+	if err := UnRegisterSubCli(RCPool, cli.id.Hex()); err != nil {
 		return err
 	}
 	return nil

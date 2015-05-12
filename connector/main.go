@@ -22,6 +22,8 @@ var EtcdCliPool *dmq.EtcdClientPool
 
 var AttrEtcdCliPool *dmq.EtcdClientPool
 
+var RCPool *dmq.RedisCliPool
+
 var log = logging.MustGetLogger("dynamicmq-connector")
 
 // InitSignal register signals handler.
@@ -160,6 +162,13 @@ func InitLog(logFile, logLevel string) error {
 }
 
 func InitServer() error {
+	var err error
+	rcfg := dmq.NewRedisConfig(Config.RedisEndPoint, Config.RedisMaxIdle,
+		Config.RedisMaxActive, Config.RedisIdleTimeout)
+	RCPool, err = dmq.NewRedisCliPool(rcfg)
+	if err != nil {
+		return err
+	}
 	SubcliTable = make(map[bson.ObjectId]*SubClient, 0)
 	EtcdCliPool = dmq.NewEtcdClientPool(
 		Config.EtcdMachines, Config.EtcdPoolSize, Config.EtcdPoolMaxSize)
