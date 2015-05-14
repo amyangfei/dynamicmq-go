@@ -36,10 +36,17 @@ start_etcd() {
 }
 
 start_redis() {
+    cp $cur/cfg/meta_redis.conf $wdir
+    cp $cur/cfg/attr_redis.conf $wdir
     cd $wdir
+
     echo "starting redis..."
-    $redis_bin >>redis.log 2>&1 &
-    echo $! > redis.pid
+
+    $redis_bin meta_redis.conf >>meta_redis.log 2>&1 &
+    echo $! > meta_redis.pid
+
+    $redis_bin attr_redis.conf >>attr_redis.log 2>&1 &
+    echo $! > attr_redis.pid
 }
 
 start_authsrv() {
@@ -150,8 +157,13 @@ stop_etcd() {
 
 stop_redis() {
     echo "stopping Redis..."
-    redis_pid=$(cat "${wdir}/redis.pid")
-    echo "killing redis-server with pid ${redis_pid}"
+
+    redis_pid=$(cat "${wdir}/meta_redis.pid")
+    echo "killing meta redis-server with pid ${redis_pid}"
+    kill $redis_pid
+
+    redis_pid=$(cat "${wdir}/attr_redis.pid")
+    echo "killing attr redis-server with pid ${redis_pid}"
     kill $redis_pid
 }
 

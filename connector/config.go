@@ -21,7 +21,8 @@ type SrvConfig struct {
 	Capacity       int
 
 	// redis
-	RedisEndPoint    string
+	MetaRedisAddr    string
+	AttrRedisAddr    string
 	RedisIdleTimeout int // in second
 	RedisMaxIdle     int
 	RedisMaxActive   int

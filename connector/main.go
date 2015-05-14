@@ -20,9 +20,9 @@ var SubcliTable map[bson.ObjectId]*SubClient
 
 var EtcdCliPool *dmq.EtcdClientPool
 
-var AttrEtcdCliPool *dmq.EtcdClientPool
+var MetaRCPool *dmq.RedisCliPool
 
-var RCPool *dmq.RedisCliPool
+var AttrRCPool *dmq.RedisCliPool
 
 var log = logging.MustGetLogger("dynamicmq-connector")
 
@@ -78,7 +78,8 @@ func InitConfig(configFile string) error {
 	serverFlagSet.Int("capacity", 100000, "subscriber capacity of this connector")
 
 	redisFlagSet := flag.NewFlagSet("redis", flag.PanicOnError)
-	redisFlagSet.String("redis_endpoint", "localhost:6379", "redis endpoint")
+	redisFlagSet.String("meta_redis_addr", "localhost:6379", "meta redis bind address")
+	redisFlagSet.String("attr_redis_addr", "localhost:6479", "attribute redis bind address")
 	redisFlagSet.String("max_idle", "50", "redis pool max idle clients")
 	redisFlagSet.String("max_active", "100", "redis pool max active clients")
 	redisFlagSet.String("timeout", "3600", "close idle redis client after timeout")
@@ -122,7 +123,8 @@ func InitConfig(configFile string) error {
 	Config.Capacity, err =
 		strconv.Atoi(serverFlagSet.Lookup("capacity").Value.String())
 
-	Config.RedisEndPoint = redisFlagSet.Lookup("redis_endpoint").Value.String()
+	Config.MetaRedisAddr = redisFlagSet.Lookup("meta_redis_addr").Value.String()
+	Config.AttrRedisAddr = redisFlagSet.Lookup("attr_redis_addr").Value.String()
 	Config.RedisMaxIdle, err =
 		strconv.Atoi(redisFlagSet.Lookup("max_idle").Value.String())
 	Config.RedisMaxActive, err =
@@ -132,8 +134,6 @@ func InitConfig(configFile string) error {
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
 	Config.EtcdMachines = strings.Split(machines, ",")
-	attr_machines := etcdFlagSet.Lookup("attr_machines").Value.String()
-	Config.AttrEtcdMachines = strings.Split(attr_machines, ",")
 	Config.EtcdPoolSize, err =
 		strconv.Atoi(etcdFlagSet.Lookup("pool_size").Value.String())
 	Config.EtcdPoolMaxSize, err =
@@ -163,17 +163,24 @@ func InitLog(logFile, logLevel string) error {
 
 func InitServer() error {
 	var err error
-	rcfg := dmq.NewRedisConfig(Config.RedisEndPoint, Config.RedisMaxIdle,
+	rcfg := dmq.NewRedisConfig(Config.MetaRedisAddr, Config.RedisMaxIdle,
 		Config.RedisMaxActive, Config.RedisIdleTimeout)
-	RCPool, err = dmq.NewRedisCliPool(rcfg)
+	MetaRCPool, err = dmq.NewRedisCliPool(rcfg)
 	if err != nil {
 		return err
 	}
+	attrcfg := dmq.NewRedisConfig(Config.AttrRedisAddr, Config.RedisMaxIdle,
+		Config.RedisMaxActive, Config.RedisIdleTimeout)
+	AttrRCPool, err = dmq.NewRedisCliPool(attrcfg)
+	if err != nil {
+		return err
+	}
+
 	SubcliTable = make(map[bson.ObjectId]*SubClient, 0)
+
 	EtcdCliPool = dmq.NewEtcdClientPool(
 		Config.EtcdMachines, Config.EtcdPoolSize, Config.EtcdPoolMaxSize)
-	AttrEtcdCliPool = dmq.NewEtcdClientPool(
-		Config.AttrEtcdMachines, Config.EtcdPoolSize, Config.EtcdPoolMaxSize)
+
 	return nil
 }
 
