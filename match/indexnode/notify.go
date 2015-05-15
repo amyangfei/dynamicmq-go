@@ -6,17 +6,15 @@ import (
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/garyburd/redigo/redis"
 	"regexp"
-	"strconv"
 	"strings"
-	"time"
 )
 
 var (
-	AttrCmdTable = map[string]func(data *etcd.Response) error{
-		dmq.EtcdActionCreate: processAttrCreate,
-		dmq.EtcdActionUpdate: processAttrUpdate,
-		dmq.EtcdActionDelete: processAttrDelete,
+	AttrCmdTable = map[string]func(msg redis.PMessage, attrRCPool *dmq.RedisCliPool) error{
+		dmq.RedisNotifySet: processAttrCreateOrUpdate,
+		dmq.RedisNotifyDel: processAttrDelete,
 	}
 
 	DataNodeCmdTable = map[string]func(data *etcd.Response) error{
@@ -76,12 +74,18 @@ func extractAttrFromSubVal(subval string) (*Attribute, error) {
 	return attr, nil
 }
 
-func processAttrCreate(data *etcd.Response) error {
-	cliId, attrName := dmq.ExtractInfoFromSubKey(data.Node.Key)
-	if cliId == "" || attrName == "" {
-		return fmt.Errorf("invalid attr craete notify key: %s", data.Node.Key)
+func processAttrCreateOrUpdate(data redis.PMessage, attrRCPool *dmq.RedisCliPool) error {
+	subkey := dmq.IdxSepString(data.Channel, ":", -1)
+	cliIdHexStr, attrName := dmq.ExtractInfoFromSubKey(subkey)
+	if cliIdHexStr == "" || attrName == "" {
+		return fmt.Errorf("invalid attr create or update notify key: %s", subkey)
 	}
-	attr, err := extractAttrFromSubVal(data.Node.Value)
+
+	attrVal, err := dmq.RedisKVGet(attrRCPool, subkey)
+	if err != nil {
+		return err
+	}
+	attr, err := extractAttrFromSubVal(attrVal)
 	if err != nil {
 		return err
 	}
@@ -92,12 +96,13 @@ func processAttrCreate(data *etcd.Response) error {
 		return nil
 	}
 
-	cid, err := hex.DecodeString(cliId)
+	cid, err := hex.DecodeString(cliIdHexStr)
 	if err != nil {
-		return fmt.Errorf("invalid client id: %s", cliId)
+		return fmt.Errorf("invalid client id: %s", cliIdHexStr)
 	}
 	cidstr := string(cid)
-	if _, ok := ClisInfo[cidstr]; !ok {
+
+	if scInfo, ok := ClisInfo[cidstr]; !ok {
 		ClisInfo[cidstr] = &SubCliInfo{
 			Cid:     cid,
 			CidHash: dmq.GenHash(cid, Config.HashFunc),
@@ -106,112 +111,53 @@ func processAttrCreate(data *etcd.Response) error {
 		}
 		ClisInfo[cidstr].Attrs = append(ClisInfo[cidstr].Attrs, attr)
 	} else {
-		// Iterate each attribute and make up a new attribute pair with the new
-		// attrbute and insert it into corresponding AttrIndex.
+		isNewAttr := true
 		for _, subattr := range ClisInfo[cidstr].Attrs {
-			xattr, yattr := AttrSort(subattr, attr)
-			cname := AttrNameCombine(xattr.name, yattr.name)
-			if aidx, ok := AttrIdxesMap[cname]; !ok {
-				return fmt.Errorf("attribute combine name %s not found", cname)
-			} else {
-				xmin, xmax, ymin, ymax := attrRangeFilter(xattr, yattr)
-				ival := aidx.InsertCliAttr(
-					xmin, xmax, ymin, ymax, &ClisInfo[cidstr].Cid)
-				ClisInfo[cidstr].Intval[cname] = ival
-			}
-
-			log.Debug("attr combine %s-%s", xattr.name, yattr.name)
-		}
-		ClisInfo[cidstr].Attrs = append(ClisInfo[cidstr].Attrs, attr)
-	}
-
-	return nil
-}
-
-func processAttrUpdate(data *etcd.Response) error {
-	cliId, attrName := dmq.ExtractInfoFromSubKey(data.Node.Key)
-	if cliId == "" || attrName == "" {
-		return fmt.Errorf("invalid attr craete notify key: %s", data.Node.Key)
-	}
-	attr, err := extractAttrFromSubVal(data.Node.Value)
-	if err != nil {
-		return err
-	}
-	attr.name = attrName
-
-	if int(attr.use) == dmq.AttrUseField[dmq.AttrUseStr] {
-		if ts, err := strconv.ParseInt(attr.strval, 10, 0); err != nil {
-			return err
-		} else {
-			now := time.Now().UnixNano()
-			latency := now - ts
-			log.Debug("recv attr strval update with latency: %d", latency)
-		}
-		return nil
-	}
-
-	// TODO: support more attribute expression besides 'range'
-	if int(attr.use) != dmq.AttrUseField[dmq.AttrUseRange] {
-		return nil
-	}
-
-	hasUpdate := false
-	cid, err := hex.DecodeString(cliId)
-	if err != nil {
-		return fmt.Errorf("invalid client id: %s", cliId)
-	}
-	cidstr := string(cid)
-	if scInfo, ok := ClisInfo[cidstr]; !ok {
-		return fmt.Errorf("client with id: %s not exists", cliId)
-	} else {
-		for _, oldAttr := range scInfo.Attrs {
-			if oldAttr.name == attr.name && oldAttr.use == attr.use {
-				if oldAttr.low != attr.low {
-					oldAttr.low = attr.low
-					hasUpdate = true
-				}
-				if oldAttr.high != attr.high {
-					oldAttr.high = attr.high
-					hasUpdate = true
-				}
+			if subattr.name == attr.name {
+				isNewAttr = false
 				break
 			}
 		}
-
-		if hasUpdate {
-			// find all attribute name combination
-			for _, existAttr := range scInfo.Attrs {
-				if existAttr.name != attr.name {
-					cname := AttrNameCombine(existAttr.name, attr.name)
-					if aidx, ok := AttrIdxesMap[cname]; !ok {
-						log.Error(
-							"cname %s not found in AttrIdxesMap for subcli %s",
-							cname, cliId)
-					} else {
-						aidx.InsertWaitUpdate(cidstr)
-					}
+		if isNewAttr {
+			// Iterate each attribute and make up a new attribute pair with the
+			// new attrbute and insert it into corresponding AttrIndex.
+			for _, subattr := range scInfo.Attrs {
+				xattr, yattr := AttrSort(subattr, attr)
+				cname := AttrNameCombine(xattr.name, yattr.name)
+				if aidx, ok := AttrIdxesMap[cname]; !ok {
+					return fmt.Errorf("attribute combine name %s not found", cname)
+				} else {
+					xmin, xmax, ymin, ymax := attrRangeFilter(xattr, yattr)
+					ival := aidx.InsertCliAttr(
+						xmin, xmax, ymin, ymax, &scInfo.Cid)
+					scInfo.Intval[cname] = ival
 				}
+
+				log.Debug("attr combine %s-%s", xattr.name, yattr.name)
 			}
+			scInfo.Attrs = append(scInfo.Attrs, attr)
+		} else {
+			scInfo.AttrUpdate(attr)
 		}
 	}
 
 	return nil
 }
 
-func processAttrDelete(data *etcd.Response) error {
-	// if attrName is empty, we will delete all this client's subscription info.
-	cliId, attrName := dmq.ExtractInfoFromDelKey(data.Node.Key)
-	if cliId == "" {
-		return fmt.Errorf("invalid attr delete notify key: %s", data.Node.Key)
+func processAttrDelete(data redis.PMessage, attrRCPool *dmq.RedisCliPool) error {
+	subkey := dmq.IdxSepString(data.Channel, ":", -1)
+	cliIdHexStr, attrName := dmq.ExtractInfoFromSubKey(subkey)
+	if cliIdHexStr == "" || attrName == "" {
+		return fmt.Errorf("invalid attr create or update notify key: %s", subkey)
 	}
 
-	cid, err := hex.DecodeString(cliId)
+	cid, err := hex.DecodeString(cliIdHexStr)
 	if err != nil {
-		return fmt.Errorf("invalid client id: %s", cliId)
+		return fmt.Errorf("invalid client id: %s", cliIdHexStr)
 	}
 	cidstr := string(cid)
 	if _, ok := ClisInfo[cidstr]; !ok {
-		return fmt.Errorf("client not exists: %s", cliId)
+		return fmt.Errorf("client not exists: %s", cliIdHexStr)
 	} else {
 		// remove attrName from Attrs of this subclient, if attrName is empty,
 		// remove all the attrs.
@@ -254,42 +200,61 @@ func processAttrDelete(data *etcd.Response) error {
 	return nil
 }
 
-func processAttrNotify(data *etcd.Response) error {
-	log.Debug("recv notify: %s %v", data.Action, data.Node)
-
-	if cmd, ok := AttrCmdTable[data.Action]; !ok {
-		return fmt.Errorf("action %s not support", data.Action)
+func processAttrNotify(msg redis.PMessage, attrRCPool *dmq.RedisCliPool) error {
+	if cmd, ok := AttrCmdTable[string(msg.Data)]; !ok {
+		return fmt.Errorf("cmd %s not support", msg.Data)
 	} else {
-		return cmd(data)
+		return cmd(msg, attrRCPool)
 	}
 }
 
-func AttrWatcher(machines []string) {
-	receiver := make(chan *etcd.Response)
+func AttrProcesser(receiver chan redis.PMessage, stop chan bool, attrRCPool *dmq.RedisCliPool) {
+	for {
+		select {
+		case msg := <-receiver:
+			if err := processAttrNotify(msg, attrRCPool); err != nil {
+				log.Error("process attr notify with error: %v", err)
+			}
+		case <-stop:
+			return
+		}
+	}
+}
+
+func AttrWatcher(attrRCPool *dmq.RedisCliPool) {
+	receiver := make(chan redis.PMessage)
 	stop := make(chan bool)
 
-	c, _ := GetEtcdClient(machines)
+	go AttrProcesser(receiver, stop, attrRCPool)
 
-	prefix := dmq.GetSubAttrBase()
-	recursive := true
-	go c.Watch(prefix, 0, recursive, receiver, stop)
+	c := attrRCPool.GetConn()
+	if c == nil {
+		log.Error("failed to get redis connection")
+		return
+	}
+	defer c.Close()
+	psc := redis.PubSubConn{c}
+	psc.PSubscribe(dmq.RedisSubAttrPattern)
 
 RecvLoop:
 	for {
-		select {
-		case data := <-receiver:
-			if data == nil {
-				log.Warning("receive nil notification in attribute watcher")
-				break RecvLoop
-			}
-			if err := processAttrNotify(data); err != nil {
-				log.Error("process attr notify with error: %v", err)
-			}
+		switch v := psc.Receive().(type) {
+		case redis.PMessage:
+			log.Debug("redis notify pmessage channel: %s data: %s", v.Channel, v.Data)
+			receiver <- v
+		case redis.Subscription:
+			log.Debug("redis notify channel: %s kind: %s", v.Channel, v.Kind)
+		case redis.Message:
+			log.Debug("redis notify message channel: %s data: %s", v.Channel, v.Data)
+		case error:
+			log.Error("redis notify error: %v", v)
+			stop <- true
+			break RecvLoop
 		}
 	}
 
-	log.Info("restart attribute watcher with %v", machines)
-	go AttrWatcher(machines)
+	log.Info("restart attribute watcher...")
+	go AttrWatcher(attrRCPool)
 }
 
 func extractVnodeKey(val string) string {

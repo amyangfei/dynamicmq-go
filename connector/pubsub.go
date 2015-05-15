@@ -248,7 +248,7 @@ func processAuth(cli *SubClient, args []string) error {
 		return fmt.Errorf("auth failed")
 	}
 
-	if err := RegisterSubCli(RCPool, cli.id.Hex(), Config.NodeId); err != nil {
+	if err := RegisterSubCli(MetaRCPool, cli.id.Hex(), Config.NodeId); err != nil {
 		return err
 	}
 
@@ -342,12 +342,12 @@ func processSubscribe(cli *SubClient, args []string) error {
 			}
 		}
 		if isNewAttr {
-			if err := CreateSubAttr(cli, cli.attrs[name], Config, AttrEtcdCliPool); err != nil {
+			if err := CreateSubAttr(cli, cli.attrs[name], AttrRCPool); err != nil {
 				log.Error("create sub attr with error(%v)", err)
 			}
 			log.Debug("create sub attr %s %v", name, cli.attrs[name])
 		} else if update {
-			if err := UpdateSubAttr(cli, cli.attrs[name], Config, AttrEtcdCliPool); err != nil {
+			if err := UpdateSubAttr(cli, cli.attrs[name], AttrRCPool); err != nil {
 				log.Error("update sub attr with error(%v)", err)
 			}
 			log.Debug("update sub attr %s %v", name, cli.attrs[name])
@@ -467,10 +467,12 @@ func cleanSubCli(cli *SubClient) error {
 		}
 		cli = nil
 	}()
-	if err := RemoveSub(cli, Config, EtcdCliPool, AttrEtcdCliPool); err != nil {
+	// Remove all attributes in redis
+	if err := RemoveSubAttrs(cli, AttrRCPool); err != nil {
 		return err
 	}
-	if err := UnRegisterSubCli(RCPool, cli.id.Hex()); err != nil {
+	// Remove subcli info in redis
+	if err := UnRegisterSubCli(cli.id.Hex(), MetaRCPool); err != nil {
 		return err
 	}
 	return nil

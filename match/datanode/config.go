@@ -41,13 +41,13 @@ type SrvConfig struct {
 	Entrypoint    string
 
 	// etcd
-	EtcdMachines     []string
-	AttrEtcdMachines [][]string
-	EtcdPoolSize     int
-	EtcdPoolMaxSize  int
+	EtcdMachines    []string
+	EtcdPoolSize    int
+	EtcdPoolMaxSize int
 
 	// redis
-	RedisEndPoint    string
+	MetaRedisAddr    string
+	AttrRedisAddrs   []string
 	RedisIdleTimeout int // in second
 	RedisMaxIdle     int
 	RedisMaxActive   int

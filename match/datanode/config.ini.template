@@ -26,12 +26,12 @@ hash_bits = 160
 
 [etcd]
 machines = http://localhost:4001
-attr_machines = "http://localhost:4101"
 pool_size = 4
 max_pool_size = 64
 
 [redis]
-redis_endpoint = tcp@localhost:6379
+meta_redis_addr = tcp@localhost:6379
+attr_redis_addr = "tcp@localhost:6479"
 max_idle = 50
 max_active = 100
 timeout = 3600

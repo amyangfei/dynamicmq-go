@@ -95,8 +95,16 @@ func InitConfig(configFile string) error {
 	etcdFlagSet.Int("pool_size", 4, "initial etcd client pool size")
 	etcdFlagSet.Int("max_pool_size", 64, "max etcd client pool size")
 
+	redisFlagSet := flag.NewFlagSet("redis", flag.PanicOnError)
+	redisFlagSet.String("attr_redis_addr", "tcp@localhost:6479",
+		"attr redis address list. different group is filtered by ';'")
+	redisFlagSet.String("max_idle", "50", "redis pool max idle clients")
+	redisFlagSet.String("max_active", "100", "redis pool max active clients")
+	redisFlagSet.String("timeout", "3600", "close idle redis client after timeout")
+
 	globalconf.Register("basic", basicFlagSet)
 	globalconf.Register("etcd", etcdFlagSet)
+	globalconf.Register("redis", redisFlagSet)
 
 	conf.ParseAll()
 
@@ -128,17 +136,19 @@ func InitConfig(configFile string) error {
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
 	Config.EtcdMachines = strings.Split(machines, ",")
-	etcdMachGroup := strings.Split(etcdFlagSet.Lookup("attr_machines").Value.String(), ";")
-	attrEtcdMach := make([][]string, 0)
-	for _, emg := range etcdMachGroup {
-		attrEtcdMach = append(attrEtcdMach, strings.Split(emg, ";"))
-	}
-	Config.AttrEtcdMachines = attrEtcdMach
-
 	Config.EtcdPoolSize, err =
 		strconv.Atoi(etcdFlagSet.Lookup("pool_size").Value.String())
 	Config.EtcdPoolMaxSize, err =
 		strconv.Atoi(etcdFlagSet.Lookup("max_pool_size").Value.String())
+
+	attrAddrs := redisFlagSet.Lookup("attr_redis_addr").Value.String()
+	Config.AttrRedisAddrs = strings.Split(attrAddrs, ";")
+	Config.RedisMaxIdle, err =
+		strconv.Atoi(redisFlagSet.Lookup("max_idle").Value.String())
+	Config.RedisMaxActive, err =
+		strconv.Atoi(redisFlagSet.Lookup("max_active").Value.String())
+	Config.RedisIdleTimeout, err =
+		strconv.Atoi(redisFlagSet.Lookup("timeout").Value.String())
 
 	return nil
 }
@@ -190,11 +200,21 @@ func ShutdownServer() {
 	os.Exit(0)
 }
 
-func NotifyService() {
-	for _, machines := range Config.AttrEtcdMachines {
-		go AttrWatcher(machines)
-	}
+func NotifyService() error {
 	go DataNodeWatcher(Config.EtcdMachines)
+
+	for _, attrRedisAddr := range Config.AttrRedisAddrs {
+		rcfg := dmq.NewRedisConfig(attrRedisAddr, Config.RedisMaxIdle,
+			Config.RedisMaxActive, Config.RedisIdleTimeout)
+		rcpool, err := dmq.NewRedisCliPool(rcfg)
+		if err != nil {
+			return err
+		}
+
+		go AttrWatcher(rcpool)
+	}
+
+	return nil
 }
 
 func AttrUpdateFlushService() {
@@ -237,7 +257,9 @@ func main() {
 		panic(err)
 	}
 
-	NotifyService()
+	if err := NotifyService(); err != nil {
+		panic(err)
+	}
 
 	AttrUpdateFlushService()
 

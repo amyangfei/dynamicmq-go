@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
+	"strings"
 )
 
 var LogLevelMap = map[string]logging.Level{
@@ -38,6 +39,20 @@ func ProcessInit(dir, pidFile string) error {
 		return err
 	}
 	return nil
+}
+
+// first split input string 's' with separator 'sep',
+// then return the idx's string segemnt
+// if the expected string segemnt doesn't exist, return ""
+func IdxSepString(s, sep string, idx int) string {
+	sps := strings.Split(s, sep)
+	if idx < 0 {
+		idx = len(sps) + idx
+	}
+	if idx < 0 || idx >= len(sps) {
+		return ""
+	}
+	return sps[idx]
 }
 
 // extract clientid and attribute name of subscription

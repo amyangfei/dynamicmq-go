@@ -23,8 +23,13 @@ type SrvConfig struct {
 	FlushTimeout   int
 
 	// etcd
-	EtcdMachines     []string
-	AttrEtcdMachines [][]string
-	EtcdPoolSize     int
-	EtcdPoolMaxSize  int
+	EtcdMachines    []string
+	EtcdPoolSize    int
+	EtcdPoolMaxSize int
+
+	// redis
+	AttrRedisAddrs   []string
+	RedisIdleTimeout int // in second
+	RedisMaxIdle     int
+	RedisMaxActive   int
 }

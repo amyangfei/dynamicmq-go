@@ -22,8 +22,8 @@ var Config *SrvConfig
 // Etcd client pool
 var EtcdCliPool *dmq.EtcdClientPool
 
-// Redis client pool
-var RCPool *dmq.RedisCliPool
+// Meta redis client pool
+var MetaRCPool *dmq.RedisCliPool
 
 // common log
 var log = logging.MustGetLogger("dynamicmq-match-datanode")
@@ -102,13 +102,13 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 
 	etcdFlagSet := flag.NewFlagSet("etcd", flag.PanicOnError)
 	etcdFlagSet.String("machines", "http://localhost:4001", "etcd machines")
-	etcdFlagSet.String("attr_machines", "http://localhost:4101",
-		"attr etcd machine list, same cluster is filtered by ',', different group is filtered by ';'")
 	etcdFlagSet.Int("pool_size", 4, "initial etcd client pool size")
 	etcdFlagSet.Int("max_pool_size", 64, "max etcd client pool size")
 
 	redisFlagSet := flag.NewFlagSet("redis", flag.PanicOnError)
-	redisFlagSet.String("redis_endpoint", "localhost:6379", "redis endpoint")
+	redisFlagSet.String("meta_redis_addr", "tcp@localhost:6379", "meta redis address")
+	redisFlagSet.String("attr_redis_addr", "tcp@localhost:6479",
+		"attr redis address list. different group is filtered by ';'")
 	redisFlagSet.String("max_idle", "50", "redis pool max idle clients")
 	redisFlagSet.String("max_active", "100", "redis pool max active clients")
 	redisFlagSet.String("timeout", "3600", "close idle redis client after timeout")
@@ -162,18 +162,14 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
 	Config.EtcdMachines = strings.Split(machines, ",")
-	etcdMachGroup := strings.Split(etcdFlagSet.Lookup("attr_machines").Value.String(), ";")
-	attrEtcdMach := make([][]string, 0)
-	for _, emg := range etcdMachGroup {
-		attrEtcdMach = append(attrEtcdMach, strings.Split(emg, ";"))
-	}
-	Config.AttrEtcdMachines = attrEtcdMach
 	Config.EtcdPoolSize, err =
 		strconv.Atoi(etcdFlagSet.Lookup("pool_size").Value.String())
 	Config.EtcdPoolMaxSize, err =
 		strconv.Atoi(etcdFlagSet.Lookup("max_pool_size").Value.String())
 
-	Config.RedisEndPoint = redisFlagSet.Lookup("redis_endpoint").Value.String()
+	Config.MetaRedisAddr = redisFlagSet.Lookup("meta_redis_addr").Value.String()
+	attrAddrs := redisFlagSet.Lookup("attr_redis_addr").Value.String()
+	Config.AttrRedisAddrs = strings.Split(attrAddrs, ";")
 	Config.RedisMaxIdle, err =
 		strconv.Atoi(redisFlagSet.Lookup("max_idle").Value.String())
 	Config.RedisMaxActive, err =
@@ -234,9 +230,9 @@ func InitServer() error {
 		return err
 	}
 
-	rcfg := dmq.NewRedisConfig(Config.RedisEndPoint, Config.RedisMaxIdle,
+	rcfg := dmq.NewRedisConfig(Config.MetaRedisAddr, Config.RedisMaxIdle,
 		Config.RedisMaxActive, Config.RedisIdleTimeout)
-	RCPool, err = dmq.NewRedisCliPool(rcfg)
+	MetaRCPool, err = dmq.NewRedisCliPool(rcfg)
 	if err != nil {
 		return err
 	}
@@ -308,10 +304,18 @@ func StartChordNode() error {
 	return nil
 }
 
-func NotifyService() {
-	for _, machines := range Config.AttrEtcdMachines {
-		go AttrWatcher(machines)
+func NotifyService() error {
+	for _, attrRedisAddr := range Config.AttrRedisAddrs {
+		rcfg := dmq.NewRedisConfig(attrRedisAddr, Config.RedisMaxIdle,
+			Config.RedisMaxActive, Config.RedisIdleTimeout)
+		rcpool, err := dmq.NewRedisCliPool(rcfg)
+		if err != nil {
+			return err
+		}
+
+		go AttrWatcher(rcpool)
 	}
+	return nil
 }
 
 func main() {
@@ -359,7 +363,9 @@ func main() {
 		panic(err)
 	}
 
-	NotifyService()
+	if err := NotifyService(); err != nil {
+		panic(err)
+	}
 
 	StartPubTCP(Config.BindAddr)
 

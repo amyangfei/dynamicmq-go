@@ -279,3 +279,36 @@ func ProcessAttrUpdateFlush(lastUpdate int64) int64 {
 
 	return updateTs
 }
+
+func (scInfo *SubCliInfo) AttrUpdate(attr *Attribute) {
+	hasUpdate := false
+	for _, oldAttr := range scInfo.Attrs {
+		if oldAttr.name == attr.name && oldAttr.use == attr.use {
+			if oldAttr.low != attr.low {
+				oldAttr.low = attr.low
+				hasUpdate = true
+			}
+			if oldAttr.high != attr.high {
+				oldAttr.high = attr.high
+				hasUpdate = true
+			}
+			break
+		}
+	}
+
+	if hasUpdate {
+		// find all attribute name combination
+		for _, existAttr := range scInfo.Attrs {
+			if existAttr.name != attr.name {
+				cname := AttrNameCombine(existAttr.name, attr.name)
+				if aidx, ok := AttrIdxesMap[cname]; !ok {
+					log.Error(
+						"cname %s not found in AttrIdxesMap for subcli %s",
+						cname, hex.EncodeToString(scInfo.Cid))
+				} else {
+					aidx.InsertWaitUpdate(string(scInfo.Cid))
+				}
+			}
+		}
+	}
+}

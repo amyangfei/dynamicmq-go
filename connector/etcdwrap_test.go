@@ -1,11 +1,8 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
-	"gopkg.in/mgo.v2/bson"
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -110,87 +107,4 @@ func TestUpdateEtcd(t *testing.T) {
 	if err := UnregisterEtcd(cfg, ecpool); err != nil {
 		t.Errorf("UnregisterEtcd error(%v)", err)
 	}
-}
-
-func TestUpdateAttr(t *testing.T) {
-	cfg := fakeSrvConfig()
-	cli := &SubClient{
-		id: bson.NewObjectId(),
-	}
-	attr := &Attribute{
-		name:   "test_attr",
-		use:    byte(dmq.AttrUseField["strval"]),
-		strval: "test app",
-	}
-	attrKey := dmq.GetSubAttrKey(cli.id.Hex(), attr.name)
-
-	if err := RegisterSub(cli, cfg, ecpool); err != nil {
-		t.Errorf("Failed to register subclient: %v", err)
-	}
-
-	if err := CreateSubAttr(cli, attr, cfg, ecpool); err != nil {
-		t.Errorf("Failed to create subscriber attribute %v: %v", attr, err)
-	}
-
-	if err := UpdateSubAttr(cli, attr, cfg, ecpool); err != nil {
-		t.Errorf("Failed to update subscriber attribute %v: %v", attr, err)
-	}
-
-	if resp, err := GetSubAttr(cli, attr.name, cfg, ecpool); err != nil {
-		t.Errorf("Failed to get subscriber attribute: %s", attrKey)
-	} else {
-		jsonData := make(map[string]interface{})
-		if err := json.Unmarshal([]byte(resp), &jsonData); err != nil {
-			t.Errorf("Failed to Unmarshal: %s", resp)
-		}
-
-		if use, ok := jsonData["use"].(float64); !ok {
-			t.Errorf("use field with error type: %v", reflect.TypeOf(jsonData["use"]))
-		} else {
-			if FloatCompare(use, float64(attr.use)) != 0 {
-				t.Errorf("use field doesn't equal to original: %f", use)
-			}
-		}
-
-		if jsonData["strval"] != attr.strval {
-			t.Errorf("strval field doesn't equal to original: %s", jsonData["strval"])
-		}
-	}
-
-	attr = &Attribute{
-		name: "range_test",
-		use:  byte(dmq.AttrUseField["range"]),
-		low:  12.3,
-		high: 21.7,
-	}
-	if err := CreateSubAttr(cli, attr, cfg, ecpool); err != nil {
-		t.Errorf("Failed to create subscriber attribute %v: %v", attr, err)
-	}
-	if err := UpdateSubAttr(cli, attr, cfg, ecpool); err != nil {
-		t.Errorf("Failed to update subscriber attribute: %v", attr)
-	}
-	if resp, err := GetSubAttr(cli, attr.name, cfg, ecpool); err != nil {
-		t.Errorf("Failed to get subscriber attribute: %s", attrKey)
-	} else {
-		jsonData := make(map[string]interface{})
-		if err := json.Unmarshal([]byte(resp), &jsonData); err != nil {
-			t.Errorf("Failed to Unmarshal: %s", resp)
-		}
-
-		if use, ok := jsonData["use"].(float64); !ok {
-			t.Errorf("use field with error type: %v", reflect.TypeOf(jsonData["use"]))
-		} else {
-			if FloatCompare(use, float64(attr.use)) != 0 {
-				t.Errorf("use field doesn't equal to original: %f", use)
-			}
-		}
-
-		if low, ok := jsonData["low"].(float64); !ok {
-			t.Errorf("low field with error type: %v", reflect.TypeOf(jsonData["low"]))
-		} else if FloatCompare(low, attr.low) != 0 {
-			t.Errorf("low field doesn't equal to original: %f", low)
-		}
-	}
-
-	RemoveSub(cli, cfg, ecpool, attrpool)
 }

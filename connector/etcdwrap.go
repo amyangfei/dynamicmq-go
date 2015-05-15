@@ -117,6 +117,7 @@ func GetConnInfo(cfg *SrvConfig, pool *dmq.EtcdClientPool) (*etcd.Response, erro
 	return c.Get(infoKey, false, true)
 }
 
+/*
 func RegisterSub(cli *SubClient, cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
 	ec, err := pool.GetEtcdClient()
 	if err != nil {
@@ -219,3 +220,4 @@ func RemoveSub(cli *SubClient, cfg *SrvConfig, pool, attrPool *dmq.EtcdClientPoo
 
 	return nil
 }
+*/
