@@ -71,13 +71,17 @@ func NewRedisCliPool(cfg *RedisConfig) (*RedisCliPool, error) {
 }
 
 func GetSubConnId(rc *RedisCliPool, scId string) (string, error) {
+	subconnKey := GetSubConnKey(scId)
+	return RedisKVGet(rc, subconnKey)
+}
+
+func RedisKVGet(rc *RedisCliPool, key string) (string, error) {
 	conn := rc.GetConn()
 	if conn == nil {
 		return "", RedisNoConnErr
 	}
 	defer conn.Close()
 
-	subconnKey := GetSubConnKey(scId)
-	r, err := conn.Do("GET", subconnKey)
+	r, err := conn.Do("GET", key)
 	return redis.String(r, err)
 }

@@ -50,6 +50,17 @@ const (
 	EtcdActionExpire           = "expire"
 )
 
+// Action name mapping of redis notification
+const (
+	RedisNotifySet = "set"
+	RedisNotifyDel = "del"
+)
+
+// attribute notification channel pattern in redis
+const (
+	RedisSubAttrPattern = "__keyspace*__:/sub/attr/*"
+)
+
 var (
 	ConnectorNodeIdSize  = 8
 	DispatcherNodeIdSize = 8
