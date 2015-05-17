@@ -1,0 +1,31 @@
+language: go
+
+go:
+    - 1.4
+
+before_install:
+    - wget https://github.com/coreos/etcd/releases/download/v2.0.11/etcd-v2.0.11-linux-amd64.tar.gz -O /tmp/etcd-v2.0.11-linux-amd64.tar.gz
+    - tar -xzvf /tmp/etcd-v2.0.11-linux-amd64.tar.gz
+    - export PATH=$PATH:$PWD/etcd-v2.0.11-linux-amd64
+    - wget https://dl.bintray.com/mitchellh/serf/0.6.4_linux_amd64.zip -O /tmp/0.6.4_linux_amd64.zip
+    - unzip /tmp/0.6.4_linux_amd64.zip
+    - sudo cp serf /usr/local/bin/serf
+
+install:
+    - ./script/install_deps.sh -y
+    - ./script/control.sh build all
+
+before_script:
+    - mkdir -p /tmp/redis6379
+    - cd /tmp/redis6379
+    - redis-server &
+    - mkdir -p /tmp/redis6479
+    - cd /tmp/redis6479
+    - redis-server --port 6479 &
+    - mkdir -p /tmp/etcd
+    - cd /tmp/etcd
+    - etcd &
+    - cd ${TRAVIS_BUILD_DIR}
+
+script:
+    - ./test

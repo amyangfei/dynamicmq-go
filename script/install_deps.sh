@@ -1,6 +1,10 @@
 #!/bin/bash
 
 check_install_local() {
+    if [ "$1" = "-y" ]; then
+        use_local=true
+        return
+    fi
     read -r -p "Install dynamicmq-go local dependency from local? [y/N] " response
     case $response in
         [yY][eE][sS]|[yY])
@@ -23,7 +27,15 @@ install_remote_dep() {
 }
 
 install_local_dep() {
-    if [ "$use_local" = true ]; then
+    if [ "$TRAVIS" = true ]; then
+        cd $HOME/gopath/src/github.com/amyangfei/dynamicmq-go/dynamicmq
+        go install
+        cd $HOME/gopath/src/github.com/amyangfei/dynamicmq-go/sdk
+        go install
+        cd $HOME/gopath/src/github.com/amyangfei/dynamicmq-go/chord
+        go install
+        cd ${TRAVIS_BUILD_DIR}
+    elif [ "$use_local" = true ]; then
         cur=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
         bash +x $cur/dev_deps_update.sh
     else
