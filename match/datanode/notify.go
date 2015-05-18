@@ -213,7 +213,7 @@ func AttrWatcher(attrRCPool *dmq.RedisCliPool) {
 		return
 	}
 	defer c.Close()
-	psc := redis.PubSubConn{c}
+	psc := redis.PubSubConn{Conn: c}
 	psc.PSubscribe("__keyspace*__:/sub/attr/*")
 
 RecvLoop:

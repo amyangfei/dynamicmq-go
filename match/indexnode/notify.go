@@ -233,7 +233,7 @@ func AttrWatcher(attrRCPool *dmq.RedisCliPool) {
 		return
 	}
 	defer c.Close()
-	psc := redis.PubSubConn{c}
+	psc := redis.PubSubConn{Conn: c}
 	psc.PSubscribe(dmq.RedisSubAttrPattern)
 
 RecvLoop:
