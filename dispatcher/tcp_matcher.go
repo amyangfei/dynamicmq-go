@@ -187,8 +187,6 @@ func processReadbuf(cli *MatchClient, buf []byte) error {
 			return ProcessLater
 		}
 	}
-	cli.processEnd = 0
-	return nil
 }
 
 func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {

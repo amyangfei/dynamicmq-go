@@ -247,8 +247,6 @@ func processReadbuf(cli *IdxNodeClient, buf []byte) error {
 			return ProcessLater
 		}
 	}
-	cli.processEnd = 0
-	return nil
 }
 
 func validatePushMsg(msg *DecodedMsg) error {
