@@ -23,16 +23,6 @@ start_etcd() {
         --listen-peer-urls 'http://localhost:2380,http://localhost:7001' \
         >>../etcd_meta.log 2>&1 &
     echo $! > ../etcd_meta.pid
-
-    if [ ! -d "$wdir/etcd_attr" ]; then
-        mkdir -p $wdir/etcd_attr
-    fi
-    cd $wdir/etcd_attr
-    echo "starting attr etcd..."
-    $etcd_bin --listen-client-urls 'http://localhost:2479,http://localhost:4101' \
-        --listen-peer-urls 'http://localhost:2480,http://localhost:7101' \
-        >>../etcd_attr.log 2>&1 &
-    echo $! > ../etcd_attr.pid
 }
 
 start_redis() {
