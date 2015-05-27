@@ -14,34 +14,39 @@ import (
 	"syscall"
 )
 
+// Server basic config
 var Config *SrvConfig
 
+// mapping from subcli's ID to its SubClient struct
 var SubcliTable map[bson.ObjectId]*SubClient
 
+// etcd client pool
 var EtcdCliPool *dmq.EtcdClientPool
 
+// meta redis client pool
 var MetaRCPool *dmq.RedisCliPool
 
+// attr redis client pool
 var AttrRCPool *dmq.RedisCliPool
 
 var log = logging.MustGetLogger("dynamicmq-connector")
 
-// InitSignal register signals handler.
-func InitSignal() chan os.Signal {
+// initSignal register signals handler.
+func initSignal() chan os.Signal {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM,
 		syscall.SIGINT, syscall.SIGSTOP)
 	return c
 }
 
-func HandleSignal(c chan os.Signal) {
+func handleSignal(c chan os.Signal) {
 	// Block until a signal is received.
 	for {
 		s := <-c
 		log.Info("get a signal %s", s.String())
 		switch s {
 		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGSTOP, syscall.SIGINT:
-			ShutdownServer()
+			shutdownServer()
 			return
 		case syscall.SIGHUP:
 			// TODO reload
@@ -51,7 +56,7 @@ func HandleSignal(c chan os.Signal) {
 	}
 }
 
-func InitConfig(configFile string) error {
+func initConfig(configFile string) error {
 	conf, err := globalconf.NewWithOptions(&globalconf.Options{
 		Filename: configFile,
 	})
@@ -98,8 +103,8 @@ func InitConfig(configFile string) error {
 
 	Config = &SrvConfig{}
 
-	Config.NodeId = serverFlagSet.Lookup("node_id").Value.String()
-	Config.BindIp = serverFlagSet.Lookup("bind_ip").Value.String()
+	Config.NodeID = serverFlagSet.Lookup("node_id").Value.String()
+	Config.BindIP = serverFlagSet.Lookup("bind_ip").Value.String()
 	Config.SubTCPBind = serverFlagSet.Lookup("sub_tcp_bind").Value.String()
 	Config.RouterTCPBind = serverFlagSet.Lookup("router_tcp_bind").Value.String()
 	Config.AuthSrvAddr = serverFlagSet.Lookup("auth_srv_addr").Value.String()
@@ -125,11 +130,11 @@ func InitConfig(configFile string) error {
 
 	Config.MetaRedisAddr = redisFlagSet.Lookup("meta_redis_addr").Value.String()
 	Config.AttrRedisAddr = redisFlagSet.Lookup("attr_redis_addr").Value.String()
-	Config.RedisMaxIdle, err =
+	Config.RedisMaxIDle, err =
 		strconv.Atoi(redisFlagSet.Lookup("max_idle").Value.String())
 	Config.RedisMaxActive, err =
 		strconv.Atoi(redisFlagSet.Lookup("max_active").Value.String())
-	Config.RedisIdleTimeout, err =
+	Config.RedisIDleTimeout, err =
 		strconv.Atoi(redisFlagSet.Lookup("timeout").Value.String())
 
 	machines := etcdFlagSet.Lookup("machines").Value.String()
@@ -142,7 +147,7 @@ func InitConfig(configFile string) error {
 	return nil
 }
 
-func InitLog(logFile, logLevel string) error {
+func initLog(logFile, logLevel string) error {
 	var format = logging.MustStringFormatter(
 		"%{time:2006-01-02 15:04:05.000} [%{level:.4s}] %{id:03x} [%{shortfunc}] %{message}",
 	)
@@ -161,16 +166,16 @@ func InitLog(logFile, logLevel string) error {
 	return nil
 }
 
-func InitServer() error {
+func initServer() error {
 	var err error
-	rcfg := dmq.NewRedisConfig(Config.MetaRedisAddr, Config.RedisMaxIdle,
-		Config.RedisMaxActive, Config.RedisIdleTimeout)
+	rcfg := dmq.NewRedisConfig(Config.MetaRedisAddr, Config.RedisMaxIDle,
+		Config.RedisMaxActive, Config.RedisIDleTimeout)
 	MetaRCPool, err = dmq.NewRedisCliPool(rcfg)
 	if err != nil {
 		return err
 	}
-	attrcfg := dmq.NewRedisConfig(Config.AttrRedisAddr, Config.RedisMaxIdle,
-		Config.RedisMaxActive, Config.RedisIdleTimeout)
+	attrcfg := dmq.NewRedisConfig(Config.AttrRedisAddr, Config.RedisMaxIDle,
+		Config.RedisMaxActive, Config.RedisIDleTimeout)
 	AttrRCPool, err = dmq.NewRedisCliPool(attrcfg)
 	if err != nil {
 		return err
@@ -184,8 +189,8 @@ func InitServer() error {
 	return nil
 }
 
-func ShutdownServer() {
-	if err := UnregisterEtcd(Config, EtcdCliPool); err != nil {
+func shutdownServer() {
+	if err := unRegisterEtcd(Config, EtcdCliPool); err != nil {
 		panic(err)
 	}
 }
@@ -204,7 +209,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err := InitConfig(configFile); err != nil {
+	if err := initConfig(configFile); err != nil {
 		panic(err)
 	}
 
@@ -212,28 +217,28 @@ func main() {
 		panic(err)
 	}
 
-	if err := InitLog(Config.LogFile, Config.LogLevel); err != nil {
+	if err := initLog(Config.LogFile, Config.LogLevel); err != nil {
 		panic(err)
 	}
 
-	if err := InitServer(); err != nil {
+	if err := initServer(); err != nil {
 		panic(err)
 	}
 
-	if err := StartSubTCP(Config.SubTCPBind); err != nil {
+	if err := startSubTCP(Config.SubTCPBind); err != nil {
 		panic(err)
 	}
 
-	if err := StartRouter(Config.RouterTCPBind); err != nil {
+	if err := startRouter(Config.RouterTCPBind); err != nil {
 		panic(err)
 	}
 
-	if err := RegisterEtcd(Config, EtcdCliPool); err != nil {
+	if err := registerEtcd(Config, EtcdCliPool); err != nil {
 		panic(err)
 	}
 
-	signalChan := InitSignal()
-	HandleSignal(signalChan)
+	signalChan := initSignal()
+	handleSignal(signalChan)
 
 	log.Info("connector stop")
 }

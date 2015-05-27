@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func RegisterEtcd(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
+func registerEtcd(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
 	ec, err := pool.GetEtcdClient()
 	if err != nil {
 		return err
@@ -21,13 +21,13 @@ func RegisterEtcd(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
 	routes := strings.Split(cfg.RouterTCPBind, ":")
 	routePort := routes[len(routes)-1]
 	info := map[string]string{
-		dmq.ConnSubAddr:   fmt.Sprintf("%s:%s", cfg.BindIp, subPort),
-		dmq.ConnRouteAddr: fmt.Sprintf("%s:%s", cfg.BindIp, routePort),
+		dmq.ConnSubAddr:   fmt.Sprintf("%s:%s", cfg.BindIP, subPort),
+		dmq.ConnRouteAddr: fmt.Sprintf("%s:%s", cfg.BindIP, routePort),
 		dmq.ConnCapacity:  fmt.Sprintf("%d", cfg.Capacity),
 		dmq.ConnLoad:      "0",
 		dmq.ConnStatus:    "new",
 	}
-	baseKey := dmq.GetInfoKey(dmq.EtcdConnectorType, cfg.NodeId)
+	baseKey := dmq.GetInfoKey(dmq.EtcdConnectorType, cfg.NodeID)
 	for k, v := range info {
 		_, err := c.Set(fmt.Sprintf("%s/%s", baseKey, k), v, 0)
 		if err != nil {
@@ -36,7 +36,7 @@ func RegisterEtcd(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
 		}
 	}
 
-	if err := RegisterWaiting(cfg, pool); err != nil {
+	if err := registerWaiting(cfg, pool); err != nil {
 		c.Delete(baseKey, true)
 		return err
 	}
@@ -44,7 +44,7 @@ func RegisterEtcd(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
 	return nil
 }
 
-func UnregisterEtcd(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
+func unRegisterEtcd(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
 	ec, err := pool.GetEtcdClient()
 	if err != nil {
 		return err
@@ -52,17 +52,17 @@ func UnregisterEtcd(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
 	defer pool.RecycleEtcdClient(ec.Id)
 	c := ec.Cli
 
-	infoKey := dmq.GetInfoKey(dmq.EtcdConnectorType, cfg.NodeId)
+	infoKey := dmq.GetInfoKey(dmq.EtcdConnectorType, cfg.NodeID)
 	c.Delete(infoKey, true)
 
-	if err := UnregisterWaiting(cfg, pool); err != nil {
+	if err := unRegisterWaiting(cfg, pool); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func RegisterWaiting(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
+func registerWaiting(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
 	ec, err := pool.GetEtcdClient()
 	if err != nil {
 		return err
@@ -70,21 +70,21 @@ func RegisterWaiting(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
 	defer pool.RecycleEtcdClient(ec.Id)
 	c := ec.Cli
 
-	l := dmq.GetWaitingLockMgr(c, cfg.NodeId)
+	l := dmq.GetWaitingLockMgr(c, cfg.NodeID)
 	_, err = l.Acquire(true)
 	defer l.Release()
 	if err != nil {
 		return err
-	} else {
-		// register connector to etcd connector waiting list
-		if err := dmq.RegisterConnToWaiting(c, cfg.NodeId); err != nil {
-			return err
-		}
 	}
+	// register connector to etcd connector waiting list
+	if err := dmq.RegisterConnToWaiting(c, cfg.NodeID); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func UnregisterWaiting(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
+func unRegisterWaiting(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
 	ec, err := pool.GetEtcdClient()
 	if err != nil {
 		return err
@@ -92,20 +92,20 @@ func UnregisterWaiting(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
 	defer pool.RecycleEtcdClient(ec.Id)
 	c := ec.Cli
 
-	l := dmq.GetWaitingLockMgr(c, cfg.NodeId)
+	l := dmq.GetWaitingLockMgr(c, cfg.NodeID)
 	_, err = l.Acquire(true)
 	defer l.Release()
 	if err != nil {
 		return err
-	} else {
-		// unregister connector from waiting list
-		dmq.UnregisterConnToWaiting(c, cfg.NodeId)
 	}
+	// unregister connector from waiting list
+	dmq.UnregisterConnToWaiting(c, cfg.NodeID)
+
 	return nil
 }
 
-func GetConnInfo(cfg *SrvConfig, pool *dmq.EtcdClientPool) (*etcd.Response, error) {
-	infoKey := dmq.GetInfoKey(dmq.EtcdConnectorType, cfg.NodeId)
+func getConnInfo(cfg *SrvConfig, pool *dmq.EtcdClientPool) (*etcd.Response, error) {
+	infoKey := dmq.GetInfoKey(dmq.EtcdConnectorType, cfg.NodeID)
 
 	ec, err := pool.GetEtcdClient()
 	if err != nil {
@@ -127,15 +127,15 @@ func RegisterSub(cli *SubClient, cfg *SrvConfig, pool *dmq.EtcdClientPool) error
 	c := ec.Cli
 
 	subConnKey := dmq.GetSubConnKey(cli.id.Hex())
-	if _, err := c.Set(subConnKey, cfg.NodeId, 0); err != nil {
+	if _, err := c.Set(subConnKey, cfg.NodeID, 0); err != nil {
 		return err
 	}
 	return nil
 }
 
 // UpdateSubAttr succeeds only if the given key does not yet exists.
-func CreateSubAttr(cli *SubClient, attr *Attribute, cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
-	key := dmq.GetSubAttrKey(cli.id.Hex(), attr.name)
+func createSubAttr(cli *SubClient, attr *Attribute, cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
+	key := dmq.getSubAttrKey(cli.id.Hex(), attr.name)
 	jsonStr, err := AttrMarshal(attr)
 	if err != nil {
 		return err
@@ -154,7 +154,7 @@ func CreateSubAttr(cli *SubClient, attr *Attribute, cfg *SrvConfig, pool *dmq.Et
 
 // UpdateSubAttr succeeds only if the given key already exists.
 func UpdateSubAttr(cli *SubClient, attr *Attribute, cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
-	key := dmq.GetSubAttrKey(cli.id.Hex(), attr.name)
+	key := dmq.getSubAttrKey(cli.id.Hex(), attr.name)
 	jsonStr, err := AttrMarshal(attr)
 	if err != nil {
 		return err
@@ -171,8 +171,8 @@ func UpdateSubAttr(cli *SubClient, attr *Attribute, cfg *SrvConfig, pool *dmq.Et
 	return err
 }
 
-func GetSubAttr(cli *SubClient, attrname string, cfg *SrvConfig, pool *dmq.EtcdClientPool) (string, error) {
-	key := dmq.GetSubAttrKey(cli.id.Hex(), attrname)
+func getSubAttr(cli *SubClient, attrname string, cfg *SrvConfig, pool *dmq.EtcdClientPool) (string, error) {
+	key := dmq.getSubAttrKey(cli.id.Hex(), attrname)
 
 	ec, err := pool.GetEtcdClient()
 	if err != nil {
@@ -188,8 +188,8 @@ func GetSubAttr(cli *SubClient, attrname string, cfg *SrvConfig, pool *dmq.EtcdC
 	}
 }
 
-func RemoveSubAttr(cli *SubClient, attrname string, cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
-	key := dmq.GetSubAttrKey(cli.id.Hex(), attrname)
+func removeSubAttr(cli *SubClient, attrname string, cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
+	key := dmq.getSubAttrKey(cli.id.Hex(), attrname)
 
 	ec, err := pool.GetEtcdClient()
 	if err != nil {
@@ -209,10 +209,10 @@ func RemoveSub(cli *SubClient, cfg *SrvConfig, pool, attrPool *dmq.EtcdClientPoo
 	if err != nil {
 		return err
 	}
-	defer attrPool.RecycleEtcdClient(attrEc.Id)
+	defer attrPool.RecycleEtcdClient(attrEc.ID)
 	attrC := attrEc.Cli
 
-	attrKey := dmq.GetSubAttrCliBase(cli.id.Hex())
+	attrKey := dmq.getSubAttrCliBase(cli.id.Hex())
 
 	if _, err := attrC.Delete(attrKey, true); err != nil {
 		return err

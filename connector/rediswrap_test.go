@@ -28,31 +28,31 @@ func testRedisConfig() *dmq.RedisConfig {
 }
 
 func TestRedisCRUD(t *testing.T) {
-	var testConnId string = "conn0123"
-	var testCliId string = "507f191e810c19729de860ea"
+	testConnID := "conn0123"
+	testCliID := "507f191e810c19729de860ea"
 
 	iterTime := 100
 	for i := 0; i < iterTime; i++ {
-		if err := RegisterSubCli(rcpool, testCliId, testConnId); err != nil {
-			t.Errorf("failed to RegisterSubCli: %v", err)
+		if err := registerSubCli(rcpool, testCliID, testConnID); err != nil {
+			t.Errorf("failed to registerSubCli: %v", err)
 		}
 	}
 
-	if r, err := dmq.GetSubConnId(rcpool, testCliId); err != nil {
+	if r, err := dmq.GetSubConnId(rcpool, testCliID); err != nil {
 		t.Errorf("failed to GetSubConn: %v", err)
 	} else {
-		if r != testConnId {
-			t.Errorf("get conn nodeid %s expected %s", r, testConnId)
+		if r != testConnID {
+			t.Errorf("get conn nodeid %s expected %s", r, testConnID)
 		}
 	}
 
-	if err := UnRegisterSubCli(testCliId, rcpool); err != nil {
-		t.Errorf("failed to UnRegisterSubCli: %v", err)
+	if err := unRegisterSubCli(testCliID, rcpool); err != nil {
+		t.Errorf("failed to unRegisterSubCli: %v", err)
 	}
 }
 
 func TestAttrOper(t *testing.T) {
-	var testConnId string = "conn0123"
+	testConnID := "conn0123"
 
 	cli := &SubClient{
 		id:    bson.NewObjectId(),
@@ -66,11 +66,11 @@ func TestAttrOper(t *testing.T) {
 	cli.attrs[attr.name] = attr
 	attrKey := dmq.GetSubAttrKey(cli.id.Hex(), attr.name)
 
-	if err := RegisterSubCli(rcpool, cli.id.Hex(), testConnId); err != nil {
+	if err := registerSubCli(rcpool, cli.id.Hex(), testConnID); err != nil {
 		t.Errorf("Failed to register subclient: %v", err)
 	}
 
-	if err := CreateSubAttr(cli, attr, rcpool); err != nil {
+	if err := createSubAttr(cli, attr, rcpool); err != nil {
 		t.Errorf("Failed to create subscriber attribute %v: %v", attr, err)
 	}
 
@@ -78,7 +78,7 @@ func TestAttrOper(t *testing.T) {
 		t.Errorf("Failed to update subscriber attribute %v: %v", attr, err)
 	}
 
-	if resp, err := GetSubAttr(cli, attr.name, rcpool); err != nil {
+	if resp, err := getSubAttr(cli, attr.name, rcpool); err != nil {
 		t.Errorf("Failed to get subscriber attribute: %s", attrKey)
 	} else {
 		jsonData := make(map[string]interface{})
@@ -89,7 +89,7 @@ func TestAttrOper(t *testing.T) {
 		if use, ok := jsonData["use"].(float64); !ok {
 			t.Errorf("use field with error type: %v", reflect.TypeOf(jsonData["use"]))
 		} else {
-			if FloatCompare(use, float64(attr.use)) != 0 {
+			if floatCompare(use, float64(attr.use)) != 0 {
 				t.Errorf("use field doesn't equal to original: %f", use)
 			}
 		}
@@ -106,13 +106,13 @@ func TestAttrOper(t *testing.T) {
 		high: 21.7,
 	}
 	cli.attrs[attr.name] = attr
-	if err := CreateSubAttr(cli, attr, rcpool); err != nil {
+	if err := createSubAttr(cli, attr, rcpool); err != nil {
 		t.Errorf("Failed to create subscriber attribute %v: %v", attr, err)
 	}
 	if err := UpdateSubAttr(cli, attr, rcpool); err != nil {
 		t.Errorf("Failed to update subscriber attribute: %v", attr)
 	}
-	if resp, err := GetSubAttr(cli, attr.name, rcpool); err != nil {
+	if resp, err := getSubAttr(cli, attr.name, rcpool); err != nil {
 		t.Errorf("Failed to get subscriber attribute: %s", attrKey)
 	} else {
 		jsonData := make(map[string]interface{})
@@ -123,21 +123,21 @@ func TestAttrOper(t *testing.T) {
 		if use, ok := jsonData["use"].(float64); !ok {
 			t.Errorf("use field with error type: %v", reflect.TypeOf(jsonData["use"]))
 		} else {
-			if FloatCompare(use, float64(attr.use)) != 0 {
+			if floatCompare(use, float64(attr.use)) != 0 {
 				t.Errorf("use field doesn't equal to original: %f", use)
 			}
 		}
 
 		if low, ok := jsonData["low"].(float64); !ok {
 			t.Errorf("low field with error type: %v", reflect.TypeOf(jsonData["low"]))
-		} else if FloatCompare(low, attr.low) != 0 {
+		} else if floatCompare(low, attr.low) != 0 {
 			t.Errorf("low field doesn't equal to original: %f", low)
 		}
 	}
 
-	RemoveSubAttrs(cli, rcpool)
+	removeSubAttrs(cli, rcpool)
 
-	if err := UnRegisterSubCli(cli.id.Hex(), rcpool); err != nil {
-		t.Errorf("failed to UnRegisterSubCli: %v", err)
+	if err := unRegisterSubCli(cli.id.Hex(), rcpool); err != nil {
+		t.Errorf("failed to unRegisterSubCli: %v", err)
 	}
 }

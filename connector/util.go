@@ -7,8 +7,9 @@ import (
 	"math"
 )
 
-var FloatMinDiff = 0.00001
+var floatMinDiff = 0.00001
 
+// MsgPack converts a dict to binary message in a resp like format
 func MsgPack(msg map[string]interface{}) ([]byte, error) {
 	bmsg, err := json.Marshal(msg)
 	if err != nil {
@@ -21,14 +22,14 @@ func MsgPack(msg map[string]interface{}) ([]byte, error) {
 	return bmsg, nil
 }
 
-func AddReplyMultiBulk(target *[]byte, cnts []string) {
+func addReplyMultiBulk(target *[]byte, cnts []string) {
 	addReply(target, fmt.Sprintf("*%d%s", len(cnts), dmq.Crlf))
 	for _, cnt := range cnts {
-		AddReplyBulk(target, cnt)
+		addReplyBulk(target, cnt)
 	}
 }
 
-func AddReplyBulk(target *[]byte, cnt string) {
+func addReplyBulk(target *[]byte, cnt string) {
 	addReplyBulklen(target, cnt)
 	addReply(target, cnt)
 	addReply(target, dmq.Crlf)
@@ -43,19 +44,18 @@ func addReply(target *[]byte, cnt string) {
 	*target = append(*target, []byte(cnt)...)
 }
 
-func FloatCompare(a, b float64) int {
-	var diff float64 = a - b
-	if math.Abs(diff) < FloatMinDiff {
+func floatCompare(a, b float64) int {
+	diff := a - b
+	if math.Abs(diff) < floatMinDiff {
 		return 0
 	}
 	if diff > 0 {
 		return 1
-	} else {
-		return -1
 	}
+	return -1
 }
 
-// TODO: attribute discretization
+// AttrMarshal converts an attribute to json format byte array
 func AttrMarshal(attr *Attribute) ([]byte, error) {
 	data := map[string]interface{}{
 		"use": attr.use,

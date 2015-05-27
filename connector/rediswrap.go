@@ -7,34 +7,34 @@ import (
 )
 
 var (
-	RedisSetnxNotSet = 0
+	redisSetnxNotSet = 0
 )
 
-func RegisterSubCli(rc *dmq.RedisCliPool, scId, connId string) error {
+func registerSubCli(rc *dmq.RedisCliPool, scID, connID string) error {
 	conn := rc.GetConn()
 	if conn == nil {
 		return dmq.RedisNoConnErr
 	}
 	defer conn.Close()
 
-	subconnKey := dmq.GetSubConnKey(scId)
+	subconnKey := dmq.GetSubConnKey(scID)
 	// FIXME: thread-safe issuse
 	// ref: http://godoc.org/github.com/garyburd/redigo/redis#hdr-Concurrency
-	if _, err := conn.Do("SET", subconnKey, connId); err != nil {
+	if _, err := conn.Do("SET", subconnKey, connID); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func UnRegisterSubCli(scId string, rc *dmq.RedisCliPool) error {
+func unRegisterSubCli(scID string, rc *dmq.RedisCliPool) error {
 	conn := rc.GetConn()
 	if conn == nil {
 		return dmq.RedisNoConnErr
 	}
 	defer conn.Close()
 
-	subconnKey := dmq.GetSubConnKey(scId)
+	subconnKey := dmq.GetSubConnKey(scID)
 	// FIXME: thread-safe issuse
 	// ref: http://godoc.org/github.com/garyburd/redigo/redis#hdr-Concurrency
 	if _, err := conn.Do("DEL", subconnKey); err != nil {
@@ -44,7 +44,7 @@ func UnRegisterSubCli(scId string, rc *dmq.RedisCliPool) error {
 	return nil
 }
 
-func CreateSubAttr(cli *SubClient, attr *Attribute, rc *dmq.RedisCliPool) error {
+func createSubAttr(cli *SubClient, attr *Attribute, rc *dmq.RedisCliPool) error {
 	key := dmq.GetSubAttrKey(cli.id.Hex(), attr.name)
 	jsonStr, err := AttrMarshal(attr)
 	if err != nil {
@@ -61,7 +61,7 @@ func CreateSubAttr(cli *SubClient, attr *Attribute, rc *dmq.RedisCliPool) error 
 	if err != nil {
 		return err
 	}
-	if r == RedisSetnxNotSet {
+	if r == redisSetnxNotSet {
 		return fmt.Errorf("attribute %s already exists", attr.name)
 	}
 
@@ -89,7 +89,7 @@ func UpdateSubAttr(cli *SubClient, attr *Attribute, rc *dmq.RedisCliPool) error 
 	return nil
 }
 
-func GetSubAttr(cli *SubClient, attrname string, rc *dmq.RedisCliPool) (string, error) {
+func getSubAttr(cli *SubClient, attrname string, rc *dmq.RedisCliPool) (string, error) {
 	conn := rc.GetConn()
 	if conn == nil {
 		return "", dmq.RedisNoConnErr
@@ -97,14 +97,11 @@ func GetSubAttr(cli *SubClient, attrname string, rc *dmq.RedisCliPool) (string, 
 	defer conn.Close()
 
 	key := dmq.GetSubAttrKey(cli.id.Hex(), attrname)
-	if resp, err := conn.Do("GET", key); err != nil {
-		return "", err
-	} else {
-		return redis.String(resp, err)
-	}
+	resp, err := conn.Do("GET", key)
+	return redis.String(resp, err)
 }
 
-func RemoveSubAttr(cli *SubClient, attrname string, rc *dmq.RedisCliPool) error {
+func removeSubAttr(cli *SubClient, attrname string, rc *dmq.RedisCliPool) error {
 	conn := rc.GetConn()
 	if conn == nil {
 		return dmq.RedisNoConnErr
@@ -119,7 +116,7 @@ func RemoveSubAttr(cli *SubClient, attrname string, rc *dmq.RedisCliPool) error 
 	return nil
 }
 
-func RemoveSubAttrs(cli *SubClient, rc *dmq.RedisCliPool) error {
+func removeSubAttrs(cli *SubClient, rc *dmq.RedisCliPool) error {
 	conn := rc.GetConn()
 	if conn == nil {
 		return dmq.RedisNoConnErr
@@ -127,7 +124,7 @@ func RemoveSubAttrs(cli *SubClient, rc *dmq.RedisCliPool) error {
 	defer conn.Close()
 
 	conn.Send("MULTI")
-	for attrName, _ := range cli.attrs {
+	for attrName := range cli.attrs {
 		key := dmq.GetSubAttrKey(cli.id.Hex(), attrName)
 		conn.Send("DEL", key)
 	}

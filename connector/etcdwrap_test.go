@@ -18,7 +18,7 @@ func init() {
 
 func fakeSrvConfig() *SrvConfig {
 	cfg := &SrvConfig{
-		NodeId:           "conn0101",
+		NodeID:           "conn0101",
 		SubTCPBind:       "localhost:7253",
 		RouterTCPBind:    "localhost:7255",
 		Capacity:         12345,
@@ -30,10 +30,10 @@ func fakeSrvConfig() *SrvConfig {
 
 func TestRegisterEtcd(t *testing.T) {
 	cfg := fakeSrvConfig()
-	if err := RegisterEtcd(cfg, ecpool); err != nil {
-		t.Errorf("RegisterEtcd error(%v)", err)
+	if err := registerEtcd(cfg, ecpool); err != nil {
+		t.Errorf("registerEtcd error(%v)", err)
 	}
-	if resp, err := GetConnInfo(cfg, ecpool); err != nil {
+	if resp, err := getConnInfo(cfg, ecpool); err != nil {
 		t.Errorf("Get connector info error(%v)", err)
 	} else {
 		if !resp.Node.Dir {
@@ -46,13 +46,13 @@ func TestRegisterEtcd(t *testing.T) {
 				case dmq.ConnSubAddr:
 					bind := strings.Split(cfg.SubTCPBind, ":")
 					subPort := bind[len(bind)-1]
-					if node.Value != fmt.Sprintf("%s:%s", cfg.BindIp, subPort) {
+					if node.Value != fmt.Sprintf("%s:%s", cfg.BindIP, subPort) {
 						t.Errorf("value error %s != %s", node.Value, cfg.SubTCPBind)
 					}
 				case dmq.ConnRouteAddr:
 					bind := strings.Split(cfg.RouterTCPBind, ":")
 					routePort := bind[len(bind)-1]
-					if node.Value != fmt.Sprintf("%s:%s", cfg.BindIp, routePort) {
+					if node.Value != fmt.Sprintf("%s:%s", cfg.BindIP, routePort) {
 						t.Errorf("value error %s != %s", node.Value, cfg.RouterTCPBind)
 					}
 				case dmq.ConnCapacity:
@@ -65,18 +65,18 @@ func TestRegisterEtcd(t *testing.T) {
 	}
 }
 
-func TestUnregisterEtcd(t *testing.T) {
+func TestUnRegisterEtcd(t *testing.T) {
 	cfg := fakeSrvConfig()
-	if err := UnregisterEtcd(cfg, ecpool); err != nil {
-		t.Errorf("UnregisterEtcd error(%v)", err)
+	if err := unRegisterEtcd(cfg, ecpool); err != nil {
+		t.Errorf("unRegisterEtcd error(%v)", err)
 	}
 }
 
 func TestUpdateEtcd(t *testing.T) {
 	cfg := fakeSrvConfig()
 
-	if err := RegisterEtcd(cfg, ecpool); err != nil {
-		t.Errorf("RegisterEtcd error(%v)", err)
+	if err := registerEtcd(cfg, ecpool); err != nil {
+		t.Errorf("registerEtcd error(%v)", err)
 		return
 	}
 
@@ -88,7 +88,7 @@ func TestUpdateEtcd(t *testing.T) {
 	defer ecpool.RecycleEtcdClient(ec.Id)
 	c := ec.Cli
 
-	loadKey := fmt.Sprintf("%s/%s", dmq.GetInfoKey(dmq.EtcdConnectorType, cfg.NodeId), dmq.ConnLoad)
+	loadKey := fmt.Sprintf("%s/%s", dmq.GetInfoKey(dmq.EtcdConnectorType, cfg.NodeID), dmq.ConnLoad)
 	for i := 0; i < 100; i++ {
 		resp, err := c.Get(loadKey, false, false)
 		if err != nil {
@@ -104,7 +104,7 @@ func TestUpdateEtcd(t *testing.T) {
 		c.Update(loadKey, fmt.Sprintf("%d", load+1), 0)
 	}
 
-	if err := UnregisterEtcd(cfg, ecpool); err != nil {
-		t.Errorf("UnregisterEtcd error(%v)", err)
+	if err := unRegisterEtcd(cfg, ecpool); err != nil {
+		t.Errorf("unRegisterEtcd error(%v)", err)
 	}
 }

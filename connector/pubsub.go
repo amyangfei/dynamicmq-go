@@ -18,6 +18,7 @@ import (
 	"time"
 )
 
+// Attribute struct
 type Attribute struct {
 	name   string
 	use    byte
@@ -27,6 +28,7 @@ type Attribute struct {
 	extra  string
 }
 
+// SubClient manages a subscriber's connection
 type SubClient struct {
 	id         bson.ObjectId // used as client identity in internal system
 	token      bson.ObjectId // used as client identity in external system
@@ -39,33 +41,30 @@ type SubClient struct {
 }
 
 var (
-	SubcliIsPending int = 0x01
-	SubcliIsAuthed  int = 0x02
-	SubcliIsDisable int = 0x04
+	subCliIsPending = 0x01
+	subCliIsAuthed  = 0x02
+	subCliIsDisable = 0x04
 )
 
 var (
 	// hearbeat reply
-	HeartbeatReply = []byte("+h" + dmq.Crlf)
+	heartbeatReply = []byte("+h" + dmq.Crlf)
 
 	// auth success reply
-	AuthSuccessReply = []byte("+authsuccess" + dmq.Crlf)
+	authSuccessReply = []byte("+authsuccess" + dmq.Crlf)
 
 	// command error reply
-	WrongCmdReply = []byte("-command error" + dmq.Crlf)
+	wrongCmdReply = []byte("-command error" + dmq.Crlf)
 )
 
 var (
-	ErrProtocol = errors.New("cmd format error")
+	errProtocol = errors.New("cmd format error")
 
-	// default expire for a subscribe client 15 min
-	DfltExpire int64 = 15 * 60
-
-	PendingExpire int64 = 10
+	pendingExpire int64 = 10
 )
 
 var (
-	CmdTable = map[string]func(c *SubClient, args []string) error{
+	cmdTable = map[string]func(c *SubClient, args []string) error{
 		// TODO: add register command
 		"auth": processAuth,
 		"sub":  processSubscribe,
@@ -73,7 +72,7 @@ var (
 	}
 )
 
-func StartSubTCP(bind string) error {
+func startSubTCP(bind string) error {
 	log.Info("start tcp listening: %s", bind)
 	go tcpListen(bind)
 	return nil
@@ -128,7 +127,7 @@ func tcpListen(bind string) {
 			id:         bson.NewObjectId(),
 			expire:     time.Now().Unix() + int64(Config.SubKeepalive),
 			conn:       conn,
-			status:     SubcliIsPending,
+			status:     subCliIsPending,
 			processBuf: make([]byte, Config.TCPRecvBufSize*2),
 			processEnd: 0,
 			attrs:      make(map[string]*Attribute, 0),
@@ -141,9 +140,9 @@ func tcpListen(bind string) {
 }
 
 func setSubTimeout(cli *SubClient) error {
-	var timeout time.Time = time.Now()
-	if cli.status&SubcliIsPending > 0 {
-		timeout = timeout.Add(time.Second * time.Duration(PendingExpire))
+	timeout := time.Now()
+	if cli.status&subCliIsPending > 0 {
+		timeout = timeout.Add(time.Second * time.Duration(pendingExpire))
 	} else {
 		timeout = timeout.Add(time.Second * time.Duration(Config.SubKeepalive))
 	}
@@ -172,7 +171,7 @@ func handleTCPConn(cli *SubClient, rc chan *bufio.Reader) {
 			}
 		} else {
 			err := processReadbuf(cli, cli.processBuf[:cli.processEnd+rlen])
-			if err != nil && err != ProcessLater {
+			if err != nil && err != errProcessLater {
 				log.Error("process conn readbuf error(%v)", err)
 				break
 			}
@@ -199,7 +198,7 @@ func processAuth(cli *SubClient, args []string) error {
 		return commonErr
 	}
 
-	client_id, ok := authData["client_id"]
+	clientID, ok := authData["client_id"]
 	if !ok {
 		log.Error("client_id not found")
 		return commonErr
@@ -215,14 +214,14 @@ func processAuth(cli *SubClient, args []string) error {
 		return commonErr
 	}
 
-	authUrl := fmt.Sprintf("http://%s/conn/sub/auth", Config.AuthSrvAddr)
+	authURL := fmt.Sprintf("http://%s/conn/sub/auth", Config.AuthSrvAddr)
 	postData := url.Values{}
-	postData.Add("client_id", client_id)
+	postData.Add("client_id", clientID)
 	postData.Add("timestamp", timestamp)
 	postData.Add("token", token)
 
 	client := &http.Client{}
-	r, _ := http.NewRequest("POST", authUrl, bytes.NewBufferString(postData.Encode()))
+	r, _ := http.NewRequest("POST", authURL, bytes.NewBufferString(postData.Encode()))
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	r.Header.Add("Content-Length", strconv.Itoa(len(postData.Encode())))
 
@@ -248,22 +247,22 @@ func processAuth(cli *SubClient, args []string) error {
 		return fmt.Errorf("auth failed")
 	}
 
-	if err := RegisterSubCli(MetaRCPool, cli.id.Hex(), Config.NodeId); err != nil {
+	if err := registerSubCli(MetaRCPool, cli.id.Hex(), Config.NodeID); err != nil {
 		return err
 	}
 
-	cli.status &= ^SubcliIsPending
-	cli.status |= SubcliIsAuthed
+	cli.status &= ^subCliIsPending
+	cli.status |= subCliIsAuthed
 	log.Info("sub client %s auth successfully", cli.id.Hex())
 
-	cli.conn.Write(AuthSuccessReply)
+	cli.conn.Write(authSuccessReply)
 
 	return nil
 }
 
 func processHeartbeat(cli *SubClient, args []string) error {
 	log.Debug("receive subclient addr: %s heartbeat", cli.conn.RemoteAddr())
-	cli.conn.Write(HeartbeatReply)
+	cli.conn.Write(heartbeatReply)
 	return nil
 }
 
@@ -303,13 +302,13 @@ func processSubscribe(cli *SubClient, args []string) error {
 		// TODO: subscription attribute validation
 		switch int(useval) {
 		case dmq.AttrUseField["strval"]:
-			if strval, ok := data["strval"].(string); !ok {
+			strval, ok := data["strval"].(string)
+			if !ok {
 				return errors.New("invalid sub command, strval not found")
-			} else {
-				if strval != cli.attrs[name].strval {
-					cli.attrs[name].strval = strval
-					update = true
-				}
+			}
+			if strval != cli.attrs[name].strval {
+				cli.attrs[name].strval = strval
+				update = true
 			}
 		case dmq.AttrUseField["range"]:
 			low, ok := data["low"].(float64)
@@ -332,17 +331,17 @@ func processSubscribe(cli *SubClient, args []string) error {
 				update = true
 			}
 		case dmq.AttrUseField["extra"]:
-			if extra, ok := data["extra"].(string); !ok {
+			extra, ok := data["extra"].(string)
+			if !ok {
 				return errors.New("invalid sub command, extra not found")
-			} else {
-				if extra != cli.attrs[name].extra {
-					cli.attrs[name].extra = extra
-					update = true
-				}
+			}
+			if extra != cli.attrs[name].extra {
+				cli.attrs[name].extra = extra
+				update = true
 			}
 		}
 		if isNewAttr {
-			if err := CreateSubAttr(cli, cli.attrs[name], AttrRCPool); err != nil {
+			if err := createSubAttr(cli, cli.attrs[name], AttrRCPool); err != nil {
 				log.Error("create sub attr with error(%v)", err)
 			}
 			log.Debug("create sub attr %s %v", name, cli.attrs[name])
@@ -360,25 +359,24 @@ func processSubscribe(cli *SubClient, args []string) error {
 func processReadbuf(cli *SubClient, msg []byte) error {
 	pos := 0
 	for pos < len(msg) {
-		if args, err := parseCmd(msg, &pos); err != nil {
-			if err == ProcessLater {
+		args, err := parseCmd(msg, &pos)
+		if err != nil {
+			if err == errProcessLater {
 				cli.processEnd = len(msg) - pos
 				copy(msg[:cli.processEnd], msg[pos:])
-				return ProcessLater
-			} else {
-				log.Error("%v", err)
-				return ErrProtocol
+				return errProcessLater
 			}
-		} else {
-			if cmd, ok := CmdTable[args[0]]; !ok {
-				cli.conn.Write(WrongCmdReply)
-				log.Warning("client: %s sent unknown cmd: %s", cli.id, args[0])
-				return ErrProtocol
-			} else {
-				if err := cmd(cli, args); err != nil {
-					return err
-				}
-			}
+			log.Error("%v", err)
+			return errProtocol
+		}
+		cmd, ok := cmdTable[args[0]]
+		if !ok {
+			cli.conn.Write(wrongCmdReply)
+			log.Warning("client: %s sent unknown cmd: %s", cli.id, args[0])
+			return errProtocol
+		}
+		if err := cmd(cli, args); err != nil {
+			return err
 		}
 	}
 	cli.processEnd = 0
@@ -389,13 +387,13 @@ func processReadbuf(cli *SubClient, msg []byte) error {
 func parseCmd(msg []byte, pos *int) ([]string, error) {
 	packLen, err := parseSize(msg, pos, '#')
 	if err != nil {
-		// including ProcessLater error
+		// including errProcessLater error
 		return nil, err
 	}
 	if packLen > len(msg)-*pos {
 		// pos back of '#', packLen, '\r\n'
 		*pos -= (3 + len(fmt.Sprintf("%d", packLen)))
-		return nil, ProcessLater
+		return nil, errProcessLater
 	}
 
 	argNum, err := parseSize(msg, pos, '*')
@@ -424,38 +422,38 @@ func parseSize(msg []byte, pos *int, prefix uint8) (int, error) {
 	// msg may be in different bufio buffer, process later
 	// at most #[0-9]{4}\r\n, length=7
 	if prefix == '#' && len(msg)-*pos < 7 {
-		return 0, ProcessLater
+		return 0, errProcessLater
 	}
-	if i := bytes.IndexByte(msg[*pos:], '\n'); i < 0 {
+
+	i := bytes.IndexByte(msg[*pos:], '\n')
+	if i < 0 {
 		return 0, errors.New("\\n not found")
-	} else {
-		// at least '(prefix)[0-9a-zA-Z]+\r\n', length >= 4, i >= 3
-		if i <= 2 || msg[*pos] != prefix || msg[*pos+i-1] != '\r' {
-			return 0, errors.New("cmd header length part error")
-		}
-		cmdSize, err := strconv.Atoi(string(msg[*pos+1 : *pos+i-1]))
-		// skip '\r\n'
-		*pos += i + 1
-		if err != nil {
-			return 0, fmt.Errorf("parse cmd size error(%v)", err)
-		}
-		return cmdSize, nil
 	}
+	// at least '(prefix)[0-9a-zA-Z]+\r\n', length >= 4, i >= 3
+	if i <= 2 || msg[*pos] != prefix || msg[*pos+i-1] != '\r' {
+		return 0, errors.New("cmd header length part error")
+	}
+	cmdSize, err := strconv.Atoi(string(msg[*pos+1 : *pos+i-1]))
+	// skip '\r\n'
+	*pos += i + 1
+	if err != nil {
+		return 0, fmt.Errorf("parse cmd size error(%v)", err)
+	}
+	return cmdSize, nil
 }
 
 func parseData(msg []byte, pos *int, dataLen int) ([]byte, error) {
-	if i := bytes.IndexByte(msg[*pos:], '\n'); i < 0 {
+	i := bytes.IndexByte(msg[*pos:], '\n')
+	if i < 0 {
 		return nil, errors.New("\\n not found in sub protocol")
-	} else {
-		// check last \r\n
-		if i != dataLen+1 || msg[*pos+i-1] != '\r' {
-			return nil, errors.New("data in wrong length or no \\r")
-		} else {
-			// skip data and '\r\n'
-			*pos += dataLen + 2
-			return msg[*pos-dataLen-2 : *pos-2], nil
-		}
 	}
+	// check last \r\n
+	if i != dataLen+1 || msg[*pos+i-1] != '\r' {
+		return nil, errors.New("data in wrong length or no \\r")
+	}
+	// skip data and '\r\n'
+	*pos += dataLen + 2
+	return msg[*pos-dataLen-2 : *pos-2], nil
 }
 
 func cleanSubCli(cli *SubClient) error {
@@ -468,16 +466,18 @@ func cleanSubCli(cli *SubClient) error {
 		cli = nil
 	}()
 	// Remove all attributes in redis
-	if err := RemoveSubAttrs(cli, AttrRCPool); err != nil {
+	if err := removeSubAttrs(cli, AttrRCPool); err != nil {
 		return err
 	}
 	// Remove subcli info in redis
-	if err := UnRegisterSubCli(cli.id.Hex(), MetaRCPool); err != nil {
+	if err := unRegisterSubCli(cli.id.Hex(), MetaRCPool); err != nil {
 		return err
 	}
 	return nil
 }
 
+// SendMsg starts a new goroutine and send message to peer
+// TODO: goroutine pool
 func (cli *SubClient) SendMsg(msg []byte) {
 	go func() {
 		wlen, err := cli.conn.Write(msg)

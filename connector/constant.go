@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	ProcessLater = errors.New("process Later")
+	errProcessLater = errors.New("process Later")
 )
 
 // message type

@@ -1,9 +1,10 @@
 package main
 
+// SrvConfig is the main configuration for connector
 type SrvConfig struct {
 	// server config
-	NodeId         string
-	BindIp         string
+	NodeID         string
+	BindIP         string
 	SubTCPBind     string
 	RouterTCPBind  string
 	AuthSrvAddr    string
@@ -23,8 +24,8 @@ type SrvConfig struct {
 	// redis
 	MetaRedisAddr    string
 	AttrRedisAddr    string
-	RedisIdleTimeout int // in second
-	RedisMaxIdle     int
+	RedisIDleTimeout int // in second
+	RedisMaxIDle     int
 	RedisMaxActive   int
 
 	// etcd
