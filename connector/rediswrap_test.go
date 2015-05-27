@@ -38,7 +38,7 @@ func TestRedisCRUD(t *testing.T) {
 		}
 	}
 
-	if r, err := dmq.GetSubConnId(rcpool, testCliID); err != nil {
+	if r, err := dmq.GetSubConnID(rcpool, testCliID); err != nil {
 		t.Errorf("failed to GetSubConn: %v", err)
 	} else {
 		if r != testConnID {

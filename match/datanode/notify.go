@@ -104,7 +104,7 @@ func processAttrCreateOrUpdate(data redis.PMessage, attrRCPool *dmq.RedisCliPool
 	cidstr := string(cid)
 	if scInfo, ok := ClisInfo[cidstr]; !ok {
 		// create new sub client
-		connId, err := dmq.GetSubConnId(MetaRCPool, cliIdHexStr)
+		connId, err := dmq.GetSubConnID(MetaRCPool, cliIdHexStr)
 		if err != nil {
 			return err
 		}

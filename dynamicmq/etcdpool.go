@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// EtcdClientPool struct
 type EtcdClientPool struct {
 	size      int // current number of etcd clients
 	maxsize   int // max number of etcd clients
@@ -17,12 +18,14 @@ type EtcdClientPool struct {
 	usingClis map[int]*EtcdClient
 }
 
+// EtcdClient struct
 type EtcdClient struct {
 	Id      int
 	Cli     *etcd.Client
 	Lastuse int64
 }
 
+// NewEtcdClientPool inits a EtcdClientPool
 func NewEtcdClientPool(machines []string, size, maxsize int) *EtcdClientPool {
 	if size <= 0 {
 		size = 2
@@ -72,6 +75,7 @@ func (pool *EtcdClientPool) resize() error {
 	return nil
 }
 
+// GetEtcdClient tries to get an available EtcdClient
 func (pool *EtcdClientPool) GetEtcdClient() (*EtcdClient, error) {
 	pool.lock.Lock()
 	defer pool.lock.Unlock()
@@ -87,14 +91,17 @@ func (pool *EtcdClientPool) GetEtcdClient() (*EtcdClient, error) {
 	return cli, nil
 }
 
+// RecycleEtcdClient recycles a EtcdClient with ID of cid
 func (pool *EtcdClientPool) RecycleEtcdClient(cid int) error {
 	pool.lock.Lock()
 	defer pool.lock.Unlock()
-	if c, ok := pool.usingClis[cid]; !ok {
+
+	c, ok := pool.usingClis[cid]
+	if !ok {
 		return fmt.Errorf("EtcdClient id=%d not found", cid)
-	} else {
-		delete(pool.usingClis, cid)
-		pool.idleClis = append(pool.idleClis, c)
 	}
+	delete(pool.usingClis, cid)
+	pool.idleClis = append(pool.idleClis, c)
+
 	return nil
 }

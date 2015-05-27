@@ -6,59 +6,73 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
+// GetInfoBase returns the info base key for specific node type
 func GetInfoBase(connType string) string {
 	return fmt.Sprintf("/%s/info", connType)
 }
 
-func GetInfoKey(connType, nodeId string) string {
-	return fmt.Sprintf("/%s/info/%s", connType, nodeId)
+// GetInfoKey returns the info key for specific node
+func GetInfoKey(connType, nodeID string) string {
+	return fmt.Sprintf("/%s/info/%s", connType, nodeID)
 }
 
+// GetWaitingBase returns waiting key base
 func GetWaitingBase(nodeType string) string {
 	return fmt.Sprintf("/%s/waiting", nodeType)
 }
 
+// GetSubConnKey returns a subclient's corresponding connector's ID
 // TODO: migrate from etcd to redis
-func GetSubConnKey(clientId string) string {
-	return fmt.Sprintf("/%s/info/%s/conn_id", EtcdSubscriberType, clientId)
+func GetSubConnKey(clientID string) string {
+	return fmt.Sprintf("/%s/info/%s/conn_id", EtcdSubscriberType, clientID)
 }
 
+// GetSubAttrBase returns the key base for subclient's attribute
 func GetSubAttrBase() string {
 	return fmt.Sprintf("/%s/attr", EtcdSubscriberType)
 }
 
-func GetSubAttrCliBase(clientId string) string {
-	return fmt.Sprintf("%s/%s", GetSubAttrBase(), clientId)
+// GetSubAttrCliBase returns the subattr base for subclient
+func GetSubAttrCliBase(clientID string) string {
+	return fmt.Sprintf("%s/%s", GetSubAttrBase(), clientID)
 }
 
-func GetSubAttrKey(clientId, attrName string) string {
-	return fmt.Sprintf("%s/%s", GetSubAttrCliBase(clientId), attrName)
+// GetSubAttrKey returns the key for a specific attribute of a subclient
+func GetSubAttrKey(clientID, attrName string) string {
+	return fmt.Sprintf("%s/%s", GetSubAttrCliBase(clientID), attrName)
 }
 
+// GetIndexBaseDim returns the dimension key in etcd
 func GetIndexBaseDim() string {
 	return fmt.Sprintf("/%s/info/dimension", EtcdIndexInfoType)
 }
 
+// GetIndexBaseBound returns base key storing index bound
 func GetIndexBaseBound() string {
 	return fmt.Sprintf("/%s/info/bound", EtcdIndexInfoType)
 }
 
+// GetIndexBaseBoundKey returns the key storing a specific bound of one index
 func GetIndexBaseBoundKey(attrname, lowerOrUpper string) string {
 	return fmt.Sprintf("%s/%s/%s", GetIndexBaseBound(), attrname, lowerOrUpper)
 }
 
+// GetDataPNodeBase returns the datanode's pnode base key
 func GetDataPNodeBase() string {
 	return fmt.Sprintf("/%s/%s", EtcdDataNodeType, DataPnode)
 }
 
-func GetDataPNodeKey(nodeId string) string {
-	return fmt.Sprintf("%s/%s", GetDataPNodeBase(), nodeId)
+// GetDataPNodeKey returns a specific datanode's pnode key
+func GetDataPNodeKey(nodeID string) string {
+	return fmt.Sprintf("%s/%s", GetDataPNodeBase(), nodeID)
 }
 
+// GetDataVnodeKey returns the datanode's vnode base key
 func GetDataVnodeKey() string {
 	return fmt.Sprintf("/%s/%s", EtcdDataNodeType, DataVnode)
 }
 
+// GetWaitingLockMgr returns a sherlock.EtcdLock for waiting connector register
 func GetWaitingLockMgr(c *etcd.Client, owner string) *sherlock.EtcdLock {
 	l := sherlock.NewEtcdLock("WaitingConnector", c)
 	l.SetNamespace("lock")
@@ -66,8 +80,9 @@ func GetWaitingLockMgr(c *etcd.Client, owner string) *sherlock.EtcdLock {
 	return l
 }
 
-func RegisterConnToWaiting(c *etcd.Client, nodeId string) error {
-	waitKey := fmt.Sprintf("%s/%s", GetWaitingBase(EtcdConnectorType), nodeId)
+// RegisterConnToWaiting registers a connector's ID to waiting list in etcd
+func RegisterConnToWaiting(c *etcd.Client, nodeID string) error {
+	waitKey := fmt.Sprintf("%s/%s", GetWaitingBase(EtcdConnectorType), nodeID)
 	// check whether directory exists
 	if resp, err := c.Get(waitKey, false, false); err == nil {
 		if resp.Node.Dir {
@@ -81,19 +96,22 @@ func RegisterConnToWaiting(c *etcd.Client, nodeId string) error {
 	return nil
 }
 
-func UnregisterConnToWaiting(c *etcd.Client, nodeId string) error {
-	waitKey := fmt.Sprintf("%s/%s", GetWaitingBase(EtcdConnectorType), nodeId)
+// UnregisterConnToWaiting unregisters a connector's ID from waiting list
+func UnregisterConnToWaiting(c *etcd.Client, nodeID string) error {
+	waitKey := fmt.Sprintf("%s/%s", GetWaitingBase(EtcdConnectorType), nodeID)
 	_, err := c.DeleteDir(waitKey)
 	return err
 }
 
-// remove all subscription attribute index base infromation in etcd
+// RemoveAttrIndexBase removes all subscription attribute index base
+// information in etcd
 func RemoveAttrIndexBase(c *etcd.Client) error {
 	idxInfoKey := GetInfoBase(EtcdIndexInfoType)
 	_, err := c.Delete(idxInfoKey, true)
 	return err
 }
 
+// NewAttrIndexBase inits the subscription attribute base space
 func NewAttrIndexBase(c *etcd.Client, dim int, names []string, lower, upper []int) error {
 	if len(names) != dim {
 		return fmt.Errorf("invalid size of names")

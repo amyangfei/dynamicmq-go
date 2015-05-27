@@ -1,19 +1,20 @@
-// Derivatived from https://github.com/Terry-Mao/gopush-cluster
 package dynamicmq
+
+// Derivatived from https://github.com/Terry-Mao/gopush-cluster
 
 import (
 	"bufio"
 	"io"
 )
 
-// tcpBuf cache.
+// TcpBufCache struct
 type TcpBufCache struct {
 	instanceNum int
 	instance    []chan *bufio.Reader
 	round       int
 }
 
-// NewTCPBufCache returns a new TcpBuf cache.
+// NewTcpBufCache returns a new TcpBuf cache.
 func NewTcpBufCache(instanceNum, bufioNum int) *TcpBufCache {
 	inst := make([]chan *bufio.Reader, instanceNum)
 	for i := 0; i < instanceNum; i++ {
@@ -32,7 +33,8 @@ func (b *TcpBufCache) Get() chan *bufio.Reader {
 	return rc
 }
 
-// Get a Reader by chan, if chan is empty then allocate a new Reader.
+// NewBufioReader tries to get a Reader by chan,
+// if chan is empty then allocates a new Reader.
 func NewBufioReader(c chan *bufio.Reader, r io.Reader, bufsz int) *bufio.Reader {
 	select {
 	case p := <-c:
@@ -43,7 +45,7 @@ func NewBufioReader(c chan *bufio.Reader, r io.Reader, bufsz int) *bufio.Reader 
 	}
 }
 
-// recycle a Reader back to chan, if chan full discard it.
+// RecycleBufioReader recycles a Reader back to chan, if chan full discard it.
 func RecycleBufioReader(c chan *bufio.Reader, r *bufio.Reader) {
 	r.Reset(nil)
 	select {

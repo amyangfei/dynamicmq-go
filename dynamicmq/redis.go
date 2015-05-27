@@ -8,10 +8,12 @@ import (
 )
 
 var (
-	RedisProtoSep  = "@"
-	RedisNoConnErr = fmt.Errorf("failed to get a redis conn")
+	redisProtoSep = "@"
+	// ErrRedisNoConn represents for no available redis conn error
+	ErrRedisNoConn = fmt.Errorf("failed to get a redis conn")
 )
 
+// RedisConfig struct
 type RedisConfig struct {
 	Endpoint  string
 	MaxIdle   int
@@ -19,10 +21,12 @@ type RedisConfig struct {
 	Timeout   int
 }
 
+// RedisCliPool struct
 type RedisCliPool struct {
 	pool *redis.Pool
 }
 
+// NewRedisConfig returns a new RedisConfig
 func NewRedisConfig(endpoint string, idle, active, timeout int) *RedisConfig {
 	return &RedisConfig{
 		Endpoint:  endpoint,
@@ -32,15 +36,17 @@ func NewRedisConfig(endpoint string, idle, active, timeout int) *RedisConfig {
 	}
 }
 
+// GetConn returns an available redis.Conn from the given RedisCliPool
 func (rc *RedisCliPool) GetConn() redis.Conn {
 	// TODO: rc.pool.Get() returns errorConnection if error occurs,
 	// in this situation we should return nil
 	return rc.pool.Get()
 }
 
+// NewRedisCliPool inits a RedisCliPool based on a given RedisConfig
 func NewRedisCliPool(cfg *RedisConfig) (*RedisCliPool, error) {
 	// get protocol and address
-	pa := strings.Split(cfg.Endpoint, RedisProtoSep)
+	pa := strings.Split(cfg.Endpoint, redisProtoSep)
 	if len(pa) != 2 {
 		return nil, fmt.Errorf("error redis endpoint: %s", cfg.Endpoint)
 	}
@@ -70,15 +76,17 @@ func NewRedisCliPool(cfg *RedisConfig) (*RedisCliPool, error) {
 	return rcpool, nil
 }
 
-func GetSubConnId(rc *RedisCliPool, scId string) (string, error) {
-	subconnKey := GetSubConnKey(scId)
+// GetSubConnID gets the connecter id which is connected by subclient scID
+func GetSubConnID(rc *RedisCliPool, scID string) (string, error) {
+	subconnKey := GetSubConnKey(scID)
 	return RedisKVGet(rc, subconnKey)
 }
 
+// RedisKVGet gets the string value for key in redis
 func RedisKVGet(rc *RedisCliPool, key string) (string, error) {
 	conn := rc.GetConn()
 	if conn == nil {
-		return "", RedisNoConnErr
+		return "", ErrRedisNoConn
 	}
 	defer conn.Close()
 

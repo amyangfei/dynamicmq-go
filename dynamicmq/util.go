@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+// LogLevelMap maps from log level string to logging.Level
 var LogLevelMap = map[string]logging.Level{
 	"CRITICAL": logging.CRITICAL,
 	"ERROR":    logging.ERROR,
@@ -19,6 +20,7 @@ var LogLevelMap = map[string]logging.Level{
 	"DEBUG":    logging.DEBUG,
 }
 
+// PrintVersion prints the version of dynamicmq basic library
 func PrintVersion() {
 	fmt.Println("dynamicmq-go version", Version)
 }
@@ -28,7 +30,7 @@ const (
 	defaultGroup = "nobody"
 )
 
-// Init create pid file, set working dir
+// ProcessInit does the following work: create pid file, set working dir
 func ProcessInit(dir, pidFile string) error {
 	// change working dir
 	if err := os.Chdir(dir); err != nil {
@@ -41,8 +43,8 @@ func ProcessInit(dir, pidFile string) error {
 	return nil
 }
 
-// first split input string 's' with separator 'sep',
-// then return the idx's string segemnt
+// IdxSepString first splits input string 's' with separator 'sep',
+// then returns the idx's string segemnt
 // if the expected string segemnt doesn't exist, return ""
 func IdxSepString(s, sep string, idx int) string {
 	sps := strings.Split(s, sep)
@@ -55,7 +57,7 @@ func IdxSepString(s, sep string, idx int) string {
 	return sps[idx]
 }
 
-// extract clientid and attribute name of subscription
+// ExtractInfoFromSubKey extracts clientid and attribute name of subscription
 // e.g. extract 5528c41448a90c1c73000015 and zcoord from
 // "/sub/attr/5528c41448a90c1c73000015/zcoord"
 func ExtractInfoFromSubKey(subkey string) (string, string) {
@@ -65,12 +67,11 @@ func ExtractInfoFromSubKey(subkey string) (string, string) {
 	match := regex.FindStringSubmatch(subkey)
 	if len(match) != 3 {
 		return "", ""
-	} else {
-		return match[1], match[2]
 	}
+	return match[1], match[2]
 }
 
-// extract clientid and attribute name
+// ExtractInfoFromDelKey extracts clientid and attribute name
 // the attribute name could be empty if the client delete all its subscription
 // attribute from etcd directly.
 func ExtractInfoFromDelKey(delkey string) (string, string) {
@@ -85,14 +86,13 @@ func ExtractInfoFromDelKey(delkey string) (string, string) {
 		match2 := regex2.FindStringSubmatch(delkey)
 		if len(match2) != 2 {
 			return "", ""
-		} else {
-			return match2[1], ""
 		}
-	} else {
-		return match[1], match[2]
+		return match2[1], ""
 	}
+	return match[1], match[2]
 }
 
+// GenHash calculates the hash of 'origin' with hash function of hashfunc
 func GenHash(origin []byte, hashfunc func() hash.Hash) []byte {
 	hasher := hashfunc()
 	hasher.Write(origin)

@@ -13,7 +13,7 @@ var (
 func registerSubCli(rc *dmq.RedisCliPool, scID, connID string) error {
 	conn := rc.GetConn()
 	if conn == nil {
-		return dmq.RedisNoConnErr
+		return dmq.ErrRedisNoConn
 	}
 	defer conn.Close()
 
@@ -30,7 +30,7 @@ func registerSubCli(rc *dmq.RedisCliPool, scID, connID string) error {
 func unRegisterSubCli(scID string, rc *dmq.RedisCliPool) error {
 	conn := rc.GetConn()
 	if conn == nil {
-		return dmq.RedisNoConnErr
+		return dmq.ErrRedisNoConn
 	}
 	defer conn.Close()
 
@@ -53,7 +53,7 @@ func createSubAttr(cli *SubClient, attr *Attribute, rc *dmq.RedisCliPool) error 
 
 	conn := rc.GetConn()
 	if conn == nil {
-		return dmq.RedisNoConnErr
+		return dmq.ErrRedisNoConn
 	}
 	defer conn.Close()
 
@@ -78,7 +78,7 @@ func UpdateSubAttr(cli *SubClient, attr *Attribute, rc *dmq.RedisCliPool) error 
 
 	conn := rc.GetConn()
 	if conn == nil {
-		return dmq.RedisNoConnErr
+		return dmq.ErrRedisNoConn
 	}
 	defer conn.Close()
 
@@ -92,7 +92,7 @@ func UpdateSubAttr(cli *SubClient, attr *Attribute, rc *dmq.RedisCliPool) error 
 func getSubAttr(cli *SubClient, attrname string, rc *dmq.RedisCliPool) (string, error) {
 	conn := rc.GetConn()
 	if conn == nil {
-		return "", dmq.RedisNoConnErr
+		return "", dmq.ErrRedisNoConn
 	}
 	defer conn.Close()
 
@@ -104,7 +104,7 @@ func getSubAttr(cli *SubClient, attrname string, rc *dmq.RedisCliPool) (string, 
 func removeSubAttr(cli *SubClient, attrname string, rc *dmq.RedisCliPool) error {
 	conn := rc.GetConn()
 	if conn == nil {
-		return dmq.RedisNoConnErr
+		return dmq.ErrRedisNoConn
 	}
 	defer conn.Close()
 
@@ -119,7 +119,7 @@ func removeSubAttr(cli *SubClient, attrname string, rc *dmq.RedisCliPool) error 
 func removeSubAttrs(cli *SubClient, rc *dmq.RedisCliPool) error {
 	conn := rc.GetConn()
 	if conn == nil {
-		return dmq.RedisNoConnErr
+		return dmq.ErrRedisNoConn
 	}
 	defer conn.Close()
 

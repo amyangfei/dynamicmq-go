@@ -1,7 +1,7 @@
 package dynamicmq
 
 var (
-	Crlf string = "\r\n"
+	Crlf = "\r\n"
 )
 
 var (
@@ -72,10 +72,10 @@ var (
 	MDMsgCmdSize        uint16 = 1
 	MDMsgBodySize       uint16 = 2
 	MDMsgExtraSize      uint16 = 1
-	MDMsgHeaderSize     uint16 = MDMsgCmdSize + MDMsgBodySize + MDMsgExtraSize
+	MDMsgHeaderSize            = MDMsgCmdSize + MDMsgBodySize + MDMsgExtraSize
 	MDMsgItemIdSize     uint16 = 1
 	MDMsgItemBodySize   uint16 = 2
-	MDMsgItemHeaderSize uint16 = MDMsgItemIdSize + MDMsgItemBodySize
+	MDMsgItemHeaderSize        = MDMsgItemIdSize + MDMsgItemBodySize
 	MDMsgMaxBodyLen     uint16 = 2000
 
 	// command
@@ -105,15 +105,15 @@ var (
 	DRMsgCmdSize        uint16 = 1
 	DRMsgBodySize       uint16 = 2
 	DRMsgExtraSize      uint16 = 1
-	DRMsgHeaderSize     uint16 = DRMsgCmdSize + DRMsgBodySize + DRMsgExtraSize
+	DRMsgHeaderSize            = DRMsgCmdSize + DRMsgBodySize + DRMsgExtraSize
 	DRMsgItemIdSize     uint16 = 1
 	DRMsgItemBodySize   uint16 = 2
-	DRMsgItemHeaderSize uint16 = DRMsgItemIdSize + DRMsgItemBodySize
+	DRMsgItemHeaderSize        = DRMsgItemIdSize + DRMsgItemBodySize
 	DRMsgMaxBodyLen     uint16 = 2000
 
 	// command
-	DRMsgCmdPushMsg   uint8 = MDMsgCmdPushMsg   // 1
-	DRMsgCmdHeartbeat uint8 = MDMsgCmdHeartbeat // 2
+	DRMsgCmdPushMsg         = MDMsgCmdPushMsg   // 1
+	DRMsgCmdHeartbeat       = MDMsgCmdHeartbeat // 2
 	DRMsgCmdHandshake uint8 = 3
 
 	// Extra Field
@@ -135,7 +135,7 @@ var (
 	DRMsgItemMsgidSize  uint16 = 12
 	DRMsgItemMaxPayload uint16 = 256
 	DRMsgItemTsSize     uint16 = 8
-	DRMsgItemDispIdSize uint16 = uint16(DispatcherNodeIdSize)
+	DRMsgItemDispIdSize        = uint16(DispatcherNodeIdSize)
 )
 
 // Message protocol from local serf handler or datanode to datanode
@@ -143,10 +143,10 @@ var (
 	SDDMsgCmdSize        uint16 = 1
 	SDDMsgBodySize       uint16 = 2
 	SDDMsgExtraSize      uint16 = 1
-	SDDMsgHeaderSize     uint16 = SDDMsgCmdSize + SDDMsgBodySize + SDDMsgExtraSize
+	SDDMsgHeaderSize            = SDDMsgCmdSize + SDDMsgBodySize + SDDMsgExtraSize
 	SDDMsgItemIdSize     uint16 = 1
 	SDDMsgItemBodySize   uint16 = 2
-	SDDMsgItemHeaderSize uint16 = SDDMsgItemIdSize + SDDMsgItemBodySize
+	SDDMsgItemHeaderSize        = SDDMsgItemIdSize + SDDMsgItemBodySize
 	SDDMsgMaxBodyLen     uint16 = 2000
 
 	// command
@@ -167,10 +167,10 @@ var (
 	PMMsgCmdSize        uint16 = 1
 	PMMsgBodySize       uint16 = 2
 	PMMsgExtraSize      uint16 = 1
-	PMMsgHeaderSize     uint16 = PMMsgCmdSize + PMMsgBodySize + PMMsgExtraSize
+	PMMsgHeaderSize            = PMMsgCmdSize + PMMsgBodySize + PMMsgExtraSize
 	PMMsgItemIdSize     uint16 = 1
 	PMMsgItemBodySize   uint16 = 2
-	PMMsgItemHeaderSize uint16 = PMMsgItemIdSize + PMMsgItemBodySize
+	PMMsgItemHeaderSize        = PMMsgItemIdSize + PMMsgItemBodySize
 	PMMsgMaxBodyLen     uint16 = 2000
 
 	// command
@@ -189,10 +189,10 @@ var (
 	IDMsgCmdSize        uint16 = 1
 	IDMsgBodySize       uint16 = 2
 	IDMsgExtraSize      uint16 = 1
-	IDMsgHeaderSize     uint16 = IDMsgCmdSize + IDMsgBodySize + IDMsgExtraSize
+	IDMsgHeaderSize            = IDMsgCmdSize + IDMsgBodySize + IDMsgExtraSize
 	IDMsgItemIdSize     uint16 = 1
 	IDMsgItemBodySize   uint16 = 2
-	IDMsgItemHeaderSize uint16 = IDMsgItemIdSize + IDMsgItemBodySize
+	IDMsgItemHeaderSize        = IDMsgItemIdSize + IDMsgItemBodySize
 	IDMsgMaxBodyLen     uint16 = 2000
 
 	// command
@@ -216,7 +216,7 @@ var (
 		"range":  2,
 		"extra":  3,
 	}
-	AttrUseStr   string = "strval"
-	AttrUseRange string = "range"
-	AttrUseExtra string = "extra"
+	AttrUseStr   = "strval"
+	AttrUseRange = "range"
+	AttrUseExtra = "extra"
 )
