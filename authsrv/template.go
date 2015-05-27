@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 )
 
-func RenderJson(handler Handler, data interface{}) {
+func renderJSON(handler Handler, data interface{}) {
 	d, err := json.Marshal(data)
 	if err != nil {
 		// log.Error("unable to parse %v", data)

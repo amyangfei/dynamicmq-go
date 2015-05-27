@@ -10,9 +10,9 @@ import (
 // standalone module in order to start a connector daemon in testing.
 
 func TestAllocateConnector(t *testing.T) {
-	addr, err := AllocateConnector([]string{"http://localhost:4001"})
+	addr, err := allocateConnector([]string{"http://localhost:4001"})
 	if err != nil {
-		t.Errorf("AllocateConnector error (%v)", err)
+		t.Errorf("allocateConnector error (%v)", err)
 	}
 	fmt.Printf("allocated %s\n", addr)
 }

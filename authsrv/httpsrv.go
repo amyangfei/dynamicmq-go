@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-func HandlerFuncWrapper(route Route) http.HandlerFunc {
+func handlerFuncWrapper(route Route) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		handler := NewHandler(w, r)
 		url := r.Method + " " + r.URL.Path
@@ -18,10 +18,10 @@ func HandlerFuncWrapper(route Route) http.HandlerFunc {
 	}
 }
 
-func StartServer(bind string) {
+func startServer(bind string) {
 	r := mux.NewRouter()
 	for _, route := range routes {
-		r.HandleFunc(route.URL, HandlerFuncWrapper(route))
+		r.HandleFunc(route.URL, handlerFuncWrapper(route))
 	}
 	http.Handle("/", r)
 	log.Info("server start listening on: %s", bind)

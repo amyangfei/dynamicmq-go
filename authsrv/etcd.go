@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func AllocateConnector(machines []string) (string, error) {
+func allocateConnector(machines []string) (string, error) {
 	rand.Seed(time.Now().UnixNano())
 
 	ec, err := EtcdCliPool.GetEtcdClient()

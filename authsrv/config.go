@@ -1,8 +1,9 @@
 package main
 
+// SrvConfig is the main config struct for authsrv
 type SrvConfig struct {
 	// server config
-	NodeId         string
+	NodeID         string
 	SubAuthTCPBind string
 	PubAuthTCPBind string
 	WorkingDir     string

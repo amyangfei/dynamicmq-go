@@ -9,17 +9,17 @@ import (
 // allocate connector, generate token for subscriber
 func prepareAuth(handler Handler) {
 	ret := make(map[string]string)
-	cliId := strings.ToLower(handler.Request.FormValue("client_id"))
-	if !ValidSubClientId(cliId) {
-		log.Warning("recv invalid cliId %s", cliId)
+	cliID := strings.ToLower(handler.Request.FormValue("client_id"))
+	if !validSubClientID(cliID) {
+		log.Warning("recv invalid cliID %s", cliID)
 		ret = map[string]string{
 			"status": "error",
 		}
 	} else {
 		timestamp := fmt.Sprintf("%d", time.Now().Unix())
-		token := SignClientId(cliId, timestamp, Config.SignKey)
+		token := signClientID(cliID, timestamp, Config.SignKey)
 		// TODO: get connector from global config service like etcd
-		if connector, err := AllocateConnector(Config.EtcdMachines); err != nil {
+		if connector, err := allocateConnector(Config.EtcdMachines); err != nil {
 			ret = map[string]string{
 				"status": "error",
 			}
@@ -32,5 +32,5 @@ func prepareAuth(handler Handler) {
 			}
 		}
 	}
-	RenderJson(handler, ret)
+	renderJSON(handler, ret)
 }

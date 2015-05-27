@@ -8,18 +8,18 @@ func authSubCli(handler Handler) {
 			"status": "error",
 			"msg":    "wrong http method",
 		}
-		RenderJson(handler, ret)
+		renderJSON(handler, ret)
 		return
 	}
-	cliId := handler.Request.FormValue("client_id")
+	cliID := handler.Request.FormValue("client_id")
 	timestamp := handler.Request.FormValue("timestamp")
 	token := handler.Request.FormValue("token")
-	if !ValidSubCliToken(cliId, timestamp, Config.SignKey, token) {
+	if !validSubCliToken(cliID, timestamp, Config.SignKey, token) {
 		ret := map[string]string{
 			"status": "error",
 			"msg":    "auth failed",
 		}
-		RenderJson(handler, ret)
+		renderJSON(handler, ret)
 		return
 	}
 	// TODO: register subscribe client to etcd service
@@ -27,5 +27,5 @@ func authSubCli(handler Handler) {
 		"status": "ok",
 		"msg":    "auth success",
 	}
-	RenderJson(handler, ret)
+	renderJSON(handler, ret)
 }

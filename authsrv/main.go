@@ -14,21 +14,23 @@ import (
 	"time"
 )
 
+// server config
 var Config *SrvConfig
 
+// etcd client pool
 var EtcdCliPool *dmq.EtcdClientPool
 
 var log = logging.MustGetLogger("dynamicmq-authsrv")
 
 // InitSignal register signals handler.
-func InitSignal() chan os.Signal {
+func initSignal() chan os.Signal {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM,
 		syscall.SIGINT, syscall.SIGSTOP)
 	return c
 }
 
-func HandleSignal(c chan os.Signal) {
+func handleSignal(c chan os.Signal) {
 	// Block until a signal is received.
 	for {
 		s := <-c
@@ -44,7 +46,7 @@ func HandleSignal(c chan os.Signal) {
 	}
 }
 
-func InitConfig(configFile string) error {
+func initConfig(configFile string) error {
 	conf, err := globalconf.NewWithOptions(&globalconf.Options{
 		Filename: configFile,
 	})
@@ -73,7 +75,7 @@ func InitConfig(configFile string) error {
 	conf.ParseAll()
 
 	Config = &SrvConfig{}
-	Config.NodeId = serverFlagSet.Lookup("node_id").Value.String()
+	Config.NodeID = serverFlagSet.Lookup("node_id").Value.String()
 	Config.SubAuthTCPBind = serverFlagSet.Lookup("sub_auth_tcp_bind").Value.String()
 	Config.PubAuthTCPBind = serverFlagSet.Lookup("pub_auth_tcp_bind").Value.String()
 	Config.WorkingDir = serverFlagSet.Lookup("working_dir").Value.String()
@@ -92,7 +94,7 @@ func InitConfig(configFile string) error {
 	return nil
 }
 
-func InitLog(logFile string) error {
+func initLog(logFile string) error {
 	var format = logging.MustStringFormatter(
 		"%{time:2006-01-02 15:04:05.000} [%{level:.4s}] %{id:03x} [%{shortfunc}] %{message}",
 	)
@@ -108,7 +110,7 @@ func InitLog(logFile string) error {
 	return nil
 }
 
-func InitServer() error {
+func initServer() error {
 	rand.Seed(time.Now().UnixNano())
 	EtcdCliPool = dmq.NewEtcdClientPool(
 		Config.EtcdMachines, Config.EtcdPoolSize, Config.EtcdPoolMaxSize)
@@ -129,7 +131,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err := InitConfig(configFile); err != nil {
+	if err := initConfig(configFile); err != nil {
 		panic(err)
 	}
 
@@ -137,18 +139,18 @@ func main() {
 		panic(err)
 	}
 
-	if err := InitLog(Config.LogFile); err != nil {
+	if err := initLog(Config.LogFile); err != nil {
 		panic(err)
 	}
 
-	if err := InitServer(); err != nil {
+	if err := initServer(); err != nil {
 		panic(err)
 	}
 
-	go StartServer(Config.SubAuthTCPBind)
+	go startServer(Config.SubAuthTCPBind)
 
-	signalChan := InitSignal()
-	HandleSignal(signalChan)
+	signalChan := initSignal()
+	handleSignal(signalChan)
 
 	log.Info("authsrv stop")
 }

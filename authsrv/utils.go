@@ -8,19 +8,19 @@ import (
 	"strings"
 )
 
-func ValidSubClientId(cliId string) bool {
+func validSubClientID(cliID string) bool {
 	r, _ := regexp.Compile("^[0-9a-fA-F]{24}$")
-	return r.MatchString(cliId)
+	return r.MatchString(cliID)
 }
 
-func SignClientId(cliId, timestamp, key string) string {
+func signClientID(cliID, timestamp, key string) string {
 	h := hmac.New(sha1.New, []byte(key))
-	cnt := strings.ToLower(cliId) + timestamp
+	cnt := strings.ToLower(cliID) + timestamp
 	h.Write([]byte(cnt))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func ValidSubCliToken(cliId, timestamp, key, token string) bool {
-	expectToken := SignClientId(cliId, timestamp, key)
+func validSubCliToken(cliID, timestamp, key, token string) bool {
+	expectToken := signClientID(cliID, timestamp, key)
 	return token == expectToken
 }
