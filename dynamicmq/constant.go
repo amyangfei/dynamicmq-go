@@ -21,7 +21,7 @@ var (
 	ConnLoad      = "load"
 	ConnStatus    = "status"
 
-	DispConnId   = "conn_id"
+	DispConnID   = "conn_id"
 	DispBindAddr = "bind_addr"
 
 	IdxAttrLower = "lower"
@@ -62,9 +62,9 @@ const (
 )
 
 var (
-	ConnectorNodeIdSize  = 8
-	DispatcherNodeIdSize = 8
-	SubClientIdSize      = 12
+	ConnectorNodeIDSize  = 8
+	DispatcherNodeIDSize = 8
+	SubClientIDSize      = 12
 )
 
 // Message protocol from Matcher to Dispatcher
@@ -73,9 +73,9 @@ var (
 	MDMsgBodySize       uint16 = 2
 	MDMsgExtraSize      uint16 = 1
 	MDMsgHeaderSize            = MDMsgCmdSize + MDMsgBodySize + MDMsgExtraSize
-	MDMsgItemIdSize     uint16 = 1
+	MDMsgItemIDSize     uint16 = 1
 	MDMsgItemBodySize   uint16 = 2
-	MDMsgItemHeaderSize        = MDMsgItemIdSize + MDMsgItemBodySize
+	MDMsgItemHeaderSize        = MDMsgItemIDSize + MDMsgItemBodySize
 	MDMsgMaxBodyLen     uint16 = 2000
 
 	// command
@@ -90,9 +90,9 @@ var (
 	MDMsgExtraSendMulTail uint8 = 0x08
 
 	// Message body item id
-	MDMsgItemMsgidId   uint8 = 1
-	MDMsgItemPayloadId uint8 = 2
-	MDMsgItemSubListId uint8 = 3
+	MDMsgItemMsgidID   uint8 = 1
+	MDMsgItemPayloadID uint8 = 2
+	MDMsgItemSubListID uint8 = 3
 
 	// Message body item size restriction
 	MDMsgItemMsgidSize  uint16 = 12
@@ -106,9 +106,9 @@ var (
 	DRMsgBodySize       uint16 = 2
 	DRMsgExtraSize      uint16 = 1
 	DRMsgHeaderSize            = DRMsgCmdSize + DRMsgBodySize + DRMsgExtraSize
-	DRMsgItemIdSize     uint16 = 1
+	DRMsgItemIDSize     uint16 = 1
 	DRMsgItemBodySize   uint16 = 2
-	DRMsgItemHeaderSize        = DRMsgItemIdSize + DRMsgItemBodySize
+	DRMsgItemHeaderSize        = DRMsgItemIDSize + DRMsgItemBodySize
 	DRMsgMaxBodyLen     uint16 = 2000
 
 	// command
@@ -125,17 +125,17 @@ var (
 	DRMsgExtraRedirect    uint8 = 0x10
 
 	// Message body item id
-	DRMsgItemMsgidId     uint8 = 1
-	DRMsgItemPayloadId   uint8 = 2
-	DRMsgItemSubListId   uint8 = 3
-	DRMsgItemTimestampId uint8 = 4
-	DRMsgItemDispidId    uint8 = 5
+	DRMsgItemMsgidID     uint8 = 1
+	DRMsgItemPayloadID   uint8 = 2
+	DRMsgItemSubListID   uint8 = 3
+	DRMsgItemTimestampID uint8 = 4
+	DRMsgItemDispidID    uint8 = 5
 
 	// Message body item size restriction
 	DRMsgItemMsgidSize  uint16 = 12
 	DRMsgItemMaxPayload uint16 = 256
 	DRMsgItemTsSize     uint16 = 8
-	DRMsgItemDispIdSize        = uint16(DispatcherNodeIdSize)
+	DRMsgItemDispIDSize        = uint16(DispatcherNodeIDSize)
 )
 
 // Message protocol from local serf handler or datanode to datanode
@@ -144,9 +144,9 @@ var (
 	SDDMsgBodySize       uint16 = 2
 	SDDMsgExtraSize      uint16 = 1
 	SDDMsgHeaderSize            = SDDMsgCmdSize + SDDMsgBodySize + SDDMsgExtraSize
-	SDDMsgItemIdSize     uint16 = 1
+	SDDMsgItemIDSize     uint16 = 1
 	SDDMsgItemBodySize   uint16 = 2
-	SDDMsgItemHeaderSize        = SDDMsgItemIdSize + SDDMsgItemBodySize
+	SDDMsgItemHeaderSize        = SDDMsgItemIDSize + SDDMsgItemBodySize
 	SDDMsgMaxBodyLen     uint16 = 2000
 
 	// command
@@ -154,12 +154,12 @@ var (
 	SDDMsgCmdVNodeInfo uint8 = 2
 
 	// Message body item id
-	SDDMsgItemHostnameId  uint8 = 1
-	SDDMsgItemBindAddrId  uint8 = 2
-	SDDMsgItemRPCAddrId   uint8 = 3
-	SDDMsgItemStartHashId uint8 = 4
-	SDDMsgItemSerfNodeId  uint8 = 5
-	SDDMsgItemVNodeListId uint8 = 6
+	SDDMsgItemHostnameID  uint8 = 1
+	SDDMsgItemBindAddrID  uint8 = 2
+	SDDMsgItemRPCAddrID   uint8 = 3
+	SDDMsgItemStartHashID uint8 = 4
+	SDDMsgItemSerfNodeID  uint8 = 5
+	SDDMsgItemVNodeListID uint8 = 6
 )
 
 // Message protocol from publisher to matching service
@@ -168,9 +168,9 @@ var (
 	PMMsgBodySize       uint16 = 2
 	PMMsgExtraSize      uint16 = 1
 	PMMsgHeaderSize            = PMMsgCmdSize + PMMsgBodySize + PMMsgExtraSize
-	PMMsgItemIdSize     uint16 = 1
+	PMMsgItemIDSize     uint16 = 1
 	PMMsgItemBodySize   uint16 = 2
-	PMMsgItemHeaderSize        = PMMsgItemIdSize + PMMsgItemBodySize
+	PMMsgItemHeaderSize        = PMMsgItemIDSize + PMMsgItemBodySize
 	PMMsgMaxBodyLen     uint16 = 2000
 
 	// command
@@ -180,8 +180,8 @@ var (
 	PMMsgExtraNone uint8 = 0x00
 
 	// Message body item id
-	PMMsgItemAttributeId uint8 = 1
-	PMMsgItemPayloadId   uint8 = 2
+	PMMsgItemAttributeID uint8 = 1
+	PMMsgItemPayloadID   uint8 = 2
 )
 
 // Message protocol from indexnode to datanode in matching service
@@ -190,9 +190,9 @@ var (
 	IDMsgBodySize       uint16 = 2
 	IDMsgExtraSize      uint16 = 1
 	IDMsgHeaderSize            = IDMsgCmdSize + IDMsgBodySize + IDMsgExtraSize
-	IDMsgItemIdSize     uint16 = 1
+	IDMsgItemIDSize     uint16 = 1
 	IDMsgItemBodySize   uint16 = 2
-	IDMsgItemHeaderSize        = IDMsgItemIdSize + IDMsgItemBodySize
+	IDMsgItemHeaderSize        = IDMsgItemIDSize + IDMsgItemBodySize
 	IDMsgMaxBodyLen     uint16 = 2000
 
 	// command
@@ -203,10 +203,10 @@ var (
 	IDMsgExtraNone uint8 = 0x00
 
 	// Message body item id
-	IDMsgItemAttributeId uint8 = 1
-	IDMsgItemPayloadId   uint8 = 2
-	IDMsgMessageIdId     uint8 = 3
-	IDMsgClientListIdId  uint8 = 4
+	IDMsgItemAttributeID uint8 = 1
+	IDMsgItemPayloadID   uint8 = 2
+	IDMsgMessageIDID     uint8 = 3
+	IDMsgClientListIDID  uint8 = 4
 )
 
 // attribute type in subscription

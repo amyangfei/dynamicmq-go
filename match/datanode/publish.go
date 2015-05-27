@@ -90,7 +90,7 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 		if offset+dmq.IDMsgItemHeaderSize > totalLen {
 			return nil, fmt.Errorf("invalid item header length")
 		}
-		itemLen := binary.BigEndian.Uint16(msg[offset+dmq.IDMsgItemIdSize:])
+		itemLen := binary.BigEndian.Uint16(msg[offset+dmq.IDMsgItemIDSize:])
 		if itemLen+dmq.IDMsgItemHeaderSize+offset > totalLen {
 			return nil, fmt.Errorf("invalid item body length")
 		}
@@ -250,15 +250,15 @@ func processReadbuf(cli *IdxNodeClient, buf []byte) error {
 }
 
 func validatePushMsg(msg *DecodedMsg) error {
-	if _, ok := msg.items[dmq.IDMsgItemPayloadId]; !ok {
+	if _, ok := msg.items[dmq.IDMsgItemPayloadID]; !ok {
 		return fmt.Errorf("msg payload item not found")
 	}
 
-	if _, ok := msg.items[dmq.IDMsgItemAttributeId]; !ok {
+	if _, ok := msg.items[dmq.IDMsgItemAttributeID]; !ok {
 		return fmt.Errorf("msg attribute item not found")
 	}
 
-	if _, ok := msg.items[dmq.IDMsgClientListIdId]; !ok {
+	if _, ok := msg.items[dmq.IDMsgClientListIDID]; !ok {
 		return fmt.Errorf("msg client id list item not found")
 	}
 
@@ -294,7 +294,7 @@ func checkSubCliMatchingMsg(pattrs []*PubAttr, cliId string) bool {
 
 func extractMsgAttr(msg *DecodedMsg) ([]*PubAttr, error) {
 	// Message must have been validated
-	attrs := msg.items[dmq.IDMsgItemAttributeId]
+	attrs := msg.items[dmq.IDMsgItemAttributeID]
 	parsedAttrrs := make(map[string]interface{})
 	if err := json.Unmarshal([]byte(attrs), &parsedAttrrs); err != nil {
 		return nil, err
@@ -325,13 +325,13 @@ func chooseMaxSubCliNum(msg *DecodedMsg) int {
 		bodyLen: 0,
 		extra:   dmq.MDMsgExtraNone,
 		items: map[uint8]string{
-			dmq.MDMsgItemMsgidId:   string(bson.NewObjectId()),
-			dmq.MDMsgItemPayloadId: msg.items[dmq.IDMsgItemPayloadId],
+			dmq.MDMsgItemMsgidID:   string(bson.NewObjectId()),
+			dmq.MDMsgItemPayloadID: msg.items[dmq.IDMsgItemPayloadID],
 		},
 	}
 	bmsg := binaryMsgEncode(tmsg)
-	oneIdSize := dmq.SubClientIdSize + dmq.ConnectorNodeIdSize +
-		int(dmq.IDMsgItemIdSize+dmq.IDMsgItemHeaderSize)
+	oneIdSize := dmq.SubClientIDSize + dmq.ConnectorNodeIDSize +
+		int(dmq.IDMsgItemIDSize+dmq.IDMsgItemHeaderSize)
 	return (int(dmq.MDMsgMaxBodyLen+dmq.MDMsgHeaderSize) - len(bmsg)) / oneIdSize
 }
 
@@ -343,8 +343,8 @@ func processPushMsg(msg *DecodedMsg, cli *IdxNodeClient) error {
 		return err
 	}
 
-	bits := dmq.SubClientIdSize
-	bclis := []byte(msg.items[dmq.IDMsgClientListIdId])
+	bits := dmq.SubClientIDSize
+	bclis := []byte(msg.items[dmq.IDMsgClientListIDID])
 	candClis := make([][]byte, 0)
 	for i := 0; (i + bits) <= len(bclis); i += bits {
 		if checkSubCliMatchingMsg(pattrs, string(bclis[i:i+bits])) {
@@ -380,15 +380,15 @@ func processPushMsg(msg *DecodedMsg, cli *IdxNodeClient) error {
 			bodyLen: 0,
 			extra:   dmq.MDMsgExtraNone,
 			items: map[uint8]string{
-				dmq.MDMsgItemMsgidId:   string(bson.NewObjectId()),
-				dmq.MDMsgItemPayloadId: msg.items[dmq.IDMsgItemPayloadId],
-				dmq.MDMsgItemSubListId: string(cliIdList),
+				dmq.MDMsgItemMsgidID:   string(bson.NewObjectId()),
+				dmq.MDMsgItemPayloadID: msg.items[dmq.IDMsgItemPayloadID],
+				dmq.MDMsgItemSubListID: string(cliIdList),
 			},
 		}
 		bmsg := binaryMsgEncode(sendmsg)
 
 		log.Debug("send msg: %v to disp (with %d subclis)",
-			bmsg, len(cliIdList)/(dmq.SubClientIdSize+dmq.ConnectorNodeIdSize))
+			bmsg, len(cliIdList)/(dmq.SubClientIDSize+dmq.ConnectorNodeIDSize))
 
 		if err := DispMsgSender(CurDispNode, bmsg); err != nil {
 			log.Error("sendmsg to dispnode error: %v", err)

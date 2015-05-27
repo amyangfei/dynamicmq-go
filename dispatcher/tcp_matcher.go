@@ -201,7 +201,7 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 		if offset+dmq.MDMsgItemHeaderSize > totalLen {
 			return nil, errors.New("invalid item header length")
 		}
-		itemLen := binary.BigEndian.Uint16(msg[offset+dmq.MDMsgItemIdSize:])
+		itemLen := binary.BigEndian.Uint16(msg[offset+dmq.MDMsgItemIDSize:])
 		if itemLen+dmq.MDMsgItemHeaderSize+offset > totalLen {
 			return nil, errors.New("invalid item body length")
 		}
@@ -215,13 +215,13 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 }
 
 func validatePushMsg(msg *DecodedMsg) error {
-	if payload, ok := msg.items[dmq.MDMsgItemPayloadId]; !ok {
+	if payload, ok := msg.items[dmq.MDMsgItemPayloadID]; !ok {
 		return errors.New("msg payload item not found")
 	} else if uint16(len(payload)) > dmq.MDMsgItemMaxPayload {
 		return fmt.Errorf("msg payload too large %d", len(payload))
 	}
 
-	if msgId, ok := msg.items[dmq.MDMsgItemMsgidId]; !ok {
+	if msgId, ok := msg.items[dmq.MDMsgItemMsgidID]; !ok {
 		return errors.New("msgid item not found")
 	} else {
 		if uint16(len(msgId)) != dmq.MDMsgItemMsgidSize {
@@ -229,7 +229,7 @@ func validatePushMsg(msg *DecodedMsg) error {
 		}
 	}
 
-	if _, ok := msg.items[dmq.MDMsgItemSubListId]; !ok {
+	if _, ok := msg.items[dmq.MDMsgItemSubListID]; !ok {
 		return errors.New("subclient id list not found")
 	}
 
@@ -240,15 +240,15 @@ func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 	// Message redirected from other dispatcher
 	if msg.extra&dmq.DRMsgExtraRedirect > 0 {
 		log.Debug("send %d redirected msg to connector",
-			len(msg.items[dmq.MDMsgItemSubListId])/dmq.SubClientIdSize)
+			len(msg.items[dmq.MDMsgItemSubListID])/dmq.SubClientIDSize)
 		rmsg := &BasicMsg{
 			cmdType: dmq.DRMsgCmdPushMsg,
 			bodyLen: 0,
 			extra:   dmq.DRMsgExtraNone,
 			items: map[uint8]string{
-				dmq.DRMsgItemMsgidId:   msg.items[dmq.MDMsgItemMsgidId],
-				dmq.DRMsgItemPayloadId: msg.items[dmq.MDMsgItemPayloadId],
-				dmq.DRMsgItemSubListId: msg.items[dmq.MDMsgItemSubListId],
+				dmq.DRMsgItemMsgidID:   msg.items[dmq.MDMsgItemMsgidID],
+				dmq.DRMsgItemPayloadID: msg.items[dmq.MDMsgItemPayloadID],
+				dmq.DRMsgItemSubListID: msg.items[dmq.MDMsgItemSubListID],
 			},
 		}
 		bmsg := binaryMsgEncode(rmsg)
@@ -257,15 +257,15 @@ func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 	}
 
 	// Message must have been validated before processing
-	msgId, _ := msg.items[dmq.MDMsgItemMsgidId]
-	msgPayload, _ := msg.items[dmq.MDMsgItemPayloadId]
+	msgId, _ := msg.items[dmq.MDMsgItemMsgidID]
+	msgPayload, _ := msg.items[dmq.MDMsgItemPayloadID]
 
 	cliGroup := map[string][]byte{}
-	subInfoList, _ := msg.items[dmq.MDMsgItemSubListId]
-	step := dmq.SubClientIdSize + dmq.ConnectorNodeIdSize
+	subInfoList, _ := msg.items[dmq.MDMsgItemSubListID]
+	step := dmq.SubClientIDSize + dmq.ConnectorNodeIDSize
 	for i := 0; i+step <= len(subInfoList); i += step {
-		subId := subInfoList[i : i+dmq.SubClientIdSize]
-		connId := subInfoList[i+dmq.SubClientIdSize : i+step]
+		subId := subInfoList[i : i+dmq.SubClientIDSize]
+		connId := subInfoList[i+dmq.SubClientIDSize : i+step]
 		cliGroup[connId] = append(cliGroup[connId], []byte(subId)...)
 	}
 
@@ -275,15 +275,15 @@ func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 			bodyLen: 0,
 			extra:   dmq.DRMsgExtraNone,
 			items: map[uint8]string{
-				dmq.DRMsgItemMsgidId:   msgId,
-				dmq.DRMsgItemPayloadId: msgPayload,
-				dmq.DRMsgItemSubListId: string(subIds),
+				dmq.DRMsgItemMsgidID:   msgId,
+				dmq.DRMsgItemPayloadID: msgPayload,
+				dmq.DRMsgItemSubListID: string(subIds),
 			},
 		}
 
 		if cid == RouterMgr.cid {
 			log.Debug("send %d direct msg to connector %s",
-				len(subIds)/dmq.SubClientIdSize, cid)
+				len(subIds)/dmq.SubClientIDSize, cid)
 			bmsg := binaryMsgEncode(msg)
 			RmSendMsg2Conn(RouterMgr, bmsg)
 		} else {

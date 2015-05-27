@@ -150,8 +150,8 @@ func SendOneMsg(conn net.Conn, idxbase *IndexBase) {
 		bodyLen: 0,
 		extra:   dmq.PMMsgExtraNone,
 		items: map[uint8]string{
-			dmq.PMMsgItemAttributeId: string(battr),
-			dmq.PMMsgItemPayloadId:   payload,
+			dmq.PMMsgItemAttributeID: string(battr),
+			dmq.PMMsgItemPayloadID:   payload,
 		},
 	}
 	bmsg := binaryMsgEncode(msg)

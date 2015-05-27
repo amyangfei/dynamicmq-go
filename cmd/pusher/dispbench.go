@@ -157,13 +157,13 @@ func chooseMaxSubCliNum() int {
 		bodyLen: 0,
 		extra:   dmq.MDMsgExtraNone,
 		items: map[uint8]string{
-			dmq.MDMsgItemMsgidId:   string(bson.NewObjectId()),
-			dmq.MDMsgItemPayloadId: fmt.Sprintf("%d", time.Now().UnixNano()/1e3),
+			dmq.MDMsgItemMsgidID:   string(bson.NewObjectId()),
+			dmq.MDMsgItemPayloadID: fmt.Sprintf("%d", time.Now().UnixNano()/1e3),
 		},
 	}
 	bmsg := binaryMsgEncode(tmsg)
 	oneIdSize := dmq.SubClientIdSize + dmq.ConnectorNodeIdSize +
-		int(dmq.MDMsgItemIdSize+dmq.MDMsgItemHeaderSize)
+		int(dmq.MDMsgItemIDSize+dmq.MDMsgItemHeaderSize)
 	return (int(dmq.IDMsgMaxBodyLen+dmq.IDMsgHeaderSize) - len(bmsg)) / oneIdSize
 }
 
@@ -220,9 +220,9 @@ func sendMsg(percent int) {
 			bodyLen: 0,
 			extra:   dmq.MDMsgExtraNone,
 			items: map[uint8]string{
-				dmq.MDMsgItemMsgidId:   string(bson.NewObjectId()),
-				dmq.MDMsgItemPayloadId: fmt.Sprintf("%d", time.Now().UnixNano()/1e3),
-				dmq.MDMsgItemSubListId: string(ids),
+				dmq.MDMsgItemMsgidID:   string(bson.NewObjectId()),
+				dmq.MDMsgItemPayloadID: fmt.Sprintf("%d", time.Now().UnixNano()/1e3),
+				dmq.MDMsgItemSubListID: string(ids),
 			},
 		}
 		bmsg := binaryMsgEncode(msg)

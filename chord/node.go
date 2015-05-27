@@ -423,7 +423,7 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 		if offset+dmq.SDDMsgItemHeaderSize > totalLen {
 			return nil, fmt.Errorf("invalid item header length")
 		}
-		itemLen := binary.BigEndian.Uint16(msg[offset+dmq.SDDMsgItemIdSize:])
+		itemLen := binary.BigEndian.Uint16(msg[offset+dmq.SDDMsgItemIDSize:])
 		if itemLen+dmq.SDDMsgItemHeaderSize+offset > totalLen {
 			return nil, fmt.Errorf("invalid item body length")
 		}
@@ -437,23 +437,23 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 }
 
 func validateNodeInfoMsg(msg *DecodedMsg, n *Node) error {
-	if _, ok := msg.items[dmq.SDDMsgItemHostnameId]; !ok {
+	if _, ok := msg.items[dmq.SDDMsgItemHostnameID]; !ok {
 		return fmt.Errorf("msg hostname item not found")
 	}
 
-	if _, ok := msg.items[dmq.SDDMsgItemSerfNodeId]; !ok {
+	if _, ok := msg.items[dmq.SDDMsgItemSerfNodeID]; !ok {
 		return fmt.Errorf("msg serfnode item not found")
 	}
 
-	if _, ok := msg.items[dmq.SDDMsgItemBindAddrId]; !ok {
+	if _, ok := msg.items[dmq.SDDMsgItemBindAddrID]; !ok {
 		return fmt.Errorf("msg bindaddr item not found")
 	}
 
-	if _, ok := msg.items[dmq.SDDMsgItemRPCAddrId]; !ok {
+	if _, ok := msg.items[dmq.SDDMsgItemRPCAddrID]; !ok {
 		return fmt.Errorf("msg rpcaddr item not found")
 	}
 
-	if _, ok := msg.items[dmq.SDDMsgItemStartHashId]; !ok {
+	if _, ok := msg.items[dmq.SDDMsgItemStartHashID]; !ok {
 		return fmt.Errorf("msg starthash item not found")
 	}
 	return nil
@@ -463,7 +463,7 @@ func processNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 	log := n.log
 
 	// Message must have been validated before processing
-	hostname := msg.items[dmq.SDDMsgItemHostnameId]
+	hostname := msg.items[dmq.SDDMsgItemHostnameID]
 
 	log.Debug("recv nodeinfo msg: %v from %s", msg, hostname)
 
@@ -474,10 +474,10 @@ func processNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 		// new peer node
 		peerNode := &PeerNode{
 			Hostname:  hostname,
-			SerfNode:  msg.items[dmq.SDDMsgItemSerfNodeId],
-			BindAddr:  msg.items[dmq.SDDMsgItemBindAddrId],
-			RPCAddr:   msg.items[dmq.SDDMsgItemRPCAddrId],
-			StartHash: []byte(msg.items[dmq.SDDMsgItemStartHashId]),
+			SerfNode:  msg.items[dmq.SDDMsgItemSerfNodeID],
+			BindAddr:  msg.items[dmq.SDDMsgItemBindAddrID],
+			RPCAddr:   msg.items[dmq.SDDMsgItemRPCAddrID],
+			StartHash: []byte(msg.items[dmq.SDDMsgItemStartHashID]),
 		}
 		n.Rtable.peers = append(n.Rtable.peers, peerNode)
 
@@ -490,15 +490,15 @@ func processNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 }
 
 func validateVNodeInfoMsg(msg *DecodedMsg, n *Node) error {
-	if _, ok := msg.items[dmq.SDDMsgItemHostnameId]; !ok {
+	if _, ok := msg.items[dmq.SDDMsgItemHostnameID]; !ok {
 		return fmt.Errorf("msg hostname item not found")
 	}
 
-	if _, ok := msg.items[dmq.SDDMsgItemSerfNodeId]; !ok {
+	if _, ok := msg.items[dmq.SDDMsgItemSerfNodeID]; !ok {
 		return fmt.Errorf("msg serfnode item not found")
 	}
 
-	if _, ok := msg.items[dmq.SDDMsgItemVNodeListId]; !ok {
+	if _, ok := msg.items[dmq.SDDMsgItemVNodeListID]; !ok {
 		return fmt.Errorf("msg vnode list item not found")
 	}
 	return nil
@@ -509,14 +509,14 @@ func processVNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 
 	// Message must have been validated before processing
 	hostname, err :=
-		base64.StdEncoding.DecodeString(msg.items[dmq.SDDMsgItemHostnameId])
+		base64.StdEncoding.DecodeString(msg.items[dmq.SDDMsgItemHostnameID])
 	if err != nil {
 		log.Error("failed to parse hostname %v", err)
 		return err
 	}
 
 	vnodes, err :=
-		base64.StdEncoding.DecodeString(msg.items[dmq.SDDMsgItemVNodeListId])
+		base64.StdEncoding.DecodeString(msg.items[dmq.SDDMsgItemVNodeListID])
 	if err != nil {
 		log.Error("failed to parse vnodelist %v", err)
 		return err
@@ -602,11 +602,11 @@ func (n *Node) sendNodeInfo(rpcAddr string) {
 		bodyLen: 0,
 		extra:   0,
 		items: map[uint8]string{
-			dmq.SDDMsgItemHostnameId:  n.Config.Hostname,
-			dmq.SDDMsgItemBindAddrId:  n.Config.BindAddr,
-			dmq.SDDMsgItemRPCAddrId:   n.Config.RPCAddr,
-			dmq.SDDMsgItemSerfNodeId:  n.Config.Serf.NodeName,
-			dmq.SDDMsgItemStartHashId: hex.EncodeToString(n.Config.StartHash),
+			dmq.SDDMsgItemHostnameID:  n.Config.Hostname,
+			dmq.SDDMsgItemBindAddrID:  n.Config.BindAddr,
+			dmq.SDDMsgItemRPCAddrID:   n.Config.RPCAddr,
+			dmq.SDDMsgItemSerfNodeID:  n.Config.Serf.NodeName,
+			dmq.SDDMsgItemStartHashID: hex.EncodeToString(n.Config.StartHash),
 		},
 	}
 	bmsg := binaryMsgEncode(basicMsg)
@@ -628,9 +628,9 @@ func (n *Node) sendVnodeInfo(rpcAddr string) {
 		bodyLen: 0,
 		extra:   0,
 		items: map[uint8]string{
-			dmq.SDDMsgItemHostnameId:  base64.StdEncoding.EncodeToString([]byte(n.Config.Hostname)),
-			dmq.SDDMsgItemSerfNodeId:  base64.StdEncoding.EncodeToString([]byte(n.Config.Serf.NodeName)),
-			dmq.SDDMsgItemVNodeListId: base64.StdEncoding.EncodeToString(ids),
+			dmq.SDDMsgItemHostnameID:  base64.StdEncoding.EncodeToString([]byte(n.Config.Hostname)),
+			dmq.SDDMsgItemSerfNodeID:  base64.StdEncoding.EncodeToString([]byte(n.Config.Serf.NodeName)),
+			dmq.SDDMsgItemVNodeListID: base64.StdEncoding.EncodeToString(ids),
 		},
 	}
 	bmsg := binaryMsgEncode(basicMsg)

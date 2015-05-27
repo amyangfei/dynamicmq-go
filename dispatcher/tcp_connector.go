@@ -41,7 +41,7 @@ func ConnToConnRouter(addr, cid string, rmgr *RouterManager, cfg *SrvConfig) err
 
 func RmHandShake2Conn(rmgr *RouterManager, cfg *SrvConfig) {
 	hsMsg := BasicHandshakeMsg()
-	hsMsg.items[dmq.DRMsgItemDispidId] = cfg.NodeId
+	hsMsg.items[dmq.DRMsgItemDispidID] = cfg.NodeId
 	bmsg := binaryMsgEncode(hsMsg)
 	rmgr.SendData(bmsg)
 }
@@ -54,7 +54,7 @@ func RmHeartbeat2Conn(rmgr *RouterManager, cfg *SrvConfig) {
 		now := time.Now().Unix()
 		binary.BigEndian.PutUint64(b, uint64(now))
 		hbMsg := BasicHeartbeatMsg()
-		hbMsg.items[dmq.DRMsgItemTimestampId] = string(b)
+		hbMsg.items[dmq.DRMsgItemTimestampID] = string(b)
 		bmsg := binaryMsgEncode(hbMsg)
 		rmgr.SendData(bmsg)
 		log.Debug("send heartbeat to connector %s", rmgr.cid)

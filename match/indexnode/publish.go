@@ -223,7 +223,7 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 		if offset+dmq.PMMsgItemHeaderSize > totalLen {
 			return nil, fmt.Errorf("invalid item header length")
 		}
-		itemLen := binary.BigEndian.Uint16(msg[offset+dmq.PMMsgItemIdSize:])
+		itemLen := binary.BigEndian.Uint16(msg[offset+dmq.PMMsgItemIDSize:])
 		if itemLen+dmq.PMMsgItemHeaderSize+offset > totalLen {
 			return nil, fmt.Errorf("invalid item body length")
 		}
@@ -237,11 +237,11 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 }
 
 func validatePushMsg(msg *DecodedMsg) error {
-	if _, ok := msg.items[dmq.PMMsgItemPayloadId]; !ok {
+	if _, ok := msg.items[dmq.PMMsgItemPayloadID]; !ok {
 		return fmt.Errorf("msg payload item not found")
 	}
 
-	if _, ok := msg.items[dmq.PMMsgItemAttributeId]; !ok {
+	if _, ok := msg.items[dmq.PMMsgItemAttributeID]; !ok {
 		return fmt.Errorf("msg attribute item not found")
 	}
 
@@ -272,8 +272,8 @@ func processPushMsg(msg *DecodedMsg) error {
 	// Message must have been validated before processing
 	log.Debug("recv %v from publisher", msg)
 
-	payload := msg.items[dmq.PMMsgItemPayloadId]
-	attrs := msg.items[dmq.PMMsgItemAttributeId]
+	payload := msg.items[dmq.PMMsgItemPayloadID]
+	attrs := msg.items[dmq.PMMsgItemAttributeID]
 	parsedAttrs := make(map[string]interface{})
 	if err := json.Unmarshal([]byte(attrs), &parsedAttrs); err != nil {
 		return err
@@ -351,17 +351,17 @@ func chooseMaxSubCliNum(msg *DecodedMsg, clidSize int) int {
 		bodyLen: 0,
 		extra:   dmq.IDMsgExtraNone,
 		items: map[uint8]string{
-			dmq.IDMsgItemAttributeId: msg.items[dmq.PMMsgItemAttributeId],
-			dmq.IDMsgItemPayloadId:   msg.items[dmq.PMMsgItemPayloadId],
+			dmq.IDMsgItemAttributeID: msg.items[dmq.PMMsgItemAttributeID],
+			dmq.IDMsgItemPayloadID:   msg.items[dmq.PMMsgItemPayloadID],
 		},
 	}
 	bmsg := binaryMsgEncode(tmsg)
-	oneIdSize := clidSize + int(dmq.IDMsgItemIdSize+dmq.IDMsgItemHeaderSize)
+	oneIdSize := clidSize + int(dmq.IDMsgItemIDSize+dmq.IDMsgItemHeaderSize)
 	return (int(dmq.IDMsgMaxBodyLen+dmq.IDMsgHeaderSize) - len(bmsg)) / oneIdSize
 }
 
 func sendMsgToDataNode(msg *DecodedMsg, pcgroupMap map[string]*PubCliGroup) error {
-	maxclis := chooseMaxSubCliNum(msg, dmq.SubClientIdSize)
+	maxclis := chooseMaxSubCliNum(msg, dmq.SubClientIDSize)
 	// send message to different datanode
 	for pnid, pcgroup := range pcgroupMap {
 		idx, clinum := 0, len(pcgroup.cids)
@@ -381,9 +381,9 @@ func sendMsgToDataNode(msg *DecodedMsg, pcgroupMap map[string]*PubCliGroup) erro
 				bodyLen: 0,
 				extra:   dmq.IDMsgExtraNone,
 				items: map[uint8]string{
-					dmq.IDMsgItemAttributeId: msg.items[dmq.PMMsgItemAttributeId],
-					dmq.IDMsgItemPayloadId:   msg.items[dmq.PMMsgItemPayloadId],
-					dmq.IDMsgClientListIdId:  string(cliIdList),
+					dmq.IDMsgItemAttributeID: msg.items[dmq.PMMsgItemAttributeID],
+					dmq.IDMsgItemPayloadID:   msg.items[dmq.PMMsgItemPayloadID],
+					dmq.IDMsgClientListIDID:  string(cliIdList),
 				},
 			}
 			bmsg := binaryMsgEncode(sendmsg)

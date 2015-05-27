@@ -49,7 +49,7 @@ func RegisterEtcd(rmgr *RouterManager, cfg *SrvConfig, pool *dmq.EtcdClientPool)
 		}
 		parsedkey := strings.Split(waitConns.Node.Nodes[0].Key, "/")
 		connNodeId := parsedkey[len(parsedkey)-1]
-		if len(connNodeId) != dmq.ConnectorNodeIdSize {
+		if len(connNodeId) != dmq.ConnectorNodeIDSize {
 			return fmt.Errorf("invalid nodeid %s from etcd", connNodeId)
 		}
 
@@ -85,7 +85,7 @@ func RegisterEtcd(rmgr *RouterManager, cfg *SrvConfig, pool *dmq.EtcdClientPool)
 
 		// register to etcd
 		dispInfoBase := dmq.GetInfoKey(dmq.EtcdDispatcherType, cfg.NodeId)
-		dispInfoConnIdKey := fmt.Sprintf("%s/%s", dispInfoBase, dmq.DispConnId)
+		dispInfoConnIdKey := fmt.Sprintf("%s/%s", dispInfoBase, dmq.DispConnID)
 		if _, err := c.Set(dispInfoConnIdKey, connNodeId, 0); err != nil {
 			c.Delete(dispInfoBase, true)
 			return err
@@ -149,7 +149,7 @@ func GetConnRelatedDispInfo(connid string, pool *dmq.EtcdClientPool) (map[string
 			dispid := getEtcdKeyLastKSep(disp.Key, 1)
 			found := false
 			for _, v := range disp.Nodes {
-				if getEtcdKeyLastKSep(v.Key, 1) == dmq.DispConnId &&
+				if getEtcdKeyLastKSep(v.Key, 1) == dmq.DispConnID &&
 					!v.Dir && v.Value == connid {
 					found = true
 				}

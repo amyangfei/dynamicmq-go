@@ -232,7 +232,7 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 		if offset+dmq.DRMsgItemHeaderSize > totalLen {
 			return nil, errors.New("invalid item header length")
 		}
-		itemLen := binary.BigEndian.Uint16(msg[offset+dmq.DRMsgItemIdSize:])
+		itemLen := binary.BigEndian.Uint16(msg[offset+dmq.DRMsgItemIDSize:])
 		if itemLen+dmq.DRMsgItemHeaderSize+offset > totalLen {
 			return nil, errors.New("invalid item body length")
 		}
@@ -249,7 +249,7 @@ func validatePushMsg(msg *DecodedMsg, cli *DispClient) error {
 	/*
 		switch msg.extra {
 		case dmq.DRMsgExtraSendSingle, dmq.DRMsgExtraSendMulHead:
-			if payload, ok := msg.items[dmq.DRMsgItemPayloadId]; !ok {
+			if payload, ok := msg.items[dmq.DRMsgItemPayloadID]; !ok {
 				return errors.New("msg payload item not found")
 			} else if uint16(len(payload)) > dmq.DRMsgItemMaxPayload {
 				return errors.New(
@@ -260,19 +260,19 @@ func validatePushMsg(msg *DecodedMsg, cli *DispClient) error {
 
 	// We don't use local message cache currently, so each message packet from
 	// dispatcher contains the message payload
-	if payload, ok := msg.items[dmq.DRMsgItemPayloadId]; !ok {
+	if payload, ok := msg.items[dmq.DRMsgItemPayloadID]; !ok {
 		return errors.New("msg payload item not found")
 	} else if uint16(len(payload)) > dmq.DRMsgItemMaxPayload {
 		return fmt.Errorf("msg payload too large: %d", len(payload))
 	}
 
-	if msgID, ok := msg.items[dmq.DRMsgItemMsgidId]; !ok {
+	if msgID, ok := msg.items[dmq.DRMsgItemMsgidID]; !ok {
 		return errors.New("msgid item not found")
 	} else if uint16(len(msgID)) != dmq.DRMsgItemMsgidSize {
 		return errors.New("msgid item not found")
 	}
 
-	if _, ok := msg.items[dmq.DRMsgItemSubListId]; !ok {
+	if _, ok := msg.items[dmq.DRMsgItemSubListID]; !ok {
 		return errors.New("sub list item not found")
 	}
 
@@ -281,9 +281,9 @@ func validatePushMsg(msg *DecodedMsg, cli *DispClient) error {
 
 func processPushMsg(msg *DecodedMsg, cli *DispClient) error {
 	// message has been validated
-	msgID, _ := msg.items[dmq.DRMsgItemMsgidId]
-	payload, _ := msg.items[dmq.DRMsgItemPayloadId]
-	subListStr, _ := msg.items[dmq.DRMsgItemSubListId]
+	msgID, _ := msg.items[dmq.DRMsgItemMsgidID]
+	payload, _ := msg.items[dmq.DRMsgItemPayloadID]
+	subListStr, _ := msg.items[dmq.DRMsgItemSubListID]
 
 	log.Debug("process msg id: %s extra: %d, bodyLen: %d",
 		hex.EncodeToString([]byte(msgID)), msg.extra, msg.bodyLen)
@@ -297,8 +297,8 @@ func processPushMsg(msg *DecodedMsg, cli *DispClient) error {
 		return err
 	}
 
-	for i := 0; i+dmq.SubClientIdSize <= len(subListStr); i += dmq.SubClientIdSize {
-		subID := subListStr[i : i+dmq.SubClientIdSize]
+	for i := 0; i+dmq.SubClientIDSize <= len(subListStr); i += dmq.SubClientIDSize {
+		subID := subListStr[i : i+dmq.SubClientIDSize]
 		oid := bson.ObjectId(subID)
 		if cli, ok := SubcliTable[oid]; !ok {
 			log.Error("subclient with id %s not found", oid.Hex())
@@ -312,7 +312,7 @@ func processPushMsg(msg *DecodedMsg, cli *DispClient) error {
 }
 
 func validateHbMsg(msg *DecodedMsg, cli *DispClient) error {
-	if ts, ok := msg.items[dmq.DRMsgItemTimestampId]; !ok {
+	if ts, ok := msg.items[dmq.DRMsgItemTimestampID]; !ok {
 		return errors.New("timestamp not in message")
 	} else if uint16(len(ts)) != dmq.DRMsgItemTsSize {
 		return errors.New("invalid timestamp size")
@@ -321,7 +321,7 @@ func validateHbMsg(msg *DecodedMsg, cli *DispClient) error {
 }
 
 func processHbMsg(msg *DecodedMsg, cli *DispClient) error {
-	ts := int64(binary.BigEndian.Uint64([]byte(msg.items[dmq.DRMsgItemTimestampId])))
+	ts := int64(binary.BigEndian.Uint64([]byte(msg.items[dmq.DRMsgItemTimestampID])))
 	log.Debug("recv heartbeat from dispatcher %s", cli.id)
 	expire := ts + int64(Config.DispKeepalive)
 	if expire > cli.expire {
@@ -332,16 +332,16 @@ func processHbMsg(msg *DecodedMsg, cli *DispClient) error {
 
 // validate handshake message
 func validateHsMsg(msg *DecodedMsg, cli *DispClient) error {
-	if nodeid, ok := msg.items[dmq.DRMsgItemDispidId]; !ok {
+	if nodeid, ok := msg.items[dmq.DRMsgItemDispidID]; !ok {
 		return errors.New("dispatcher id not in message")
-	} else if uint16(len(nodeid)) != dmq.DRMsgItemDispIdSize {
+	} else if uint16(len(nodeid)) != dmq.DRMsgItemDispIDSize {
 		return errors.New("invalid dispatcher id size")
 	}
 	return nil
 }
 
 func processHsMsg(msg *DecodedMsg, cli *DispClient) error {
-	dispID := msg.items[dmq.DRMsgItemDispidId]
+	dispID := msg.items[dmq.DRMsgItemDispidID]
 	log.Debug("recv handshake from dispatcher %s", dispID)
 	cli.id = dispID
 	return nil

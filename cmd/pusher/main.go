@@ -105,9 +105,9 @@ func SendOneMsg(conn net.Conn) {
 		bodyLen: 0,
 		extra:   dmq.MDMsgExtraNone,
 		items: map[uint8]string{
-			dmq.MDMsgItemMsgidId:   string(msgid),
-			dmq.MDMsgItemPayloadId: payload,
-			dmq.MDMsgItemSubListId: string(sublist),
+			dmq.MDMsgItemMsgidID:   string(msgid),
+			dmq.MDMsgItemPayloadID: payload,
+			dmq.MDMsgItemSubListID: string(sublist),
 		},
 	}
 	bmsg := binaryMsgEncode(msg)
