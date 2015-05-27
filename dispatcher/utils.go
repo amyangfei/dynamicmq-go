@@ -5,6 +5,7 @@ import (
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 )
 
+// BasicMsg struct
 type BasicMsg struct {
 	cmdType uint8
 	bodyLen uint16
@@ -12,7 +13,7 @@ type BasicMsg struct {
 	items   map[uint8]string
 }
 
-func BasicHeartbeatMsg() *BasicMsg {
+func basicHeartbeatMsg() *BasicMsg {
 	// FIXME: here if we use a global variable, go test will faile
 	HeartbeatMsg := &BasicMsg{
 		cmdType: dmq.DRMsgCmdHeartbeat,
@@ -23,7 +24,7 @@ func BasicHeartbeatMsg() *BasicMsg {
 	return HeartbeatMsg
 }
 
-func BasicHandshakeMsg() *BasicMsg {
+func basicHandshakeMsg() *BasicMsg {
 	HandshakeMsg := &BasicMsg{
 		cmdType: dmq.DRMsgCmdHandshake,
 		bodyLen: 0,
@@ -38,7 +39,7 @@ func binaryMsgEncode(msg *BasicMsg) []byte {
 	bmsg[0] = msg.cmdType
 	binary.BigEndian.PutUint16(bmsg[1:], msg.bodyLen)
 	bmsg[dmq.DRMsgCmdSize+dmq.DRMsgBodySize] = msg.extra
-	var bodyLen uint16 = 0
+	var bodyLen uint16
 	for itemid, item := range msg.items {
 		bmsg = append(bmsg, itemid)
 		bItemLen := make([]byte, dmq.DRMsgItemBodySize)

@@ -8,8 +8,8 @@ const (
 )
 
 var (
-	MatchNodeDfltExpire = 15 * 60
+	matchNodeDfltExpire = 15 * 60
 
 	// heartbeat interval to other dispatcher, 5min
-	HbIntervalToDisp int = 5 * 60
+	hbIntervalToDisp = 5 * 60
 )

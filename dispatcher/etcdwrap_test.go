@@ -19,15 +19,15 @@ func init() {
 // separate the connector into a standalone module in order to start a
 // connector daemon in testing.
 
-var connid string = "conn0101"
+var connid = "conn0101"
 
 var matchport = 6000
 var bindip = "10.0.10.25"
 
 func fakeSrvConfig() *SrvConfig {
 	cfg := &SrvConfig{
-		NodeId:        "disp0101",
-		BindIp:        bindip,
+		NodeID:        "disp0101",
+		BindIP:        bindip,
 		MatchTCPBind:  "0.0.0.0:6000",
 		MatchTCPPort:  matchport,
 		HeartbeatIval: 30,
@@ -39,13 +39,13 @@ func fakeSrvConfig() *SrvConfig {
 func TestRegisterEtcd(t *testing.T) {
 	rmgr := &RouterManager{}
 	cfg := fakeSrvConfig()
-	err := RegisterEtcd(rmgr, cfg, ecpool)
+	err := registerEtcd(rmgr, cfg, ecpool)
 	defer func() {
-		UnregisterEtcd(cfg, ecpool)
+		unRegisterEtcd(cfg, ecpool)
 		rmgr.conn.Close()
 	}()
 	if err != nil {
-		t.Errorf("RegisterEtcd error(%v)", err)
+		t.Errorf("registerEtcd error(%v)", err)
 	}
 }
 
@@ -54,17 +54,23 @@ func TestGetConnRelatedDispAddr(t *testing.T) {
 	time.Sleep(time.Duration(100) * time.Millisecond)
 	rmgr := &RouterManager{}
 	cfg := fakeSrvConfig()
-	if err := RegisterEtcd(rmgr, cfg, ecpool); err != nil {
+	if err := registerEtcd(rmgr, cfg, ecpool); err != nil {
 		panic(err)
 	}
 	defer func() {
-		UnregisterEtcd(cfg, ecpool)
+		unRegisterEtcd(cfg, ecpool)
 		rmgr.conn.Close()
 	}()
 
-	if addr, err := GetConnRelatedDispAddr(connid, ecpool); err != nil {
-		t.Errorf("Get Connector related Dispatcher failed: %v", err)
-	} else if addr != fmt.Sprintf("%s:%d", bindip, matchport) {
+	info, err := getConnRelatedDispInfo(connid, ecpool)
+	if err != nil {
+		t.Errorf("Get Connector related info failed: %v", err)
+	}
+	addr, ok := info["addr"]
+	if !ok {
+		t.Errorf("addr not in info: %v", info)
+	}
+	if addr != fmt.Sprintf("%s:%d", bindip, matchport) {
 		t.Errorf("wrong addr %s found, should be %s:%d", addr, bindip, matchport)
 	}
 }

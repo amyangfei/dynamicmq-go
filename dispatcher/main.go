@@ -15,32 +15,37 @@ import (
 	"time"
 )
 
+// Server basic config
 var Config *SrvConfig
 
-var RouterMgr *RouterManager = &RouterManager{}
+// manage connection to connector
+var RouterMgr = &RouterManager{}
 
+// mapping from a connector ID to its corresponding DispConn, which manages a
+// connection to a specific dispatcher
 var DispConns map[string]*DispConn
 
+// etcd client pool
 var EtcdCliPool *dmq.EtcdClientPool
 
 var log = logging.MustGetLogger("dynamicmq-dispatcher")
 
-// InitSignal register signals handler.
-func InitSignal() chan os.Signal {
+// initSignal register signals handler.
+func initSignal() chan os.Signal {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM,
 		syscall.SIGINT, syscall.SIGSTOP)
 	return c
 }
 
-func HandleSignal(c chan os.Signal) {
+func handleSignal(c chan os.Signal) {
 	// Block until a signal is received.
 	for {
 		s := <-c
 		log.Info("get a signal %s", s.String())
 		switch s {
 		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGSTOP, syscall.SIGINT:
-			ShutdownServer()
+			shutdownServer()
 			return
 		case syscall.SIGHUP:
 			// TODO reload
@@ -50,7 +55,7 @@ func HandleSignal(c chan os.Signal) {
 	}
 }
 
-func InitConfig(configFile string) error {
+func initConfig(configFile string) error {
 	conf, err := globalconf.NewWithOptions(&globalconf.Options{
 		Filename: configFile,
 	})
@@ -84,8 +89,8 @@ func InitConfig(configFile string) error {
 
 	Config = &SrvConfig{}
 
-	Config.NodeId = serverFlagSet.Lookup("node_id").Value.String()
-	Config.BindIp = serverFlagSet.Lookup("bind_ip").Value.String()
+	Config.NodeID = serverFlagSet.Lookup("node_id").Value.String()
+	Config.BindIP = serverFlagSet.Lookup("bind_ip").Value.String()
 	Config.MatchTCPPort, err =
 		strconv.Atoi(serverFlagSet.Lookup("match_tcp_port").Value.String())
 	Config.MatchTCPBind = fmt.Sprintf("0.0.0.0:%d", Config.MatchTCPPort)
@@ -113,7 +118,7 @@ func InitConfig(configFile string) error {
 	return nil
 }
 
-func InitLog(logFile string) error {
+func initLog(logFile string) error {
 	var format = logging.MustStringFormatter(
 		"%{time:2006-01-02 15:04:05.000} [%{level:.4s}] %{id:03x} [%{shortfunc}] %{message}",
 	)
@@ -129,15 +134,15 @@ func InitLog(logFile string) error {
 	return nil
 }
 
-func InitServer() error {
+func initServer() error {
 	DispConns = make(map[string]*DispConn)
 	EtcdCliPool = dmq.NewEtcdClientPool(
 		Config.EtcdMachines, Config.EtcdPoolSize, Config.EtcdPoolMaxSize)
 	return nil
 }
 
-func ShutdownServer() {
-	UnregisterEtcd(Config, EtcdCliPool)
+func shutdownServer() {
+	unRegisterEtcd(Config, EtcdCliPool)
 }
 
 func main() {
@@ -154,7 +159,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err := InitConfig(configFile); err != nil {
+	if err := initConfig(configFile); err != nil {
 		panic(err)
 	}
 
@@ -162,25 +167,25 @@ func main() {
 		panic(err)
 	}
 
-	if err := InitLog(Config.LogFile); err != nil {
+	if err := initLog(Config.LogFile); err != nil {
 		panic(err)
 	}
 
-	if err := InitServer(); err != nil {
+	if err := initServer(); err != nil {
 		panic(err)
 	}
 
-	if err := StartMatchTCP(Config.MatchTCPBind); err != nil {
+	if err := startMatchTCP(Config.MatchTCPBind); err != nil {
 		panic(err)
 	}
 
 	// Errors may occur if this procedure acquires the waiting lock before the
 	// expected connector registering to etcd. So try another time when error
-	// occurs. We should ensure the RegisterEtcd can be called idempotently.
+	// occurs. We should ensure the registerEtcd can be called idempotently.
 	retryTime := 5
 	var regerr error
 	for i := 0; i < retryTime; i++ {
-		if regerr = RegisterEtcd(RouterMgr, Config, EtcdCliPool); regerr != nil {
+		if regerr = registerEtcd(RouterMgr, Config, EtcdCliPool); regerr != nil {
 			log.Error("%d time register to etcd with error: %v", i+1, regerr)
 			time.Sleep(time.Second * time.Duration(1))
 		} else {
@@ -191,8 +196,8 @@ func main() {
 		panic(regerr)
 	}
 
-	signalChan := InitSignal()
-	HandleSignal(signalChan)
+	signalChan := initSignal()
+	handleSignal(signalChan)
 
 	log.Info("connector stop")
 }

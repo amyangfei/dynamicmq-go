@@ -1,9 +1,10 @@
 package main
 
+// SrvConfig represents server basic configuration
 type SrvConfig struct {
 	// server config
-	NodeId         string
-	BindIp         string
+	NodeID         string
+	BindIP         string
 	MatchTCPPort   int
 	MatchTCPBind   string
 	MaxProc        int

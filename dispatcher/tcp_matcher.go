@@ -12,13 +12,15 @@ import (
 	"time"
 )
 
+// MatchClient manages connection of a matcher
 type MatchClient struct {
-	id         bson.ObjectId // Matcher NodeId
+	id         bson.ObjectId // Matcher NodeID
 	conn       net.Conn
 	processBuf []byte
 	processEnd int
 }
 
+// DecodedMsg struct
 type DecodedMsg struct {
 	extra   uint8
 	bodyLen uint16
@@ -26,20 +28,20 @@ type DecodedMsg struct {
 }
 
 var (
-	ProcessLater = errors.New("process later")
+	errProcessLater = errors.New("process later")
 )
 
-type HandleMsgFunc struct {
+type handleMsgFunc struct {
 	validate func(msg *DecodedMsg) error
 	process  func(msg *DecodedMsg, cli *MatchClient) error
 }
 
-var DispCmdTable = map[uint8]HandleMsgFunc{
-	dmq.MDMsgCmdPushMsg:   HandleMsgFunc{validate: validatePushMsg, process: processPushMsg},
-	dmq.MDMsgCmdHeartbeat: HandleMsgFunc{validate: validateHeartbeat, process: processHeartbeat},
+var dispCmdTable = map[uint8]handleMsgFunc{
+	dmq.MDMsgCmdPushMsg:   handleMsgFunc{validate: validatePushMsg, process: processPushMsg},
+	dmq.MDMsgCmdHeartbeat: handleMsgFunc{validate: validateHeartbeat, process: processHeartbeat},
 }
 
-func StartMatchTCP(bind string) error {
+func startMatchTCP(bind string) error {
 	log.Info("start tcp listening: %s for matcher", bind)
 	go tcpListen(bind)
 	return nil
@@ -100,8 +102,8 @@ func tcpListen(bind string) {
 }
 
 func setMatchNodeTimeout(cli *MatchClient) error {
-	var timeout time.Time = time.Now()
-	timeout = timeout.Add(time.Second * time.Duration(MatchNodeDfltExpire))
+	timeout := time.Now()
+	timeout = timeout.Add(time.Second * time.Duration(matchNodeDfltExpire))
 	return cli.conn.SetReadDeadline(timeout)
 }
 
@@ -122,13 +124,12 @@ func handleTCPConn(cli *MatchClient, rc chan *bufio.Reader) {
 			if err == io.EOF {
 				log.Info("addr: %s close connection", addr)
 				return
-			} else {
-				log.Error("addr: %s read with error(%v)", addr, err)
-				break
 			}
+			log.Error("addr: %s read with error(%v)", addr, err)
+			break
 		} else {
 			err := processReadbuf(cli, cli.processBuf[:cli.processEnd+rlen])
-			if err != nil && err != ProcessLater {
+			if err != nil && err != errProcessLater {
 				log.Error("process MatcherClient conn readbuf error(%v)", err)
 				break
 			}
@@ -145,7 +146,7 @@ func handleTCPConn(cli *MatchClient, rc chan *bufio.Reader) {
 }
 
 func processReadbuf(cli *MatchClient, buf []byte) error {
-	var remaining uint16 = uint16(len(buf))
+	remaining := uint16(len(buf))
 	for {
 		if remaining == 0 {
 			cli.processEnd = 0
@@ -154,11 +155,11 @@ func processReadbuf(cli *MatchClient, buf []byte) error {
 		if remaining < dmq.MDMsgHeaderSize {
 			cli.processEnd = int(remaining)
 			copy(buf[:cli.processEnd], buf[len(buf)-int(remaining):])
-			return ProcessLater
+			return errProcessLater
 		}
 		start := uint16(len(buf)) - remaining
-		var cmd uint8 = buf[start]
-		var bodyLen uint16 = binary.BigEndian.Uint16(buf[start+dmq.MDMsgCmdSize:])
+		cmd := buf[start]
+		bodyLen := binary.BigEndian.Uint16(buf[start+dmq.MDMsgCmdSize:])
 		if bodyLen > dmq.MDMsgMaxBodyLen {
 			cli.processEnd = 0
 			log.Error("invalid request, invalid body length: %d", bodyLen)
@@ -172,7 +173,7 @@ func processReadbuf(cli *MatchClient, buf []byte) error {
 				log.Error("invalid request error(%v)", err)
 				continue
 			}
-			if processFunc, ok := DispCmdTable[cmd]; ok {
+			if processFunc, ok := dispCmdTable[cmd]; ok {
 				if err := processFunc.validate(decMsg); err != nil {
 					log.Error("request valid error(%v)", err)
 				} else {
@@ -184,13 +185,13 @@ func processReadbuf(cli *MatchClient, buf []byte) error {
 		} else {
 			cli.processEnd = int(remaining)
 			copy(buf[:cli.processEnd], buf[len(buf)-int(remaining):])
-			return ProcessLater
+			return errProcessLater
 		}
 	}
 }
 
 func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
-	var extra uint8 = msg[dmq.MDMsgCmdSize+dmq.MDMsgBodySize]
+	extra := msg[dmq.MDMsgCmdSize+dmq.MDMsgBodySize]
 	decMsg := DecodedMsg{
 		extra: extra, bodyLen: bodyLen, items: make(map[uint8]string, 0),
 	}
@@ -205,8 +206,8 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 		if itemLen+dmq.MDMsgItemHeaderSize+offset > totalLen {
 			return nil, errors.New("invalid item body length")
 		}
-		var itemId uint8 = msg[offset]
-		decMsg.items[itemId] = string(
+		itemID := msg[offset]
+		decMsg.items[itemID] = string(
 			msg[offset+dmq.MDMsgItemHeaderSize : offset+dmq.MDMsgItemHeaderSize+itemLen])
 		offset += dmq.MDMsgItemHeaderSize + itemLen
 	}
@@ -221,12 +222,10 @@ func validatePushMsg(msg *DecodedMsg) error {
 		return fmt.Errorf("msg payload too large %d", len(payload))
 	}
 
-	if msgId, ok := msg.items[dmq.MDMsgItemMsgidID]; !ok {
+	if msgID, ok := msg.items[dmq.MDMsgItemMsgidID]; !ok {
 		return errors.New("msgid item not found")
-	} else {
-		if uint16(len(msgId)) != dmq.MDMsgItemMsgidSize {
-			return errors.New("msgid item not found")
-		}
+	} else if uint16(len(msgID)) != dmq.MDMsgItemMsgidSize {
+		return errors.New("msgid item not found")
 	}
 
 	if _, ok := msg.items[dmq.MDMsgItemSubListID]; !ok {
@@ -252,44 +251,44 @@ func processPushMsg(msg *DecodedMsg, cli *MatchClient) error {
 			},
 		}
 		bmsg := binaryMsgEncode(rmsg)
-		RmSendMsg2Conn(RouterMgr, bmsg)
+		rmSendMsg2Conn(RouterMgr, bmsg)
 		return nil
 	}
 
 	// Message must have been validated before processing
-	msgId, _ := msg.items[dmq.MDMsgItemMsgidID]
+	msgID, _ := msg.items[dmq.MDMsgItemMsgidID]
 	msgPayload, _ := msg.items[dmq.MDMsgItemPayloadID]
 
 	cliGroup := map[string][]byte{}
 	subInfoList, _ := msg.items[dmq.MDMsgItemSubListID]
 	step := dmq.SubClientIDSize + dmq.ConnectorNodeIDSize
 	for i := 0; i+step <= len(subInfoList); i += step {
-		subId := subInfoList[i : i+dmq.SubClientIDSize]
-		connId := subInfoList[i+dmq.SubClientIDSize : i+step]
-		cliGroup[connId] = append(cliGroup[connId], []byte(subId)...)
+		subID := subInfoList[i : i+dmq.SubClientIDSize]
+		connID := subInfoList[i+dmq.SubClientIDSize : i+step]
+		cliGroup[connID] = append(cliGroup[connID], []byte(subID)...)
 	}
 
-	for cid, subIds := range cliGroup {
+	for cid, subIDs := range cliGroup {
 		msg := &BasicMsg{
 			cmdType: dmq.DRMsgCmdPushMsg,
 			bodyLen: 0,
 			extra:   dmq.DRMsgExtraNone,
 			items: map[uint8]string{
-				dmq.DRMsgItemMsgidID:   msgId,
+				dmq.DRMsgItemMsgidID:   msgID,
 				dmq.DRMsgItemPayloadID: msgPayload,
-				dmq.DRMsgItemSubListID: string(subIds),
+				dmq.DRMsgItemSubListID: string(subIDs),
 			},
 		}
 
 		if cid == RouterMgr.cid {
 			log.Debug("send %d direct msg to connector %s",
-				len(subIds)/dmq.SubClientIDSize, cid)
+				len(subIDs)/dmq.SubClientIDSize, cid)
 			bmsg := binaryMsgEncode(msg)
-			RmSendMsg2Conn(RouterMgr, bmsg)
+			rmSendMsg2Conn(RouterMgr, bmsg)
 		} else {
 			msg.extra |= dmq.DRMsgExtraRedirect
 			bmsg := binaryMsgEncode(msg)
-			DispMsgSender(cid, bmsg)
+			dispMsgSender(cid, bmsg)
 		}
 	}
 

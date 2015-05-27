@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// DispConn struct
 type DispConn struct {
 	connid string
 	dispid string
@@ -15,15 +16,16 @@ type DispConn struct {
 	stop   chan bool
 }
 
-func DispMsgSender(connid string, msg []byte) error {
-	if dpconn, err := getDispConn(connid); err != nil {
+func dispMsgSender(connid string, msg []byte) error {
+	dpconn, err := getDispConn(connid)
+	if err != nil {
 		return err
-	} else {
-		// FIXME: benchmark shows great latency using channel way: dpconn.sender <- msg
-		go func() {
-			dpconn.conn.Write(msg)
-		}()
 	}
+	// FIXME: benchmark shows great latency using channel way: dpconn.sender <- msg
+	go func() {
+		dpconn.conn.Write(msg)
+	}()
+
 	return nil
 }
 
@@ -32,7 +34,7 @@ func DispMsgSender(connid string, msg []byte) error {
 func getDispConn(connid string) (*DispConn, error) {
 	dispConn, ok := DispConns[connid]
 	if !ok {
-		info, err := GetConnRelatedDispInfo(connid, EtcdCliPool)
+		info, err := getConnRelatedDispInfo(connid, EtcdCliPool)
 		if err != nil {
 			return nil, err
 		}
@@ -54,7 +56,7 @@ func getDispConn(connid string) (*DispConn, error) {
 		}
 
 		DispConns[connid] = dispConn
-		dispConn.LifeCycle()
+		dispConn.lifeCycle()
 	}
 	return dispConn, nil
 }
@@ -70,7 +72,7 @@ func (dpconn *DispConn) heartbeat() {
 	dpconn.sender <- bmsg
 }
 
-func (dpconn *DispConn) HeartbeatRoutine(interval int) {
+func (dpconn *DispConn) heartbeatRoutine(interval int) {
 	ticker := time.NewTicker(time.Second * time.Duration(interval))
 	for {
 		<-ticker.C
@@ -78,8 +80,8 @@ func (dpconn *DispConn) HeartbeatRoutine(interval int) {
 	}
 }
 
-func (dpconn *DispConn) LifeCycle() {
-	go dpconn.HeartbeatRoutine(HbIntervalToDisp)
+func (dpconn *DispConn) lifeCycle() {
+	go dpconn.heartbeatRoutine(hbIntervalToDisp)
 
 	go func() {
 		buf := make([]byte, 64)

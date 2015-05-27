@@ -7,18 +7,19 @@ import (
 	"time"
 )
 
+// RouterManager struct
 type RouterManager struct {
-	cid    string // Connector NodeId
+	cid    string // Connector NodeID
 	conn   net.Conn
 	status int
 }
 
-func (rmgr *RouterManager) SendData(msg []byte) error {
+func (rmgr *RouterManager) sendData(msg []byte) error {
 	_, err := rmgr.conn.Write(msg)
 	return err
 }
 
-func ConnToConnRouter(addr, cid string, rmgr *RouterManager, cfg *SrvConfig) error {
+func connToConnRouter(addr, cid string, rmgr *RouterManager, cfg *SrvConfig) error {
 	log.Info("start tcp connection to router: %s", addr)
 	raddr, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
@@ -33,35 +34,35 @@ func ConnToConnRouter(addr, cid string, rmgr *RouterManager, cfg *SrvConfig) err
 	rmgr.conn = conn
 	rmgr.status = RmStatusOk
 
-	go RmHandShake2Conn(rmgr, cfg)
-	go RmHeartbeat2Conn(rmgr, cfg)
+	go rmHandShake2Conn(rmgr, cfg)
+	go rmHeartbeat2Conn(rmgr, cfg)
 
 	return nil
 }
 
-func RmHandShake2Conn(rmgr *RouterManager, cfg *SrvConfig) {
-	hsMsg := BasicHandshakeMsg()
-	hsMsg.items[dmq.DRMsgItemDispidID] = cfg.NodeId
+func rmHandShake2Conn(rmgr *RouterManager, cfg *SrvConfig) {
+	hsMsg := basicHandshakeMsg()
+	hsMsg.items[dmq.DRMsgItemDispidID] = cfg.NodeID
 	bmsg := binaryMsgEncode(hsMsg)
-	rmgr.SendData(bmsg)
+	rmgr.sendData(bmsg)
 }
 
-func RmHeartbeat2Conn(rmgr *RouterManager, cfg *SrvConfig) {
+func rmHeartbeat2Conn(rmgr *RouterManager, cfg *SrvConfig) {
 	ticker := time.NewTicker(time.Second * time.Duration(cfg.HeartbeatIval))
 	b := make([]byte, dmq.DRMsgItemTsSize)
 	for {
 		<-ticker.C
 		now := time.Now().Unix()
 		binary.BigEndian.PutUint64(b, uint64(now))
-		hbMsg := BasicHeartbeatMsg()
+		hbMsg := basicHeartbeatMsg()
 		hbMsg.items[dmq.DRMsgItemTimestampID] = string(b)
 		bmsg := binaryMsgEncode(hbMsg)
-		rmgr.SendData(bmsg)
+		rmgr.sendData(bmsg)
 		log.Debug("send heartbeat to connector %s", rmgr.cid)
 	}
 }
 
-func RmSendMsg2Conn(rmgr *RouterManager, msg []byte) {
+func rmSendMsg2Conn(rmgr *RouterManager, msg []byte) {
 	go func() {
 		// From golang document: http://golang.org/pkg/net/
 		// Multiple goroutines may invoke methods on a Conn simultaneously.
