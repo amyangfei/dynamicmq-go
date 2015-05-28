@@ -5,18 +5,18 @@ import (
 	"sort"
 )
 
-// When a new physical node join the ring,
+// JoinVnodes is called when a new physical node join the ring,
 // add all of its virtual nodes into local route table
 func (rt *RTable) JoinVnodes(newnodes []*Vnode) {
 	for _, vn := range newnodes {
-		rt.JoinVnode(vn)
+		rt.joinVnode(vn)
 	}
 }
 
-func (rt *RTable) JoinVnode(vnode *Vnode) {
+func (rt *RTable) joinVnode(vnode *Vnode) {
 	// find insertion postion
 	pos := sort.Search(len(rt.vnodes), func(i int) bool {
-		return bytes.Compare(rt.vnodes[i].Id, vnode.Id) >= 0
+		return bytes.Compare(rt.vnodes[i].ID, vnode.ID) >= 0
 	})
 	// Insert new virtual node into route-table
 	if pos == len(rt.vnodes) {
@@ -28,14 +28,15 @@ func (rt *RTable) JoinVnode(vnode *Vnode) {
 	}
 }
 
-// Find the vnode who stores the key with hash of keyhash
+// Search finds the vnode who stores the key with hash of keyhash
 func (rt *RTable) Search(keyhash []byte) *Vnode {
 	pos := sort.Search(len(rt.vnodes), func(i int) bool {
-		return bytes.Compare(rt.vnodes[i].Id, keyhash) >= 0
+		return bytes.Compare(rt.vnodes[i].ID, keyhash) >= 0
 	})
 	return rt.vnodes[pos%len(rt.vnodes)]
 }
 
+// FindPeer finds the peer node with hostname
 func (rt *RTable) FindPeer(hostname string) (int, *PeerNode) {
 	for idx, pnode := range rt.peers {
 		if pnode.Hostname == hostname {

@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-var hashBytes int = 20 // 20 * 8 = 160 bits
-var vnodeNum int = 16
+var hashBytes = 20 // 20 * 8 = 160 bits
+var vnodeNum = 16
 var maxhash, step *big.Int
 
 func init() {
@@ -31,10 +31,10 @@ func makeVnode() *localVnode {
 func TestVnodeInit(t *testing.T) {
 	vn := makeVnode()
 	vn.init(nil, vn.node.Config.StartHash)
-	if len(vn.Id) != sha1.New().Size() {
-		t.Errorf("wrong virtual node id %v", vn.Id)
+	if len(vn.ID) != sha1.New().Size() {
+		t.Errorf("wrong virtual node id %v", vn.ID)
 	}
-	t.Logf("virtual node id %v", vn.Id)
+	t.Logf("virtual node id %v", vn.ID)
 }
 
 func TestHashJump(t *testing.T) {

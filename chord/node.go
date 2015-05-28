@@ -17,6 +17,7 @@ import (
 	"time"
 )
 
+// StatusClient manages the TCP connection from local serf status client
 type StatusClient struct {
 	hostname   string
 	expire     int64
@@ -25,6 +26,7 @@ type StatusClient struct {
 	processEnd int
 }
 
+// BasicMsg struct
 type BasicMsg struct {
 	cmdType uint8
 	bodyLen uint16
@@ -32,6 +34,7 @@ type BasicMsg struct {
 	items   map[uint8]string
 }
 
+// DecodedMsg struct
 type DecodedMsg struct {
 	extra   uint8
 	bodyLen uint16
@@ -39,17 +42,17 @@ type DecodedMsg struct {
 }
 
 var (
-	DfltExpire int64 = 15 * 60
+	dfltExpire int64 = 15 * 60
 )
 
-type HandleMsgFunc struct {
+type handleMsgFunc struct {
 	validate func(msg *DecodedMsg, n *Node) error
 	process  func(msg *DecodedMsg, n *Node) error
 }
 
-var StatusCmdTable = map[uint8]HandleMsgFunc{
-	dmq.SDDMsgCmdNodeInfo:  HandleMsgFunc{validate: validateNodeInfoMsg, process: processNodeInfoMsg},
-	dmq.SDDMsgCmdVNodeInfo: HandleMsgFunc{validate: validateVNodeInfoMsg, process: processVNodeInfoMsg},
+var statusCmdTable = map[uint8]handleMsgFunc{
+	dmq.SDDMsgCmdNodeInfo:  handleMsgFunc{validate: validateNodeInfoMsg, process: processNodeInfoMsg},
+	dmq.SDDMsgCmdVNodeInfo: handleMsgFunc{validate: validateVNodeInfoMsg, process: processVNodeInfoMsg},
 }
 
 func chgWorkdir(path string) error {
@@ -72,14 +75,15 @@ func createSerfevHelper(conf *NodeConfig) error {
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
-	w.WriteString(fmt.Sprintf("[%s]\n", cfg_sect_node))
+	w.WriteString(fmt.Sprintf("[%s]\n", cfgSectNode))
 	rpcAddr := strings.Split(conf.RPCAddr, ":")
 	rpcPort := rpcAddr[len(rpcAddr)-1]
-	w.WriteString(fmt.Sprintf("%s = %s:%s\n", cfg_item_rpcaddr, conf.HostIp, rpcPort))
+	w.WriteString(fmt.Sprintf("%s = %s:%s\n", cfgItemRpcaddr, conf.HostIP, rpcPort))
 	w.Flush()
 	return nil
 }
 
+// CreateNode creates a new Node struct
 func CreateNode(conf *NodeConfig) *Node {
 	node := &Node{
 		Config: conf,
@@ -115,11 +119,12 @@ func (n *Node) init() {
 		}
 		n.LVnodes[i] = lvn
 		lvn.init(peerNode, curHash)
-		n.Rtable.JoinVnode(&lvn.Vnode)
+		n.Rtable.joinVnode(&lvn.Vnode)
 		curHash = HashJump(curHash, n.Config.step, n.Config.maxhash)
 	}
 }
 
+// SetLogger is used to set logging module for this node
 func (n *Node) SetLogger(log *logging.Logger) {
 	n.log = log
 }
@@ -132,7 +137,7 @@ func (n *Node) Len() int {
 // Less returns whether the vnode with index i should sort
 // before the vnode with index j.
 func (n *Node) Less(i, j int) bool {
-	return bytes.Compare(n.LVnodes[i].Id, n.LVnodes[j].Id) == -1
+	return bytes.Compare(n.LVnodes[i].ID, n.LVnodes[j].ID) == -1
 }
 
 // Swap swaps the vnodes with indexes i and j.
@@ -140,6 +145,7 @@ func (n *Node) Swap(i, j int) {
 	n.LVnodes[i], n.LVnodes[j] = n.LVnodes[j], n.LVnodes[i]
 }
 
+// SerfStart is a wrapper function for serfStart
 func (n *Node) SerfStart(c chan Notification, logger io.Writer) {
 	params := make(map[string]string)
 	if n.Config.Serf.NodeName != "" {
@@ -161,17 +167,18 @@ func (n *Node) SerfStart(c chan Notification, logger io.Writer) {
 	serfStart(c, logger, n.Config.Serf.BinPath, params, n.Config.Serf.Args)
 }
 
+// SerfStop is a wrapper function for serfStop
 func (n *Node) SerfStop() error {
 	return serfStop(n.Config.Serf.BinPath, n.Config.Serf.RPCAddr)
 }
 
-// Call This function to tell serf running on this node to join the cluster
+// SerfJoin is called to tell serf running on this node to join the cluster
 // addr is an arbitrary serf bind address of nodes in Chord ring
 func (n *Node) SerfJoin(addr string) error {
 	return serfJoin(n.Config.Serf.BinPath, n.Config.Serf.RPCAddr, addr)
 }
 
-// Call This function to send serf user event to serf cluster
+// SerfUserEvent is Called to send serf user event to serf cluster
 // evname, represents for event type, including:
 // 	 nodeinfo: information of chord physical node
 // 	 vnodeinfo: information of all vnodes that belongs to one chord physical node
@@ -187,31 +194,33 @@ func (n *Node) SerfUserEvent(evname, payload string, coalesce bool, c chan Notif
 	serfUserEvent(n.Config.Serf.BinPath, evname, payload, params, c)
 }
 
+// Shutdown is called when we want to destroy the node
 func (n *Node) Shutdown() error {
 	err := n.SerfStop()
 	return err
 }
 
+// SerfSchdule is called after one chord node is created and to create or join
+// a serf topology
 func (n *Node) SerfSchdule(c chan Notification, logger io.Writer) error {
 	// start serf agent
 	n.SerfStart(c, logger)
 
 	// try to detect member's aliveness for three times
-	retry_count := 3
-	for i := 0; i < retry_count; i++ {
+	retryConut := 3
+	for i := 0; i < retryConut; i++ {
 		msg, err := checkMemberAlive(n.Config.Serf.BinPath, n.Config.Serf.RPCAddr)
 		if err == nil {
 			if strings.Contains(msg, n.Config.Serf.NodeName) &&
-				strings.Contains(msg, serf_agent_alive) {
+				strings.Contains(msg, serfAgentAlive) {
 				break
 			}
 		}
-		if i == retry_count-1 {
+		if i == retryConut-1 {
 			if err != nil {
 				return fmt.Errorf("%v: %s", err, msg)
-			} else {
-				return fmt.Errorf("alive not detected: %s", msg)
 			}
+			return fmt.Errorf("alive not detected: %s", msg)
 		}
 	}
 
@@ -223,23 +232,23 @@ func (n *Node) SerfSchdule(c chan Notification, logger io.Writer) error {
 	}
 
 	// broadcast node information via serf
-	if info, err := n.Nodeinfo(); err != nil {
+	info, err := n.Nodeinfo()
+	if err != nil {
 		return err
-	} else {
-		n.SerfUserEvent(serf_userev_nodeinfo, string(info), false, c)
 	}
+	n.SerfUserEvent(serfUserevNodeinfo, string(info), false, c)
 
 	// broadcast node's virtual nodes information via serf
-	if info, err := n.Vnodeinfo(); err != nil {
+	vinfo, err := n.Vnodeinfo()
+	if err != nil {
 		return err
-	} else {
-		n.SerfUserEvent(serf_userev_vnodeinfo, string(info), false, c)
 	}
+	n.SerfUserEvent(serfUserevVnodeinfo, string(vinfo), false, c)
 
 	return nil
 }
 
-// return a json string represents chord node information
+// Nodeinfo returns a json string represents chord node information
 func (n *Node) Nodeinfo() ([]byte, error) {
 	info := make(map[string]string)
 	info["hostname"] = n.Config.Hostname
@@ -251,6 +260,7 @@ func (n *Node) Nodeinfo() ([]byte, error) {
 	return json.Marshal(&info)
 }
 
+// Vnodeinfo returns node information with all its vnodes in json string format
 // TODO: Support vnode information broadcasting with any packet size.
 // Currently we don't support broadcasting vnode info larger than 512 byte.
 // because serf has data size limitation with UserEventSizeLimit = 512 byte
@@ -258,17 +268,17 @@ func (n *Node) Vnodeinfo() ([]byte, error) {
 	info := make(map[string][]byte)
 	info["hostname"] = []byte(n.Config.Hostname)
 	info["serf"] = []byte(n.Config.Serf.NodeName)
-	ids := make([]byte, 0)
+	var ids []byte
 	for _, vnode := range n.LVnodes {
-		ids = append(ids, vnode.Id...)
+		ids = append(ids, vnode.ID...)
 	}
 	info["vnode"] = ids
 
 	return json.Marshal(&info)
 }
 
-// Public interface for node/vnode information and status broadcasting
-// FIXME: use generic log interface
+// StartStatusTcp is the public interface for node/vnode information and status
+// broadcasting
 func (n *Node) StartStatusTcp() {
 	go n.statusTcpListen()
 }
@@ -316,7 +326,7 @@ func (n *Node) statusTcpListen() {
 			continue
 		}
 		statusCli := &StatusClient{
-			expire:     time.Now().Unix() + DfltExpire,
+			expire:     time.Now().Unix() + dfltExpire,
 			conn:       conn,
 			processBuf: make([]byte, n.Config.TCPRecvBufSize*2),
 			processEnd: 0,
@@ -332,7 +342,7 @@ func (n *Node) handleStatusTCPconn(cli *StatusClient, rc chan *bufio.Reader) {
 	log.Debug("handleStatusTCPconn(%s) routine start", addr)
 
 	for {
-		timeout := time.Now().Add(time.Second * time.Duration(DfltExpire))
+		timeout := time.Now().Add(time.Second * time.Duration(dfltExpire))
 		if err := cli.conn.SetReadDeadline(timeout); err != nil {
 			log.Error("StatusClient set timeout error(%v)", err)
 			break
@@ -344,13 +354,12 @@ func (n *Node) handleStatusTCPconn(cli *StatusClient, rc chan *bufio.Reader) {
 			if err == io.EOF {
 				log.Info("addr: %s close connection", addr)
 				return
-			} else {
-				log.Error("addr: %s read with error(%v)", addr, err)
-				break
 			}
+			log.Error("addr: %s read with error(%v)", addr, err)
+			break
 		} else {
 			err := n.processReadbuf(cli, cli.processBuf[:cli.processEnd+rlen])
-			if err != nil && err != ProcessLater {
+			if err != nil && err != errProcessLater {
 				log.Error("process conn readbuf error(%v)", err)
 				break
 			}
@@ -366,7 +375,7 @@ func (n *Node) handleStatusTCPconn(cli *StatusClient, rc chan *bufio.Reader) {
 
 func (n *Node) processReadbuf(cli *StatusClient, buf []byte) error {
 	log := n.log
-	var remaining uint16 = uint16(len(buf))
+	remaining := uint16(len(buf))
 	for {
 		if remaining == 0 {
 			cli.processEnd = 0
@@ -375,11 +384,11 @@ func (n *Node) processReadbuf(cli *StatusClient, buf []byte) error {
 		if remaining < dmq.SDDMsgHeaderSize {
 			cli.processEnd = int(remaining)
 			copy(buf[:cli.processEnd], buf[len(buf)-int(remaining):])
-			return ProcessLater
+			return errProcessLater
 		}
 		start := uint16(len(buf)) - remaining
-		var cmd uint8 = buf[start]
-		var bodyLen uint16 = binary.BigEndian.Uint16(buf[start+dmq.SDDMsgCmdSize:])
+		cmd := buf[start]
+		bodyLen := binary.BigEndian.Uint16(buf[start+dmq.SDDMsgCmdSize:])
 		if bodyLen > dmq.SDDMsgMaxBodyLen {
 			cli.processEnd = 0
 			log.Error("invalid request, invalid body length: %d", bodyLen)
@@ -392,7 +401,7 @@ func (n *Node) processReadbuf(cli *StatusClient, buf []byte) error {
 				log.Error("invalid request error(%v)", err)
 				continue
 			}
-			if processFunc, ok := StatusCmdTable[cmd]; ok {
+			if processFunc, ok := statusCmdTable[cmd]; ok {
 				if err := processFunc.validate(decMsg, n); err != nil {
 					log.Error("cmd %d request valid error(%v)", cmd, err)
 				} else {
@@ -406,13 +415,13 @@ func (n *Node) processReadbuf(cli *StatusClient, buf []byte) error {
 		} else {
 			cli.processEnd = int(remaining)
 			copy(buf[:cli.processEnd], buf[len(buf)-int(remaining):])
-			return ProcessLater
+			return errProcessLater
 		}
 	}
 }
 
 func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
-	var extra uint8 = msg[dmq.SDDMsgCmdSize+dmq.SDDMsgBodySize]
+	extra := msg[dmq.SDDMsgCmdSize+dmq.SDDMsgBodySize]
 	decMsg := DecodedMsg{
 		extra: extra, bodyLen: bodyLen, items: make(map[uint8]string, 0),
 	}
@@ -427,8 +436,8 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 		if itemLen+dmq.SDDMsgItemHeaderSize+offset > totalLen {
 			return nil, fmt.Errorf("invalid item body length")
 		}
-		var itemId uint8 = msg[offset]
-		decMsg.items[itemId] = string(
+		itemID := msg[offset]
+		decMsg.items[itemID] = string(
 			msg[offset+dmq.SDDMsgItemHeaderSize : offset+dmq.SDDMsgItemHeaderSize+itemLen])
 		offset += dmq.SDDMsgItemHeaderSize + itemLen
 	}
@@ -521,18 +530,18 @@ func processVNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 		log.Error("failed to parse vnodelist %v", err)
 		return err
 	}
-	vnodeIds := make([][]byte, 0)
+	var vnodeIDs [][]byte
 	for i := 0; i < len(vnodes); i += n.Config.HashBits / 8 {
 		if i+n.Config.HashBits/8 <= len(vnodes) {
-			vnodeIds = append(vnodeIds, vnodes[i:i+20])
+			vnodeIDs = append(vnodeIDs, vnodes[i:i+20])
 		}
 	}
 
 	log.Debug("recv vnodeinfo from %s", hostname)
 
 	var peer *PeerNode
-	var retry_count int = 5
-	for i := 0; i < retry_count; i++ {
+	retryConut := 5
+	for i := 0; i < retryConut; i++ {
 		_, peer = n.Rtable.FindPeer(string(hostname))
 		if peer == nil {
 			// wait a short time
@@ -548,12 +557,12 @@ func processVNodeInfoMsg(msg *DecodedMsg, n *Node) error {
 		return fmt.Errorf("peer %s not found", string(hostname))
 	}
 
-	for _, nid := range vnodeIds {
+	for _, nid := range vnodeIDs {
 		vnode := &Vnode{
-			Id:    nid,
+			ID:    nid,
 			Pnode: peer,
 		}
-		n.Rtable.JoinVnode(vnode)
+		n.Rtable.joinVnode(vnode)
 	}
 
 	return nil
@@ -579,7 +588,7 @@ func binaryMsgEncode(msg *BasicMsg) []byte {
 	bmsg[0] = msg.cmdType
 	binary.BigEndian.PutUint16(bmsg[1:], msg.bodyLen)
 	bmsg[dmq.SDDMsgCmdSize+dmq.SDDMsgBodySize] = msg.extra
-	var bodyLen uint16 = 0
+	var bodyLen uint16
 	for itemid, item := range msg.items {
 		bmsg = append(bmsg, itemid)
 		bItemLen := make([]byte, dmq.SDDMsgItemBodySize)
@@ -619,9 +628,9 @@ func (n *Node) sendNodeInfo(rpcAddr string) {
 func (n *Node) sendVnodeInfo(rpcAddr string) {
 	log := n.log
 
-	ids := make([]byte, 0)
+	var ids []byte
 	for _, vnode := range n.LVnodes {
-		ids = append(ids, vnode.Id...)
+		ids = append(ids, vnode.ID...)
 	}
 	basicMsg := &BasicMsg{
 		cmdType: dmq.SDDMsgCmdVNodeInfo,
@@ -639,8 +648,8 @@ func (n *Node) sendVnodeInfo(rpcAddr string) {
 	}
 }
 
-// Public interface for messages delivery
-func (n *Node) StartMsgTcp(log *logging.Logger) {
+// Deprecated: Public interface for messages delivery
+func (n *Node) startMsgTcp(log *logging.Logger) {
 	go n.msgTcpListen(log)
 }
 

@@ -14,7 +14,7 @@ var serfBindAddr = "0.0.0.0:12000"
 var serfRPCAddr = "127.0.0.1:13000"
 
 func startSerfAgent(t *testing.T) {
-	args := make([]string, 0)
+	var args []string
 	args = append(args, "agent")
 	args = append(args, fmt.Sprintf("-bind=%s", serfBindAddr))
 	args = append(args, fmt.Sprintf("-rpc-addr=%s", serfRPCAddr))

@@ -8,11 +8,13 @@ import (
 	"runtime"
 )
 
+// Notification struct
 type Notification struct {
 	Err error
 	Msg string
 }
 
+// SerfConfig struct
 type SerfConfig struct {
 	BinPath    string   // Path of serf binary
 	NodeName   string   // Serf agent node name
@@ -23,10 +25,11 @@ type SerfConfig struct {
 	ConfigFile string   // Path of configuration file that serf agent will load
 }
 
+// NodeConfig struct
 type NodeConfig struct {
 	Serf          *SerfConfig
 	Hostname      string           // Local host name
-	HostIp        string           // Host ip
+	HostIP        string           // Host ip
 	BindAddr      string           // Addr for message dispatching
 	WorkDir       string           // working dir
 	RPCAddr       string           // Addr for local serf agent communication
@@ -45,13 +48,13 @@ type NodeConfig struct {
 	TCPBufioNum    int
 }
 
-// Represents an Vnode
+// Vnode represents an virtual node
 type Vnode struct {
-	Id    []byte    // Virtual ID
+	ID    []byte    // Virtual ID
 	Pnode *PeerNode // physical node pointer
 }
 
-// Router Table: stores all vnodes in chord hash ring
+// RTable means router table, which stores all vnodes in chord hash ring
 type RTable struct {
 	vnodes []*Vnode
 	peers  []*PeerNode
@@ -73,7 +76,7 @@ type Node struct {
 	Rtable  *RTable
 }
 
-// represents for peer physical node
+// PeerNode represents for peer physical node
 type PeerNode struct {
 	Hostname  string
 	SerfNode  string
@@ -82,6 +85,7 @@ type PeerNode struct {
 	StartHash []byte
 }
 
+// DefaultConfig returns a default node config
 func DefaultConfig(hostname, serfname string) *NodeConfig {
 	conf := &NodeConfig{
 		Serf: &SerfConfig{
@@ -93,7 +97,7 @@ func DefaultConfig(hostname, serfname string) *NodeConfig {
 			ConfigFile: "",
 		},
 		Hostname:       hostname,
-		HostIp:         "127.0.0.1",
+		HostIP:         "127.0.0.1",
 		BindAddr:       "0.0.0.0:5000",
 		RPCAddr:        "0.0.0.0:5500",
 		NumVnodes:      16,

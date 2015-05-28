@@ -9,7 +9,7 @@ import (
 )
 
 func checkMemberAlive(serfBinPath, serfRPCAddr string) (string, error) {
-	args := make([]string, 0)
+	var args []string
 	args = append(args, "members")
 	args = append(args, fmt.Sprintf("-rpc-addr=%s", serfRPCAddr))
 
@@ -24,7 +24,7 @@ func checkMemberAlive(serfBinPath, serfRPCAddr string) (string, error) {
 }
 
 func serfStart(c chan Notification, logger io.Writer, serfBinPath string, params map[string]string, otherArgs []string) {
-	args := make([]string, 0)
+	var args []string
 	args = append(args, "agent")
 	for k, v := range params {
 		args = append(args, fmt.Sprintf("-%s=%s", k, v))
@@ -47,7 +47,7 @@ func serfStart(c chan Notification, logger io.Writer, serfBinPath string, params
 }
 
 func serfStop(serfBinPath, serfRPCAddr string) error {
-	args := make([]string, 0)
+	var args []string
 	args = append(args, "leave")
 	if serfRPCAddr != "" {
 		args = append(args, fmt.Sprintf("-rpc-addr=%s", serfRPCAddr))
@@ -70,7 +70,7 @@ func serfStop(serfBinPath, serfRPCAddr string) error {
 // addr: an arbitrary serf bind address of nodes in Chord ring
 // serfRPCAddr: the rpc address of this serf agent
 func serfJoin(serfBinPath, serfRPCAddr, addr string) error {
-	args := make([]string, 0)
+	var args []string
 	args = append(args, "join")
 	if serfRPCAddr != "" {
 		args = append(args, fmt.Sprintf("-rpc-addr=%s", serfRPCAddr))
@@ -98,7 +98,7 @@ func serfJoin(serfBinPath, serfRPCAddr, addr string) error {
 //   If coalesce is true, if many events of the same name are received within a
 //   short amount of time, the event handler is only invoked once.
 func serfUserEvent(serfBinPath, evname, payload string, params map[string]string, c chan Notification) {
-	args := make([]string, 0)
+	var args []string
 	args = append(args, "event")
 	for k, v := range params {
 		args = append(args, fmt.Sprintf("-%s=%s", k, v))

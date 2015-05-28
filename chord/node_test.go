@@ -27,6 +27,6 @@ func init() {
 func TestNodeCreate(t *testing.T) {
 	node := CreateNode(conf)
 	for _, lvnode := range node.LVnodes {
-		t.Logf("%v", lvnode.Id)
+		t.Logf("%v", lvnode.ID)
 	}
 }

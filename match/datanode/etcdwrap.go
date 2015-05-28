@@ -48,7 +48,7 @@ func registerVnodes(cfg *SrvConfig, node *chord.Node, pool *dmq.EtcdClientPool) 
 	var verr error
 	lvns := node.LVnodes
 	for i, lvn := range lvns {
-		vnk := fmt.Sprintf("%s/%s", vnBaseKey, hex.EncodeToString(lvn.Vnode.Id))
+		vnk := fmt.Sprintf("%s/%s", vnBaseKey, hex.EncodeToString(lvn.Vnode.ID))
 		if _, err := c.Create(vnk, lvn.Vnode.Pnode.Hostname, 0); err != nil {
 			idx = i
 			verr = err
@@ -58,7 +58,7 @@ func registerVnodes(cfg *SrvConfig, node *chord.Node, pool *dmq.EtcdClientPool) 
 	// if error occurs, remove vnodes already registered.
 	for i := 0; i < idx; i++ {
 		lvn := lvns[i]
-		vnk := fmt.Sprintf("%s/%s", vnBaseKey, hex.EncodeToString(lvn.Vnode.Id))
+		vnk := fmt.Sprintf("%s/%s", vnBaseKey, hex.EncodeToString(lvn.Vnode.ID))
 		c.Delete(vnk, true)
 	}
 	return verr
@@ -81,7 +81,7 @@ func unRegisterDN(cfg *SrvConfig, node *chord.Node, pool *dmq.EtcdClientPool) er
 
 	vnBaseKey := dmq.GetDataVnodeKey()
 	for _, lvn := range node.LVnodes {
-		vnk := fmt.Sprintf("%s/%s", vnBaseKey, hex.EncodeToString(lvn.Vnode.Id))
+		vnk := fmt.Sprintf("%s/%s", vnBaseKey, hex.EncodeToString(lvn.Vnode.ID))
 		if _, err := c.Delete(vnk, true); err != nil {
 			reterr = fmt.Errorf("%v: %v", reterr, err)
 		}

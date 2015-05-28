@@ -66,7 +66,7 @@ func TestDataNodeOperation(t *testing.T) {
 
 	vnBaseKey := dmq.GetDataVnodeKey()
 	for _, lvn := range node.LVnodes {
-		vnk := fmt.Sprintf("%s/%s", vnBaseKey, hex.EncodeToString(lvn.Vnode.Id))
+		vnk := fmt.Sprintf("%s/%s", vnBaseKey, hex.EncodeToString(lvn.Vnode.ID))
 		if resp, err := c.Get(vnk, false, false); err != nil {
 			t.Errorf("failed to retrive vnode hash vnk %s: %v", vnk, err)
 		} else if resp.Node.Dir || resp.Node.Value != lvn.Vnode.Pnode.Hostname {

@@ -5,11 +5,13 @@ import (
 )
 
 func (lvn *localVnode) init(pnode *PeerNode, curHash []byte) {
-	lvn.Id = curHash[:]
+	lvn.ID = curHash[:]
 	lvn.Pnode = pnode
 	lvn.successors = make([]*Vnode, lvn.node.Config.NumSuccessors)
 }
 
+// HashJump gets the hash value by add step to start, if the result is larger
+// than maxhash, then calculates the remainder
 func HashJump(start []byte, step, maxhash *big.Int) []byte {
 	bi := big.NewInt(0)
 	bi.SetBytes(start)
@@ -21,6 +23,7 @@ func HashJump(start []byte, step, maxhash *big.Int) []byte {
 	return bi.Bytes()
 }
 
+// HashSplit splits the interval between start and end by percent
 func HashSplit(start, end []byte, percent int) []byte {
 	if percent < 1 || percent > 99 {
 		percent = 50

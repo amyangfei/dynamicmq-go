@@ -11,8 +11,8 @@ import (
 )
 
 var serfLogFile = "./serfagent.log"
-var fakeSerfBind string = "127.0.0.1:7497"
-var fakeSerfRPC string = "127.0.0.1:7374"
+var fakeSerfBind = "127.0.0.1:7497"
+var fakeSerfRPC = "127.0.0.1:7374"
 
 var nodeLogFile = "./test_node.log"
 
@@ -54,7 +54,7 @@ func fakeSerfConf() *SerfConfig {
 func fakeSerf(c chan Notification) {
 	conf := fakeSerfConf()
 
-	args := make([]string, 0)
+	var args []string
 	args = append(args, "agent")
 	args = append(args, fmt.Sprintf("-node=%s", conf.NodeName))
 	args = append(args, fmt.Sprintf("-bind=%s", conf.BindAddr))
@@ -79,7 +79,7 @@ func fakeSerf(c chan Notification) {
 func fakeSerfLeave(c chan Notification) {
 	conf := fakeSerfConf()
 
-	args := make([]string, 0)
+	var args []string
 	args = append(args, "leave")
 	args = append(args, fmt.Sprintf("-rpc-addr=%s", conf.RPCAddr))
 

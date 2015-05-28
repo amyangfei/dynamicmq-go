@@ -259,7 +259,7 @@ func chordRoutine() {
 			EvHandler: Config.SerfEvHandler,
 		},
 		Hostname:       Config.Hostname,
-		HostIp:         Config.BindIP,
+		HostIP:         Config.BindIP,
 		BindAddr:       Config.BindAddr,
 		RPCAddr:        Config.RPCAddr,
 		NumVnodes:      Config.NumVnodes,
