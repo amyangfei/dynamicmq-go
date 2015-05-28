@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func GetEtcdClient(machines []string) *etcd.Client {
+func getEtcdClient(machines []string) *etcd.Client {
 	return etcd.NewClient(machines)
 }
 
@@ -26,28 +26,28 @@ func stringIndex(target string, source []string) int {
 }
 
 func getAliveConnector(machines []string) ([]string, error) {
-	c := GetEtcdClient(machines)
+	c := getEtcdClient(machines)
 	connKey := "/conn/info"
-	if resp, err := c.Get(connKey, false, false); err != nil {
+	resp, err := c.Get(connKey, false, false)
+	if err != nil {
 		return nil, err
-	} else {
-		if !resp.Node.Dir {
-			return nil, fmt.Errorf("%s node should be dir", connKey)
-		}
-		connIds := make([]string, 0)
-		for _, node := range resp.Node.Nodes {
-			connIds = append(connIds, extractEtcdLastKey(node.Key))
-		}
-		return connIds, nil
 	}
+	if !resp.Node.Dir {
+		return nil, fmt.Errorf("%s node should be dir", connKey)
+	}
+	var connIDs []string
+	for _, node := range resp.Node.Nodes {
+		connIDs = append(connIDs, extractEtcdLastKey(node.Key))
+	}
+	return connIDs, nil
 }
 
-func CleanSubscriber(machines []string) error {
+func cleanSubscriber(machines []string) error {
 	fmt.Println("start cleaning disp in etcd...")
 
-	toCleanSubIds := make([]string, 0)
+	var toCleanSubIds []string
 
-	c := GetEtcdClient(machines)
+	c := getEtcdClient(machines)
 
 	connids, err := getAliveConnector(machines)
 	if err != nil {
@@ -59,31 +59,31 @@ func CleanSubscriber(machines []string) error {
 		return err
 	}
 	for _, node := range resp.Node.Nodes {
-		subId := extractEtcdLastKey(node.Key)
-		subConnKey := fmt.Sprintf("/sub/info/%s/conn_id", subId)
+		subID := extractEtcdLastKey(node.Key)
+		subConnKey := fmt.Sprintf("/sub/info/%s/conn_id", subID)
 		if connResp, err := c.Get(subConnKey, false, false); err != nil {
 			fmt.Printf("retrive %s error(%v)\n", subConnKey, err)
 		} else {
-			connId := extractEtcdLastKey(connResp.Node.Value)
-			if stringIndex(connId, connids) == -1 {
+			connID := extractEtcdLastKey(connResp.Node.Value)
+			if stringIndex(connID, connids) == -1 {
 				// case1: if a subscriber's corresponding connector is dead,
 				// remove this subscriber
-				toCleanSubIds = append(toCleanSubIds, subId)
+				toCleanSubIds = append(toCleanSubIds, subID)
 			} else {
-				connSubKey := fmt.Sprintf("/conn/info/%s/sub/%s", connId, subId)
+				connSubKey := fmt.Sprintf("/conn/info/%s/sub/%s", connID, subID)
 				if _, err := c.Get(connSubKey, false, false); err != nil {
 					// case2: a subscriber's corresponding connector is alive,
 					// however it isn't connecting with this connector
-					toCleanSubIds = append(toCleanSubIds, subId)
+					toCleanSubIds = append(toCleanSubIds, subID)
 				}
 			}
 		}
 	}
 
 	// clean work
-	for _, subId := range toCleanSubIds {
-		fmt.Printf("cleaning sub %s...\n", subId)
-		subKey := fmt.Sprintf("/sub/info/%s", subId)
+	for _, subID := range toCleanSubIds {
+		fmt.Printf("cleaning sub %s...\n", subID)
+		subKey := fmt.Sprintf("/sub/info/%s", subID)
 		c.Delete(subKey, true)
 	}
 
@@ -96,7 +96,7 @@ func main() {
 	flag.Parse()
 
 	machines := strings.Split(*etcdm, ",")
-	if err := CleanSubscriber(machines); err != nil {
+	if err := cleanSubscriber(machines); err != nil {
 		fmt.Println("clean subscriber with error(%v)", err)
 	}
 }
