@@ -17,6 +17,7 @@ import (
 	"syscall"
 )
 
+// Server basic configuration
 var Config *SrvConfig
 
 // Etcd client pool
@@ -31,6 +32,7 @@ var log = logging.MustGetLogger("dynamicmq-match-datanode")
 // logger used for serf daemon in chord node
 var serfLog *os.File
 
+// Node in chord topology
 var ChordNode *chord.Node
 
 // Mapping from subclient's id to subclient information
@@ -40,24 +42,25 @@ var ClisInfo map[string]*SubCliInfo
 // mapping from dispatcher's id(disp name) to a DispConn struct with it
 var DispConns map[string]*DispConn
 
+// the connected dispatcher at present
 var CurDispNode *DispNode
 
-// InitSignal register signals handler.
-func InitSignal() chan os.Signal {
+// initSignal register signals handler.
+func initSignal() chan os.Signal {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM,
 		syscall.SIGINT, syscall.SIGSTOP)
 	return c
 }
 
-func HandleSignal(c chan os.Signal) {
+func handleSignal(c chan os.Signal) {
 	// Block until a signal is received.
 	for {
 		s := <-c
 		log.Info("get a signal %s", s.String())
 		switch s {
 		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGSTOP, syscall.SIGINT:
-			ShutdownServer()
+			shutdownServer()
 		case syscall.SIGHUP:
 			// TODO reload
 		default:
@@ -66,7 +69,7 @@ func HandleSignal(c chan os.Signal) {
 	}
 }
 
-func InitConfig(configFile, entrypoint, starthash string) error {
+func initConfig(configFile, entrypoint, starthash string) error {
 	conf, err := globalconf.NewWithOptions(&globalconf.Options{
 		Filename: configFile,
 	})
@@ -123,7 +126,7 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 
 	Config = &SrvConfig{}
 
-	Config.BindIp = basicFlagSet.Lookup("bind_ip").Value.String()
+	Config.BindIP = basicFlagSet.Lookup("bind_ip").Value.String()
 	Config.Workdir = basicFlagSet.Lookup("workdir").Value.String()
 	Config.LogLevel = basicFlagSet.Lookup("log_level").Value.String()
 	Config.LogFile = basicFlagSet.Lookup("log_file").Value.String()
@@ -149,10 +152,10 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 	Config.Hostname = chordFlagSet.Lookup("hostname").Value.String()
 	Config.BindPort, err =
 		strconv.Atoi(chordFlagSet.Lookup("bind_port").Value.String())
-	Config.BindAddr = fmt.Sprintf("%s:%d", Config.BindIp, Config.BindPort)
+	Config.BindAddr = fmt.Sprintf("%s:%d", Config.BindIP, Config.BindPort)
 	Config.RPCPort, err =
 		strconv.Atoi(chordFlagSet.Lookup("rpc_port").Value.String())
-	Config.RPCAddr = fmt.Sprintf("%s:%d", Config.BindIp, Config.RPCPort)
+	Config.RPCAddr = fmt.Sprintf("%s:%d", Config.BindIP, Config.RPCPort)
 	Config.NumVnodes, err =
 		strconv.Atoi(chordFlagSet.Lookup("num_vnodes").Value.String())
 	Config.NumSuccessors, err =
@@ -193,7 +196,7 @@ func InitConfig(configFile, entrypoint, starthash string) error {
 	return nil
 }
 
-func InitLog(logFile, serfLogFile, logLevel string) error {
+func initLog(logFile, serfLogFile, logLevel string) error {
 	var format = logging.MustStringFormatter(
 		"%{time:2006-01-02 15:04:05.000} [%{level:.4s}] %{id:03x} [%{shortfunc}] %{message}",
 	)
@@ -217,7 +220,7 @@ func InitLog(logFile, serfLogFile, logLevel string) error {
 	return nil
 }
 
-func InitServer() error {
+func initServer() error {
 	log.Info("Datanode server is starting...")
 	ClisInfo = make(map[string]*SubCliInfo)
 	EtcdCliPool = dmq.NewEtcdClientPool(
@@ -225,7 +228,7 @@ func InitServer() error {
 
 	DispConns = make(map[string]*DispConn)
 	var err error
-	CurDispNode, err = AllocateDispNode(EtcdCliPool)
+	CurDispNode, err = allocateDispNode(EtcdCliPool)
 	if err != nil {
 		return err
 	}
@@ -240,9 +243,9 @@ func InitServer() error {
 	return nil
 }
 
-func ShutdownServer() {
+func shutdownServer() {
 	log.Info("Datanode stop...")
-	UnregisterDN(Config, ChordNode, EtcdCliPool)
+	unRegisterDN(Config, ChordNode, EtcdCliPool)
 	os.Exit(0)
 }
 
@@ -256,7 +259,7 @@ func chordRoutine() {
 			EvHandler: Config.SerfEvHandler,
 		},
 		Hostname:       Config.Hostname,
-		HostIp:         Config.BindIp,
+		HostIp:         Config.BindIP,
 		BindAddr:       Config.BindAddr,
 		RPCAddr:        Config.RPCAddr,
 		NumVnodes:      Config.NumVnodes,
@@ -282,10 +285,10 @@ func chordRoutine() {
 	ChordNode.SerfSchdule(c, serfLog)
 
 	// FIXME: register datanode and vnode in a more accruacy time
-	if err := RegisterDataNode(Config, EtcdCliPool); err != nil {
+	if err := registerDataNode(Config, EtcdCliPool); err != nil {
 		panic(err)
 	}
-	if err := RegisterVnodes(Config, ChordNode, EtcdCliPool); err != nil {
+	if err := registerVnodes(Config, ChordNode, EtcdCliPool); err != nil {
 		panic(err)
 	}
 
@@ -299,12 +302,12 @@ func chordRoutine() {
 	}()
 }
 
-func StartChordNode() error {
+func startChordNode() error {
 	go chordRoutine()
 	return nil
 }
 
-func NotifyService() error {
+func notifyService() error {
 	for _, attrRedisAddr := range Config.AttrRedisAddrs {
 		rcfg := dmq.NewRedisConfig(attrRedisAddr, Config.RedisMaxIdle,
 			Config.RedisMaxActive, Config.RedisIdleTimeout)
@@ -313,7 +316,7 @@ func NotifyService() error {
 			return err
 		}
 
-		go AttrWatcher(rcpool)
+		go attrWatcher(rcpool)
 	}
 	return nil
 }
@@ -343,7 +346,7 @@ func main() {
 		os.Exit(-1)
 	}
 
-	if err := InitConfig(configFile, entrypoint, starthash); err != nil {
+	if err := initConfig(configFile, entrypoint, starthash); err != nil {
 		panic(err)
 	}
 
@@ -351,24 +354,24 @@ func main() {
 		panic(err)
 	}
 
-	if err := InitLog(Config.LogFile, Config.SerfLogFile, Config.LogLevel); err != nil {
+	if err := initLog(Config.LogFile, Config.SerfLogFile, Config.LogLevel); err != nil {
 		panic(err)
 	}
 
-	if err := InitServer(); err != nil {
+	if err := initServer(); err != nil {
 		panic(err)
 	}
 
-	if err := StartChordNode(); err != nil {
+	if err := startChordNode(); err != nil {
 		panic(err)
 	}
 
-	if err := NotifyService(); err != nil {
+	if err := notifyService(); err != nil {
 		panic(err)
 	}
 
-	StartPubTCP(Config.BindAddr)
+	startPubTCP(Config.BindAddr)
 
-	signalChan := InitSignal()
-	HandleSignal(signalChan)
+	signalChan := initSignal()
+	handleSignal(signalChan)
 }

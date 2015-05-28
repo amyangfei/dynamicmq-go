@@ -33,7 +33,7 @@ func TestDataNodeOperation(t *testing.T) {
 	nodeCfg := fakeChordNodeConfig()
 	node := chord.CreateNode(nodeCfg)
 
-	if err := RegisterDataNode(srvCfg, ecpool); err != nil {
+	if err := registerDataNode(srvCfg, ecpool); err != nil {
 		t.Errorf("failed to register datanode")
 	}
 
@@ -60,8 +60,8 @@ func TestDataNodeOperation(t *testing.T) {
 		t.Errorf("error datanode status result")
 	}
 
-	if err := RegisterVnodes(srvCfg, node, ecpool); err != nil {
-		t.Errorf("failed to RegisterVnodes: %v", err)
+	if err := registerVnodes(srvCfg, node, ecpool); err != nil {
+		t.Errorf("failed to registerVnodes: %v", err)
 	}
 
 	vnBaseKey := dmq.GetDataVnodeKey()
@@ -74,7 +74,7 @@ func TestDataNodeOperation(t *testing.T) {
 		}
 	}
 
-	if err := UnregisterDN(srvCfg, node, ecpool); err != nil {
+	if err := unRegisterDN(srvCfg, node, ecpool); err != nil {
 		t.Errorf("failed to UnregisterEtcd: %v", err)
 	}
 }
@@ -82,8 +82,8 @@ func TestDataNodeOperation(t *testing.T) {
 // FIXME: to run this function properity, we should start at least one dispatch
 // node. In future work we will separate the dispatcher into a standalone module.
 func TestAllocateDispNode(t *testing.T) {
-	if dnode, err := AllocateDispNode(ecpool); err != nil {
-		// t.Errorf("failed to AllocateDispNode: %v", err)
+	if dnode, err := allocateDispNode(ecpool); err != nil {
+		// t.Errorf("failed to allocateDispNode: %v", err)
 		t.Logf("failed to allocate disp node: %v", err)
 	} else {
 		t.Logf("allocate disp node: %s %s", dnode.dispid, dnode.bindAddr)

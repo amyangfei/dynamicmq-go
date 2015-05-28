@@ -6,16 +6,19 @@ import (
 	"time"
 )
 
+// Response is a simple encapsulation for dispatcher response
 type Response struct {
 	msg string
 	err error
 }
 
+// DispNode represents basic information of a dispatcher node
 type DispNode struct {
 	dispid   string
 	bindAddr string
 }
 
+// DispConn manages a TCP connection to a specific dispatcher
 type DispConn struct {
 	dispid   string
 	conn     net.Conn
@@ -31,16 +34,17 @@ func buildDispConn(dnode *DispNode) (net.Conn, error) {
 	return net.DialTCP("tcp", nil, addr)
 }
 
-func DispMsgSender(dnode *DispNode, msg []byte) error {
-	if dispconn, err := getDispConn(dnode); err != nil {
+func dispMsgSender(dnode *DispNode, msg []byte) error {
+	dispconn, err := getDispConn(dnode)
+	if err != nil {
 		return err
-	} else {
-		// TODO: error handling. e.g. broken connection, write failed etc.
-		// FIXME benchmark shows great latency using channel way: disp.sender <- msg
-		go func() {
-			dispconn.conn.Write(msg)
-		}()
 	}
+	// TODO: error handling. e.g. broken connection, write failed etc.
+	// FIXME benchmark shows great latency using channel way: disp.sender <- msg
+	go func() {
+		dispconn.conn.Write(msg)
+	}()
+
 	return nil
 }
 
@@ -59,7 +63,7 @@ func getDispConn(dnode *DispNode) (*DispConn, error) {
 			receiver: make(chan *Response),
 		}
 		DispConns[dnode.dispid] = dispconn
-		dispconn.LifeCycle()
+		dispconn.lifeCycle()
 	}
 	return dispconn, nil
 }
@@ -75,7 +79,7 @@ func (dispconn *DispConn) heartbeat() {
 	dispconn.sender <- bmsg
 }
 
-func (dispconn *DispConn) HeartbeatRoutine(interval int) {
+func (dispconn *DispConn) heartbeatRoutine(interval int) {
 	ticker := time.NewTicker(time.Second * time.Duration(interval))
 	for {
 		<-ticker.C
@@ -83,8 +87,8 @@ func (dispconn *DispConn) HeartbeatRoutine(interval int) {
 	}
 }
 
-func (dispconn *DispConn) LifeCycle() {
-	go dispconn.HeartbeatRoutine(HbIntervalToDisp)
+func (dispconn *DispConn) lifeCycle() {
+	go dispconn.heartbeatRoutine(hbIntervalToDisp)
 
 	go func() {
 		for {
@@ -99,9 +103,8 @@ func (dispconn *DispConn) LifeCycle() {
 					dispconn.conn.Close()
 					delete(DispConns, dispconn.dispid)
 					return
-				} else {
-					log.Debug("receive msg: '%s' from dispconn %s", resp.msg, dispconn.dispid)
 				}
+				log.Debug("receive msg: '%s' from dispconn %s", resp.msg, dispconn.dispid)
 			}
 		}
 	}()

@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// TODO: uniform Attribute structure, also used in connector module.
+// Attribute represents a complete subscribe attribute
 type Attribute struct {
 	name   string
 	use    byte
@@ -24,6 +24,7 @@ type Attribute struct {
 	extra  string
 }
 
+// PubAttr represents a simplified subscription
 type PubAttr struct {
 	name   string
 	use    int
@@ -31,15 +32,17 @@ type PubAttr struct {
 	val    float64
 }
 
+// SubCliInfo manages information of all subscribers stored on this node
 type SubCliInfo struct {
 	lock    *sync.RWMutex
 	Cid     []byte                // subscribe client's Id
 	CidHash []byte                // cid's hash in datanode
-	ConnId  string                // id of connector the subclient connecting with
+	ConnID  string                // id of connector the subclient connecting with
 	Attrs   []*Attribute          // subscription attribute array
 	AttrMap map[string]*Attribute // used for accelerating matching
 }
 
+// IdxNodeClient struct
 type IdxNodeClient struct {
 	expire     int64
 	conn       net.Conn
@@ -48,12 +51,12 @@ type IdxNodeClient struct {
 }
 
 var (
-	DfltExpire int64 = 15 * 60
+	idxNodeDfltExpire int64 = 15 * 60
 
-	ProcessLater = fmt.Errorf("process Later")
+	errProcessLater = fmt.Errorf("process Later")
 )
 
-// basic data structure for binary message
+// BasicMsg is basic data structure for binary message
 type BasicMsg struct {
 	cmdType uint8
 	bodyLen uint16
@@ -61,25 +64,25 @@ type BasicMsg struct {
 	items   map[uint8]string
 }
 
-// Decoded binary message
+// DecodedMsg represents decoded binary message
 type DecodedMsg struct {
 	extra   uint8
 	bodyLen uint16
 	items   map[uint8]string
 }
 
-type HandleMsgFunc struct {
+type handleMsgFunc struct {
 	validate func(msg *DecodedMsg) error
 	process  func(msg *DecodedMsg, cli *IdxNodeClient) error
 }
 
-var PubCmdTable = map[uint8]HandleMsgFunc{
-	dmq.IDMsgCmdPushMsg:      HandleMsgFunc{validate: validatePushMsg, process: processPushMsg},
-	dmq.IDMsgCmdHeartbeatMsg: HandleMsgFunc{validate: validateHeartbeat, process: processHeartbeat},
+var pubCmdTable = map[uint8]handleMsgFunc{
+	dmq.IDMsgCmdPushMsg:      handleMsgFunc{validate: validatePushMsg, process: processPushMsg},
+	dmq.IDMsgCmdHeartbeatMsg: handleMsgFunc{validate: validateHeartbeat, process: processHeartbeat},
 }
 
 func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
-	var extra uint8 = msg[dmq.IDMsgCmdSize+dmq.IDMsgBodySize]
+	extra := msg[dmq.IDMsgCmdSize+dmq.IDMsgBodySize]
 	decMsg := DecodedMsg{
 		extra: extra, bodyLen: bodyLen, items: make(map[uint8]string, 0),
 	}
@@ -94,8 +97,8 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 		if itemLen+dmq.IDMsgItemHeaderSize+offset > totalLen {
 			return nil, fmt.Errorf("invalid item body length")
 		}
-		var itemId uint8 = msg[offset]
-		decMsg.items[itemId] = string(
+		itemID := msg[offset]
+		decMsg.items[itemID] = string(
 			msg[offset+dmq.IDMsgItemHeaderSize : offset+dmq.IDMsgItemHeaderSize+itemLen])
 		offset += dmq.IDMsgItemHeaderSize + itemLen
 	}
@@ -103,7 +106,7 @@ func binaryMsgDecode(msg []byte, bodyLen uint16) (*DecodedMsg, error) {
 	return &decMsg, nil
 }
 
-func StartPubTCP(bind string) {
+func startPubTCP(bind string) {
 	log.Info("start tcp listening for indexnode on: %s", bind)
 	go pubTCPListen(bind)
 }
@@ -149,7 +152,7 @@ func pubTCPListen(bind string) {
 			continue
 		}
 		inCli := &IdxNodeClient{
-			expire:     time.Now().Unix() + DfltExpire,
+			expire:     time.Now().Unix() + idxNodeDfltExpire,
 			conn:       conn,
 			processBuf: make([]byte, Config.TCPRecvBufSize*2),
 			processEnd: 0,
@@ -160,8 +163,8 @@ func pubTCPListen(bind string) {
 }
 
 func setIdxNodeTimeout(cli *IdxNodeClient) error {
-	var timeout time.Time = time.Now()
-	timeout = timeout.Add(time.Second * time.Duration(DfltExpire))
+	timeout := time.Now()
+	timeout = timeout.Add(time.Second * time.Duration(idxNodeDfltExpire))
 	return cli.conn.SetReadDeadline(timeout)
 }
 
@@ -182,13 +185,12 @@ func handleTCPConn(cli *IdxNodeClient, rc chan *bufio.Reader) {
 				log.Info("addr: %s close connection", addr)
 				// TODO: clean work for pub client
 				return
-			} else {
-				log.Error("addr: %s read with error(%v)", addr, err)
-				break
 			}
+			log.Error("addr: %s read with error(%v)", addr, err)
+			break
 		} else {
 			err := processReadbuf(cli, cli.processBuf[:cli.processEnd+rlen])
-			if err != nil && err != ProcessLater {
+			if err != nil && err != errProcessLater {
 				log.Error("process conn readbuf error(%v)", err)
 				break
 			}
@@ -204,7 +206,7 @@ func handleTCPConn(cli *IdxNodeClient, rc chan *bufio.Reader) {
 }
 
 func processReadbuf(cli *IdxNodeClient, buf []byte) error {
-	var remaining uint16 = uint16(len(buf))
+	remaining := uint16(len(buf))
 	for {
 		if remaining == 0 {
 			cli.processEnd = 0
@@ -213,11 +215,11 @@ func processReadbuf(cli *IdxNodeClient, buf []byte) error {
 		if remaining < dmq.IDMsgHeaderSize {
 			cli.processEnd = int(remaining)
 			copy(buf[:cli.processEnd], buf[len(buf)-int(remaining):])
-			return ProcessLater
+			return errProcessLater
 		}
 		start := uint16(len(buf)) - remaining
-		var cmd uint8 = buf[start]
-		var bodyLen uint16 = binary.BigEndian.Uint16(buf[start+dmq.IDMsgCmdSize:])
+		cmd := buf[start]
+		bodyLen := binary.BigEndian.Uint16(buf[start+dmq.IDMsgCmdSize:])
 		if bodyLen > dmq.IDMsgMaxBodyLen {
 			cli.processEnd = 0
 			log.Error("invalid request, invalid body length: %d", bodyLen)
@@ -230,7 +232,7 @@ func processReadbuf(cli *IdxNodeClient, buf []byte) error {
 				log.Error("invalid request error(%v)", err)
 				continue
 			}
-			if processFunc, ok := PubCmdTable[cmd]; ok {
+			if processFunc, ok := pubCmdTable[cmd]; ok {
 				if err := processFunc.validate(decMsg); err != nil {
 					log.Error("cmd %d request valid error(%v)", cmd, err)
 				} else {
@@ -244,7 +246,7 @@ func processReadbuf(cli *IdxNodeClient, buf []byte) error {
 		} else {
 			cli.processEnd = int(remaining)
 			copy(buf[:cli.processEnd], buf[len(buf)-int(remaining):])
-			return ProcessLater
+			return errProcessLater
 		}
 	}
 }
@@ -265,30 +267,31 @@ func validatePushMsg(msg *DecodedMsg) error {
 	return nil
 }
 
-// cliId is in BSON format, not hex string
-func checkSubCliMatchingMsg(pattrs []*PubAttr, cliId string) bool {
-	if scInfo, ok := ClisInfo[cliId]; !ok {
+// cliID is in BSON format, not hex string
+func checkSubCliMatchingMsg(pattrs []*PubAttr, cliID string) bool {
+	scInfo, ok := ClisInfo[cliID]
+	if !ok {
 		log.Warning("subclient %s not found in ClisInfo",
-			hex.EncodeToString([]byte(cliId)))
+			hex.EncodeToString([]byte(cliID)))
 		return false
-	} else {
-		scInfo.lock.RLock()
-		defer scInfo.lock.RUnlock()
-		for _, pattr := range pattrs {
-			if attr, ok := scInfo.AttrMap[pattr.name]; !ok {
-				// ignore if the subclient has no interest on this attribute
-			} else {
-				if int(attr.use) != pattr.use {
-					log.Warning("different attr type for cli %s: %d expetted %d",
-						hex.EncodeToString([]byte(cliId)), attr.use, pattr.use)
-					return false
-				}
-				if pattr.val < attr.low || pattr.val > attr.high {
-					return false
-				}
+	}
+	scInfo.lock.RLock()
+	defer scInfo.lock.RUnlock()
+	for _, pattr := range pattrs {
+		if attr, ok := scInfo.AttrMap[pattr.name]; !ok {
+			// ignore if the subclient has no interest on this attribute
+		} else {
+			if int(attr.use) != pattr.use {
+				log.Warning("different attr type for cli %s: %d expetted %d",
+					hex.EncodeToString([]byte(cliID)), attr.use, pattr.use)
+				return false
+			}
+			if pattr.val < attr.low || pattr.val > attr.high {
+				return false
 			}
 		}
 	}
+
 	return true
 }
 
@@ -299,7 +302,7 @@ func extractMsgAttr(msg *DecodedMsg) ([]*PubAttr, error) {
 	if err := json.Unmarshal([]byte(attrs), &parsedAttrrs); err != nil {
 		return nil, err
 	}
-	pattrs := make([]*PubAttr, 0)
+	var pattrs []*PubAttr
 	for aname, attr := range parsedAttrrs {
 		if v, ok := attr.(string); ok {
 			pattrs = append(pattrs, &PubAttr{
@@ -330,9 +333,9 @@ func chooseMaxSubCliNum(msg *DecodedMsg) int {
 		},
 	}
 	bmsg := binaryMsgEncode(tmsg)
-	oneIdSize := dmq.SubClientIDSize + dmq.ConnectorNodeIDSize +
+	oneIDSize := dmq.SubClientIDSize + dmq.ConnectorNodeIDSize +
 		int(dmq.IDMsgItemIDSize+dmq.IDMsgItemHeaderSize)
-	return (int(dmq.MDMsgMaxBodyLen+dmq.MDMsgHeaderSize) - len(bmsg)) / oneIdSize
+	return (int(dmq.MDMsgMaxBodyLen+dmq.MDMsgHeaderSize) - len(bmsg)) / oneIDSize
 }
 
 func processPushMsg(msg *DecodedMsg, cli *IdxNodeClient) error {
@@ -345,7 +348,7 @@ func processPushMsg(msg *DecodedMsg, cli *IdxNodeClient) error {
 
 	bits := dmq.SubClientIDSize
 	bclis := []byte(msg.items[dmq.IDMsgClientListIDID])
-	candClis := make([][]byte, 0)
+	var candClis [][]byte
 	for i := 0; (i + bits) <= len(bclis); i += bits {
 		if checkSubCliMatchingMsg(pattrs, string(bclis[i:i+bits])) {
 			candClis = append(candClis, bclis[i:i+bits])
@@ -361,17 +364,17 @@ func processPushMsg(msg *DecodedMsg, cli *IdxNodeClient) error {
 		} else {
 			end = clinum
 		}
-		cliIdList := make([]byte, 0)
+		var cliIDList []byte
 		for i := idx; i < end; i++ {
-			cliId := candClis[i]
-			scInfo, ok := ClisInfo[string(cliId)]
+			cliID := candClis[i]
+			scInfo, ok := ClisInfo[string(cliID)]
 			if !ok {
-				log.Error("subclient %s not in ClisInfo", hex.EncodeToString(cliId))
+				log.Error("subclient %s not in ClisInfo", hex.EncodeToString(cliID))
 				continue
 			}
 			scInfo.lock.RLock()
-			cliIdList = append(cliIdList, cliId...)
-			cliIdList = append(cliIdList, []byte(scInfo.ConnId)...)
+			cliIDList = append(cliIDList, cliID...)
+			cliIDList = append(cliIDList, []byte(scInfo.ConnID)...)
 			scInfo.lock.RUnlock()
 		}
 
@@ -382,15 +385,15 @@ func processPushMsg(msg *DecodedMsg, cli *IdxNodeClient) error {
 			items: map[uint8]string{
 				dmq.MDMsgItemMsgidID:   string(bson.NewObjectId()),
 				dmq.MDMsgItemPayloadID: msg.items[dmq.IDMsgItemPayloadID],
-				dmq.MDMsgItemSubListID: string(cliIdList),
+				dmq.MDMsgItemSubListID: string(cliIDList),
 			},
 		}
 		bmsg := binaryMsgEncode(sendmsg)
 
 		log.Debug("send msg: %v to disp (with %d subclis)",
-			bmsg, len(cliIdList)/(dmq.SubClientIDSize+dmq.ConnectorNodeIDSize))
+			bmsg, len(cliIDList)/(dmq.SubClientIDSize+dmq.ConnectorNodeIDSize))
 
-		if err := DispMsgSender(CurDispNode, bmsg); err != nil {
+		if err := dispMsgSender(CurDispNode, bmsg); err != nil {
 			log.Error("sendmsg to dispnode error: %v", err)
 		}
 

@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	NotifyCmdTable = map[string]func(msg redis.PMessage, attrRCPool *dmq.RedisCliPool) error{
+	notifyCmdTable = map[string]func(msg redis.PMessage, attrRCPool *dmq.RedisCliPool) error{
 		dmq.RedisNotifySet: processAttrCreateOrUpdate,
 		dmq.RedisNotifyDel: processAttrDelete,
 	}
@@ -35,11 +35,11 @@ func extractAttrFromSubVal(subval string) (*Attribute, error) {
 
 	switch int(useval) {
 	case dmq.AttrUseField["strval"]:
-		if strval, ok := attrData["strval"].(string); !ok {
+		strval, ok := attrData["strval"].(string)
+		if !ok {
 			return nil, fmt.Errorf("invalid sub record, strval not found")
-		} else {
-			attr.strval = strval
 		}
+		attr.strval = strval
 	case dmq.AttrUseField["range"]:
 		low, ok := attrData["low"].(float64)
 		if !ok {
@@ -54,11 +54,11 @@ func extractAttrFromSubVal(subval string) (*Attribute, error) {
 		}
 		attr.low, attr.high = low, high
 	case dmq.AttrUseField["extra"]:
-		if extra, ok := attrData["extra"].(string); !ok {
+		extra, ok := attrData["extra"].(string)
+		if !ok {
 			return nil, fmt.Errorf("invalid sub record, extra not found")
-		} else {
-			attr.extra = extra
 		}
+		attr.extra = extra
 	default:
 		return nil, fmt.Errorf("invalid use field: %s", use)
 	}
@@ -68,8 +68,8 @@ func extractAttrFromSubVal(subval string) (*Attribute, error) {
 
 func processAttrCreateOrUpdate(data redis.PMessage, attrRCPool *dmq.RedisCliPool) error {
 	subkey := dmq.IdxSepString(data.Channel, ":", -1)
-	cliIdHexStr, attrName := dmq.ExtractInfoFromSubKey(subkey)
-	if cliIdHexStr == "" || attrName == "" {
+	cliIDHexStr, attrName := dmq.ExtractInfoFromSubKey(subkey)
+	if cliIDHexStr == "" || attrName == "" {
 		return fmt.Errorf("invalid attr create or update notify key: %s", subkey)
 	}
 
@@ -88,9 +88,9 @@ func processAttrCreateOrUpdate(data redis.PMessage, attrRCPool *dmq.RedisCliPool
 		return nil
 	}
 
-	cid, err := hex.DecodeString(cliIdHexStr)
+	cid, err := hex.DecodeString(cliIDHexStr)
 	if err != nil {
-		return fmt.Errorf("invalid client id: %s", cliIdHexStr)
+		return fmt.Errorf("invalid client id: %s", cliIDHexStr)
 	}
 
 	// check whether is stored on this datanode
@@ -104,7 +104,7 @@ func processAttrCreateOrUpdate(data redis.PMessage, attrRCPool *dmq.RedisCliPool
 	cidstr := string(cid)
 	if scInfo, ok := ClisInfo[cidstr]; !ok {
 		// create new sub client
-		connId, err := dmq.GetSubConnID(MetaRCPool, cliIdHexStr)
+		connID, err := dmq.GetSubConnID(MetaRCPool, cliIDHexStr)
 		if err != nil {
 			return err
 		}
@@ -112,7 +112,7 @@ func processAttrCreateOrUpdate(data redis.PMessage, attrRCPool *dmq.RedisCliPool
 			lock:    new(sync.RWMutex),
 			Cid:     cid,
 			CidHash: cidHash,
-			ConnId:  connId,
+			ConnID:  connID,
 			Attrs:   make([]*Attribute, 0),
 			AttrMap: make(map[string]*Attribute),
 		}
@@ -125,7 +125,7 @@ func processAttrCreateOrUpdate(data redis.PMessage, attrRCPool *dmq.RedisCliPool
 			ClisInfo[cidstr].AttrMap[attr.name] = attr
 		} else {
 			// update attribute
-			log.Debug("update %s's attr %s", cliIdHexStr, attr.name)
+			log.Debug("update %s's attr %s", cliIDHexStr, attr.name)
 			scInfo.lock.Lock()
 			defer scInfo.lock.Unlock()
 			if oldAttr.low != attr.low {
@@ -142,53 +142,51 @@ func processAttrCreateOrUpdate(data redis.PMessage, attrRCPool *dmq.RedisCliPool
 
 func processAttrDelete(data redis.PMessage, attrRCPool *dmq.RedisCliPool) error {
 	subkey := dmq.IdxSepString(data.Channel, ":", -1)
-	cliId, attrName := dmq.ExtractInfoFromDelKey(subkey)
-	if cliId == "" {
+	cliID, attrName := dmq.ExtractInfoFromDelKey(subkey)
+	if cliID == "" {
 		return fmt.Errorf("invalid attr delete notify key: %s", subkey)
 	}
 
-	cid, err := hex.DecodeString(cliId)
+	cid, err := hex.DecodeString(cliID)
 	if err != nil {
-		return fmt.Errorf("invalid client id: %s", cliId)
+		return fmt.Errorf("invalid client id: %s", cliID)
 	}
 	cidstr := string(cid)
-	if _, ok := ClisInfo[cidstr]; !ok {
-		return fmt.Errorf("client not exists: %s", cliId)
-	} else {
-		ClisInfo[cidstr].lock.Lock()
-		attrNum := len(ClisInfo[cidstr].Attrs)
-		for i := 0; i < attrNum; i++ {
-			if ClisInfo[cidstr].Attrs[i].name == attrName {
-				delete(ClisInfo[cidstr].AttrMap, attrName)
-				ClisInfo[cidstr].Attrs[attrNum-1], ClisInfo[cidstr].Attrs =
-					nil,
-					append(ClisInfo[cidstr].Attrs[:i],
-						ClisInfo[cidstr].Attrs[i+1:]...)
-				break
-			}
-		}
 
-		ClisInfo[cidstr].lock.Unlock()
-
-		if len(ClisInfo[cidstr].Attrs) == 0 {
-			// TODO: memory check http://stackoverflow.com/a/23231539/1115857
-			// FIXME: ClisInfo[cidstr] = nil
-			delete(ClisInfo, cidstr)
+	scInfo, ok := ClisInfo[cidstr]
+	if !ok {
+		return fmt.Errorf("client not exists: %s", cliID)
+	}
+	scInfo.lock.Lock()
+	attrNum := len(scInfo.Attrs)
+	for i := 0; i < attrNum; i++ {
+		if scInfo.Attrs[i].name == attrName {
+			delete(scInfo.AttrMap, attrName)
+			scInfo.Attrs[attrNum-1], scInfo.Attrs =
+				nil, append(scInfo.Attrs[:i], scInfo.Attrs[i+1:]...)
+			break
 		}
+	}
+	scInfo.lock.Unlock()
+
+	if len(scInfo.Attrs) == 0 {
+		// TODO: memory check http://stackoverflow.com/a/23231539/1115857
+		// FIXME: ClisInfo[cidstr] = nil
+		delete(ClisInfo, cidstr)
 	}
 
 	return nil
 }
 
 func processAttrNotify(msg redis.PMessage, attrRCPool *dmq.RedisCliPool) error {
-	if cmd, ok := NotifyCmdTable[string(msg.Data)]; !ok {
+	cmd, ok := notifyCmdTable[string(msg.Data)]
+	if !ok {
 		return fmt.Errorf("cmd %s not support", msg.Data)
-	} else {
-		return cmd(msg, attrRCPool)
 	}
+	return cmd(msg, attrRCPool)
 }
 
-func AttrProcesser(receiver chan redis.PMessage, stop chan bool, attrRCPool *dmq.RedisCliPool) {
+func attrProcesser(receiver chan redis.PMessage, stop chan bool, attrRCPool *dmq.RedisCliPool) {
 	for {
 		select {
 		case msg := <-receiver:
@@ -201,11 +199,11 @@ func AttrProcesser(receiver chan redis.PMessage, stop chan bool, attrRCPool *dmq
 	}
 }
 
-func AttrWatcher(attrRCPool *dmq.RedisCliPool) {
+func attrWatcher(attrRCPool *dmq.RedisCliPool) {
 	receiver := make(chan redis.PMessage)
 	stop := make(chan bool)
 
-	go AttrProcesser(receiver, stop, attrRCPool)
+	go attrProcesser(receiver, stop, attrRCPool)
 
 	c := attrRCPool.GetConn()
 	if c == nil {
@@ -234,5 +232,5 @@ RecvLoop:
 	}
 
 	log.Info("restart attribute watcher...")
-	go AttrWatcher(attrRCPool)
+	go attrWatcher(attrRCPool)
 }

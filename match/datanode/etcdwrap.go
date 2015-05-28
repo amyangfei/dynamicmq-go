@@ -5,17 +5,11 @@ import (
 	"fmt"
 	"github.com/amyangfei/dynamicmq-go/chord"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
-	"github.com/coreos/go-etcd/etcd"
 	"math/rand"
 	"strings"
 )
 
-func GetEtcdClient(machines []string) (*etcd.Client, error) {
-	c := etcd.NewClient(machines)
-	return c, nil
-}
-
-func RegisterDataNode(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
+func registerDataNode(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
 	ec, err := pool.GetEtcdClient()
 	if err != nil {
 		return err
@@ -41,7 +35,7 @@ func RegisterDataNode(cfg *SrvConfig, pool *dmq.EtcdClientPool) error {
 	return nil
 }
 
-func RegisterVnodes(cfg *SrvConfig, node *chord.Node, pool *dmq.EtcdClientPool) error {
+func registerVnodes(cfg *SrvConfig, node *chord.Node, pool *dmq.EtcdClientPool) error {
 	ec, err := pool.GetEtcdClient()
 	if err != nil {
 		return err
@@ -50,8 +44,8 @@ func RegisterVnodes(cfg *SrvConfig, node *chord.Node, pool *dmq.EtcdClientPool) 
 	c := ec.Cli
 
 	vnBaseKey := dmq.GetDataVnodeKey()
-	var idx int = -1
-	var verr error = nil
+	idx := -1
+	var verr error
 	lvns := node.LVnodes
 	for i, lvn := range lvns {
 		vnk := fmt.Sprintf("%s/%s", vnBaseKey, hex.EncodeToString(lvn.Vnode.Id))
@@ -70,7 +64,7 @@ func RegisterVnodes(cfg *SrvConfig, node *chord.Node, pool *dmq.EtcdClientPool) 
 	return verr
 }
 
-func UnregisterDN(cfg *SrvConfig, node *chord.Node, pool *dmq.EtcdClientPool) error {
+func unRegisterDN(cfg *SrvConfig, node *chord.Node, pool *dmq.EtcdClientPool) error {
 	ec, err := pool.GetEtcdClient()
 	if err != nil {
 		return err
@@ -78,7 +72,7 @@ func UnregisterDN(cfg *SrvConfig, node *chord.Node, pool *dmq.EtcdClientPool) er
 	defer pool.RecycleEtcdClient(ec.Id)
 	c := ec.Cli
 
-	var reterr error = nil
+	var reterr error
 
 	baseKey := dmq.GetDataPNodeKey(cfg.Hostname)
 	if _, err := c.Delete(baseKey, true); err != nil {
@@ -96,26 +90,7 @@ func UnregisterDN(cfg *SrvConfig, node *chord.Node, pool *dmq.EtcdClientPool) er
 	return reterr
 }
 
-func GetSubCliConnId(cliId string, pool *dmq.EtcdClientPool) (string, error) {
-	ec, err := pool.GetEtcdClient()
-	if err != nil {
-		return "", err
-	}
-	defer pool.RecycleEtcdClient(ec.Id)
-	c := ec.Cli
-
-	subCliConnKey := dmq.GetSubConnKey(cliId)
-
-	if resp, err := c.Get(subCliConnKey, false, false); err != nil {
-		return "", err
-	} else if resp.Node.Dir {
-		return "", fmt.Errorf("%s should not be a directory", resp.Node.Key)
-	} else {
-		return resp.Node.Value, nil
-	}
-}
-
-func AllocateDispNode(pool *dmq.EtcdClientPool) (*DispNode, error) {
+func allocateDispNode(pool *dmq.EtcdClientPool) (*DispNode, error) {
 	ec, err := pool.GetEtcdClient()
 	if err != nil {
 		return nil, err
@@ -141,9 +116,9 @@ func AllocateDispNode(pool *dmq.EtcdClientPool) (*DispNode, error) {
 		dispBindKey := fmt.Sprintf("%s/%s", dispInfo.Key, dmq.DispBindAddr)
 		for _, info := range dispInfo.Nodes {
 			if info.Key == dispBindKey {
-				dispIdKey := strings.Split(dispInfo.Key, "/")
+				dispIDKey := strings.Split(dispInfo.Key, "/")
 				dispnode := &DispNode{
-					dispid:   dispIdKey[len(dispIdKey)-1],
+					dispid:   dispIDKey[len(dispIDKey)-1],
 					bindAddr: info.Value,
 				}
 				return dispnode, nil
