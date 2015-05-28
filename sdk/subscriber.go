@@ -12,11 +12,12 @@ import (
 	"time"
 )
 
+// SubSdk struct
 type SubSdk struct {
-	// cliId is a 12-byte hex string as identity used in external system, among
+	// cliID is a 12-byte hex string as identity used in external system, among
 	// clients using sdk. The system doesn't care about how it is generated. It
 	// is reserved for external interface.
-	cliId       string
+	cliID       string
 	token       string
 	preAuthAddr string
 	laddr       string
@@ -25,31 +26,33 @@ type SubSdk struct {
 
 var (
 	// mapping from command name to command content should be sent
-	CmdTable = map[string]string{
+	cmdTable = map[string]string{
 		"auth":      "auth",
 		"subscribe": "sub",
 		"heartbeat": "hb",
 	}
 )
 
-func validSubClientId(cliId string) bool {
+func validSubClientID(cliID string) bool {
 	r, _ := regexp.Compile("^[0-9a-fA-F]{24}$")
-	return r.MatchString(cliId)
+	return r.MatchString(cliID)
 }
 
-func NewSubSdk(cliId, preAuth string) (*SubSdk, error) {
-	if !validSubClientId(cliId) {
+// NewSubSdk creates a new SubSdk object
+func NewSubSdk(cliID, preAuth string) (*SubSdk, error) {
+	if !validSubClientID(cliID) {
 		return nil, errors.New("invalid sub client id")
 	}
-	return &SubSdk{cliId: cliId, preAuthAddr: preAuth}, nil
+	return &SubSdk{cliID: cliID, preAuthAddr: preAuth}, nil
 }
 
+// SetLaddr sets the sdk binding TCP address
 func (sdk *SubSdk) SetLaddr(laddr string) {
 	sdk.laddr = laddr
 }
 
-func (sub *SubSdk) sendMessage(msgs []string) error {
-	sendMsg := make([]byte, 0)
+func (sdk *SubSdk) sendMessage(msgs []string) error {
+	var sendMsg []byte
 	sendMsg = append(sendMsg, fmt.Sprintf("*%d%s", len(msgs), dmq.Crlf)...)
 	for _, msg := range msgs {
 		sendMsg = append(sendMsg, fmt.Sprintf("$%d%s", len(msg), dmq.Crlf)...)
@@ -58,24 +61,23 @@ func (sub *SubSdk) sendMessage(msgs []string) error {
 	// add '#len\r\n'
 	sendMsg = append(
 		[]byte(fmt.Sprintf("#%d%s", len(sendMsg), dmq.Crlf)), sendMsg...)
-	sent, err := sub.conn.Write(sendMsg)
+	sent, err := sdk.conn.Write(sendMsg)
 	if sent != len(sendMsg) {
-		return errors.New(
-			fmt.Sprintf("send incomplete message should: %d sent: %d",
-				len(sendMsg), sent))
+		return fmt.Errorf("send incomplete message should: %d sent: %d",
+			len(sendMsg), sent)
 	}
 	return err
 }
 
-func (sub *SubSdk) connect(dst string) error {
+func (sdk *SubSdk) connect(dst string) error {
 	addr, err := net.ResolveTCPAddr("tcp", dst)
 	if err != nil {
 		return err
 	}
-	var laddr *net.TCPAddr = nil
-	if sub.laddr != "" {
+	var laddr *net.TCPAddr
+	if sdk.laddr != "" {
 		var err error
-		if laddr, err = net.ResolveTCPAddr("tcp", sub.laddr); err != nil {
+		if laddr, err = net.ResolveTCPAddr("tcp", sdk.laddr); err != nil {
 			return err
 		}
 	}
@@ -84,26 +86,26 @@ func (sub *SubSdk) connect(dst string) error {
 		return err
 	}
 	if err := conn.SetKeepAlive(true); err != nil {
-		sub.Close()
+		sdk.Close()
 		return err
 	}
-	sub.conn = conn
+	sdk.conn = conn
 	return nil
 }
 
-func (sub *SubSdk) getPreAuthHost() (string, error) {
+func (sdk *SubSdk) getPreAuthHost() (string, error) {
 	// TODO: get preauth addr from global config service like etcd
-	return sub.preAuthAddr, nil
+	return sdk.preAuthAddr, nil
 }
 
-func (sub *SubSdk) preAuth() (map[string]string, error) {
-	preAuthHost, err := sub.getPreAuthHost()
+func (sdk *SubSdk) preAuth() (map[string]string, error) {
+	preAuthHost, err := sdk.getPreAuthHost()
 	if err != nil {
 		return nil, err
 	}
 
-	preAuthUrl := fmt.Sprintf("http://%s/sdk/sub/preauth?client_id=%s", preAuthHost, sub.cliId)
-	resp, err := http.Get(preAuthUrl)
+	preAuthURL := fmt.Sprintf("http://%s/sdk/sub/preauth?client_id=%s", preAuthHost, sdk.cliID)
+	resp, err := http.Get(preAuthURL)
 	if err != nil {
 		return nil, err
 	}
@@ -136,55 +138,56 @@ func (sub *SubSdk) preAuth() (map[string]string, error) {
 	return data, nil
 }
 
-func (sub *SubSdk) prepareAuthCmd(data map[string]string) ([]byte, error) {
+func (sdk *SubSdk) prepareAuthCmd(data map[string]string) ([]byte, error) {
 	timestamp, _ := data["timestamp"]
 	token, _ := data["token"]
 
 	cmdData := map[string]string{
-		"client_id": sub.cliId,
+		"client_id": sdk.cliID,
 		"timestamp": timestamp,
 		"token":     token,
 	}
-	if jsonData, err := json.Marshal(cmdData); err != nil {
-		return nil, err
-	} else {
-		return jsonData, nil
-	}
+	return json.Marshal(cmdData)
 }
 
-func (sub *SubSdk) Auth() error {
-	preAuthData, err := sub.preAuth()
+// Auth does the following task in sequence:
+// 1) preauth to authsrv
+// 2) connect to a connector
+// 3) send auth cmd to connector
+func (sdk *SubSdk) Auth() error {
+	preAuthData, err := sdk.preAuth()
 	if err != nil {
 		return err
 	}
 
 	connector, _ := preAuthData["connector"]
-	if err := sub.connect(connector); err != nil {
+	if err := sdk.connect(connector); err != nil {
 		return err
 	}
 
-	if cmd, ok := CmdTable["auth"]; !ok {
+	cmd, ok := cmdTable["auth"]
+	if !ok {
 		return errors.New("auth cmd not found")
-	} else {
-		cmdData, err := sub.prepareAuthCmd(preAuthData)
-		if err != nil {
-			return err
-		}
-		if err := sub.sendMessage([]string{cmd, string(cmdData)}); err != nil {
-			return err
-		} else {
-			resp := make([]byte, 64)
-			if _, err := sub.conn.Read(resp); err != nil {
-				return err
-			}
-		}
+	}
+	cmdData, err := sdk.prepareAuthCmd(preAuthData)
+	if err != nil {
+		return err
+	}
+	if err := sdk.sendMessage([]string{cmd, string(cmdData)}); err != nil {
+		return err
+	}
+	resp := make([]byte, 64)
+	if _, err := sdk.conn.Read(resp); err != nil {
+		return err
 	}
 	return nil
 }
 
+// Subscribe is used when sdk wants to create new subsrciption or update
+// existing subscription.
 // attrnames is an array attribute name.
 // attrvals is an array of json string represents attribute information
-func (sub *SubSdk) Subscribe(attrnames, attrvals []string) error {
+func (sdk *SubSdk) Subscribe(attrnames, attrvals []string) error {
 	if len(attrnames) != len(attrvals) {
 		return fmt.Errorf("attrnames and attrvals not matching")
 	}
@@ -194,45 +197,48 @@ func (sub *SubSdk) Subscribe(attrnames, attrvals []string) error {
 		}
 	}
 
-	msg := make([]string, 0)
-	msg = append(msg, CmdTable["subscribe"])
+	var msg []string
+	msg = append(msg, cmdTable["subscribe"])
 	for i := 0; i < len(attrnames); i++ {
 		msg = append(msg, attrnames[i])
 		msg = append(msg, attrvals[i])
 	}
 
-	if err := sub.sendMessage(msg); err != nil {
-		sub.Close()
+	if err := sdk.sendMessage(msg); err != nil {
+		sdk.Close()
 		return err
 	}
 	return nil
 }
 
-func (sub *SubSdk) Heartbeat() error {
-	if cmd, ok := CmdTable["heartbeat"]; !ok {
+func (sdk *SubSdk) heartbeat() error {
+	cmd, ok := cmdTable["heartbeat"]
+	if !ok {
 		return errors.New("heartbeat cmd not found")
-	} else {
-		if err := sub.sendMessage([]string{cmd}); err != nil {
-			sub.Close()
-			return err
-		}
-		// get response data back in RecvMsgRoutine
 	}
+	if err := sdk.sendMessage([]string{cmd}); err != nil {
+		sdk.Close()
+		return err
+	}
+	// get response data back in RecvMsgRoutine
+
 	return nil
 }
 
-func (sub *SubSdk) HeartbeatRoutine(interval int) {
+// HeartbeatRoutine is a standalone goroutine for heartbeat to connector
+func (sdk *SubSdk) HeartbeatRoutine(interval int) {
 	ticker := time.NewTicker(time.Second * time.Duration(interval))
 	for {
 		<-ticker.C
-		sub.Heartbeat()
+		sdk.heartbeat()
 	}
 }
 
-func (sub *SubSdk) RecvMsgRoutine() {
+// RecvMsgRoutine is a standalone goroutine for message receiving
+func (sdk *SubSdk) RecvMsgRoutine() {
 	dataChan := make(chan []byte)
 	errChan := make(chan error)
-	go sub.recvMsg(dataChan, errChan)
+	go sdk.recvMsg(dataChan, errChan)
 	for {
 		select {
 		case data := <-dataChan:
@@ -244,10 +250,10 @@ func (sub *SubSdk) RecvMsgRoutine() {
 	}
 }
 
-func (sub *SubSdk) recvMsg(dataChan chan []byte, errChan chan error) {
+func (sdk *SubSdk) recvMsg(dataChan chan []byte, errChan chan error) {
 	for {
 		buf := make([]byte, 2048)
-		rlen, err := sub.conn.Read(buf)
+		rlen, err := sdk.conn.Read(buf)
 		if err != nil {
 			errChan <- err
 			break
@@ -257,9 +263,10 @@ func (sub *SubSdk) recvMsg(dataChan chan []byte, errChan chan error) {
 	}
 }
 
-func (sub *SubSdk) Close() error {
-	if sub.conn != nil {
-		return sub.conn.Close()
+// Close should be called when we want to destory a subsdk
+func (sdk *SubSdk) Close() error {
+	if sdk.conn != nil {
+		return sdk.conn.Close()
 	}
 	return nil
 }
