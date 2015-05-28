@@ -8,27 +8,27 @@ import (
 	"strings"
 )
 
-func GetEtcdClient(machines []string) (*etcd.Client, error) {
+func getEtcdClient(machines []string) (*etcd.Client, error) {
 	c := etcd.NewClient(machines)
 	return c, nil
 }
 
-func LoadIndexBase(c *etcd.Client, idxBase *IndexBase) error {
+func loadIndexBase(c *etcd.Client, idxBase *IndexBase) error {
 	if idxBase.attrbases == nil {
 		idxBase.attrbases = make(map[string]*AttrBase)
 	}
 
 	// load /idx/info/dimension
 	dimKey := dmq.GetIndexBaseDim()
-	if resp, err := c.Get(dimKey, false, false); err != nil {
+	resp, err := c.Get(dimKey, false, false)
+	if err != nil {
 		return err
-	} else {
-		dimension, err := strconv.Atoi(resp.Node.Value)
-		if err != nil {
-			return err
-		}
-		idxBase.dimension = dimension
 	}
+	dimension, err := strconv.Atoi(resp.Node.Value)
+	if err != nil {
+		return err
+	}
+	idxBase.dimension = dimension
 
 	idxBaseBound := dmq.GetIndexBaseBound()
 	if resp, err := c.Get(idxBaseBound, false, true); err != nil {
@@ -86,7 +86,7 @@ func LoadIndexBase(c *etcd.Client, idxBase *IndexBase) error {
 	return nil
 }
 
-func GetPnodeBindAddr(c *etcd.Client, pnid string) (string, error) {
+func getPnodeBindAddr(c *etcd.Client, pnid string) (string, error) {
 	pnkey := dmq.GetDataPNodeKey(pnid)
 
 	statusKey := fmt.Sprintf("%s/%s", pnkey, dmq.DataPnodeStatus)

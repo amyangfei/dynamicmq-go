@@ -16,6 +16,7 @@ import (
 	"time"
 )
 
+// Server basic configuration
 var Config *SrvConfig
 var log = logging.MustGetLogger("dynamicmq-match-indexnode")
 
@@ -42,21 +43,21 @@ var Rtable *RTable
 var DnConns map[string]*DnodeConn
 
 // InitSignal register signals handler.
-func InitSignal() chan os.Signal {
+func initSignal() chan os.Signal {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM,
 		syscall.SIGINT, syscall.SIGSTOP)
 	return c
 }
 
-func HandleSignal(c chan os.Signal) {
+func handleSignal(c chan os.Signal) {
 	// Block until a signal is received.
 	for {
 		s := <-c
 		log.Info("get a signal %s", s.String())
 		switch s {
 		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGSTOP, syscall.SIGINT:
-			ShutdownServer()
+			shutdownServer()
 		case syscall.SIGHUP:
 			// TODO reload
 		default:
@@ -65,7 +66,7 @@ func HandleSignal(c chan os.Signal) {
 	}
 }
 
-func InitConfig(configFile string) error {
+func initConfig(configFile string) error {
 	conf, err := globalconf.NewWithOptions(&globalconf.Options{
 		Filename: configFile,
 	})
@@ -110,8 +111,8 @@ func InitConfig(configFile string) error {
 
 	Config = &SrvConfig{}
 
-	Config.NodeId = basicFlagSet.Lookup("node_id").Value.String()
-	Config.BindIp = basicFlagSet.Lookup("bind_ip").Value.String()
+	Config.NodeID = basicFlagSet.Lookup("node_id").Value.String()
+	Config.BindIP = basicFlagSet.Lookup("bind_ip").Value.String()
 	pubTcpPort, err :=
 		strconv.Atoi(basicFlagSet.Lookup("pub_tcp_port").Value.String())
 	Config.PubTCPBind = fmt.Sprintf("0.0.0.0:%d", pubTcpPort)
@@ -153,7 +154,7 @@ func InitConfig(configFile string) error {
 	return nil
 }
 
-func InitLog(logFile, logLevel string) error {
+func initLog(logFile, logLevel string) error {
 	var format = logging.MustStringFormatter(
 		"%{time:2006-01-02 15:04:05.000} [%{level:.4s}] %{id:03x} [%{shortfunc}] %{message}",
 	)
@@ -172,7 +173,7 @@ func InitLog(logFile, logLevel string) error {
 	return nil
 }
 
-func InitServer() error {
+func initServer() error {
 	log.Info("Indexnode server is starting...")
 
 	EtcdCliPool = dmq.NewEtcdClientPool(
@@ -189,19 +190,19 @@ func InitServer() error {
 
 	DnConns = make(map[string]*DnodeConn)
 
-	if err := InitIndex(AttrIdxesMap, IdxBase, EtcdCliPool); err != nil {
+	if err := initIndex(AttrIdxesMap, IdxBase, EtcdCliPool); err != nil {
 		return err
 	}
 	return nil
 }
 
-func ShutdownServer() {
+func shutdownServer() {
 	log.Info("Indexnode server stop...")
 	os.Exit(0)
 }
 
-func NotifyService() error {
-	go DataNodeWatcher(Config.EtcdMachines)
+func notifyService() error {
+	go dataNodeWatcher(Config.EtcdMachines)
 
 	for _, attrRedisAddr := range Config.AttrRedisAddrs {
 		rcfg := dmq.NewRedisConfig(attrRedisAddr, Config.RedisMaxIdle,
@@ -211,19 +212,19 @@ func NotifyService() error {
 			return err
 		}
 
-		go AttrWatcher(rcpool)
+		go attrWatcher(rcpool)
 	}
 
 	return nil
 }
 
-func AttrUpdateFlushService() {
+func attrUpdateFlushService() {
 	go func() {
 		lastUpdate := time.Now().Unix()
 		ticker := time.NewTicker(time.Second * time.Duration(Config.FlushInterval))
 		for {
 			<-ticker.C
-			lastUpdate = ProcessAttrUpdateFlush(lastUpdate)
+			lastUpdate = processAttrUpdateFlush(lastUpdate)
 		}
 	}()
 }
@@ -241,7 +242,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err := InitConfig(configFile); err != nil {
+	if err := initConfig(configFile); err != nil {
 		panic(err)
 	}
 
@@ -249,22 +250,22 @@ func main() {
 		panic(err)
 	}
 
-	if err := InitLog(Config.LogFile, Config.LogLevel); err != nil {
+	if err := initLog(Config.LogFile, Config.LogLevel); err != nil {
 		panic(err)
 	}
 
-	if err := InitServer(); err != nil {
+	if err := initServer(); err != nil {
 		panic(err)
 	}
 
-	if err := NotifyService(); err != nil {
+	if err := notifyService(); err != nil {
 		panic(err)
 	}
 
-	AttrUpdateFlushService()
+	attrUpdateFlushService()
 
-	StartPubTCP(Config.PubTCPBind)
+	startPubTCP(Config.PubTCPBind)
 
-	signalChan := InitSignal()
-	HandleSignal(signalChan)
+	signalChan := initSignal()
+	handleSignal(signalChan)
 }

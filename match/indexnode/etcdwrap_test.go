@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var machines []string = []string{"http://localhost:4001"}
+var machines = []string{"http://localhost:4001"}
 
 var dimension = 4
 var names = []string{"xcoord", "ycoord", "zcoord", "time"}
@@ -35,7 +35,7 @@ func checkIndexBase(idxBase *IndexBase) error {
 }
 
 func TestLoadIndexBase(t *testing.T) {
-	c, _ := GetEtcdClient(machines)
+	c, _ := getEtcdClient(machines)
 
 	idxBase := &IndexBase{}
 
@@ -43,7 +43,7 @@ func TestLoadIndexBase(t *testing.T) {
 		t.Errorf("failed to create attribute index base: %v", err)
 	}
 
-	if err := LoadIndexBase(c, idxBase); err != nil {
+	if err := loadIndexBase(c, idxBase); err != nil {
 		t.Errorf("failed to load IndexBase: %v", err)
 	}
 

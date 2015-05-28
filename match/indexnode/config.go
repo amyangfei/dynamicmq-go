@@ -4,10 +4,11 @@ import (
 	"hash"
 )
 
+// SrvConfig is server's basic configuration
 type SrvConfig struct {
 	// basic config
-	NodeId         string
-	BindIp         string
+	NodeID         string
+	BindIP         string
 	PubTCPBind     string
 	Workdir        string
 	LogLevel       string

@@ -9,28 +9,31 @@ import (
 	"time"
 )
 
-// physical node in datanode cluster
+// Pnode represents a physical node in datanode cluster
 type Pnode struct {
 	id       string
 	bindAddr string
 	vnum     int // vnode number
 }
 
-// virtual node in datanode cluster
+// Vnode represents a virtual node in datanode cluster
 type Vnode struct {
 	id []byte // virtual node id
 	pn *Pnode
 }
 
+// RTable stores all vnodes in a chord topology
 type RTable struct {
 	vns []*Vnode
 }
 
+// Response is a simple encapsulation for datanode response
 type Response struct {
 	msg string
 	err error
 }
 
+// DnodeConn manages a TCP connection to a datanode
 type DnodeConn struct {
 	dnid     string
 	conn     net.Conn
@@ -45,7 +48,7 @@ func compareVid(vid1, vid2 []byte) int {
 // if allowSame is false, refuse to insert into a vnode if the rtable exists
 // a vnode with the same id.
 // return true if vnode is inserted into rtable's vns.
-func (rt *RTable) JoinVnode(vn *Vnode, allowSame bool) bool {
+func (rt *RTable) joinVnode(vn *Vnode, allowSame bool) bool {
 	// find insertion postion
 	pos := sort.Search(len(rt.vns), func(i int) bool {
 		return compareVid(rt.vns[i].id, vn.id) >= 0
@@ -68,19 +71,18 @@ func (rt *RTable) JoinVnode(vn *Vnode, allowSame bool) bool {
 	return true
 }
 
-// Find the vnode with id of keyhash
+// Search finds the vnode with id of keyhash
 func (rt *RTable) Search(keyhash []byte) (int, *Vnode) {
 	pos := sort.Search(len(rt.vns), func(i int) bool {
 		return compareVid(rt.vns[i].id, keyhash) >= 0
 	})
 	if pos < len(rt.vns) && compareVid(rt.vns[pos].id, keyhash) == 0 {
 		return pos, rt.vns[pos]
-	} else {
-		return -1, nil
 	}
+	return -1, nil
 }
 
-// Find the vnode who stores the key with hash of keyhash
+// StoreSearch finds the vnode who stores the key with hash of keyhash
 func (rt *RTable) StoreSearch(keyhash []byte) *Vnode {
 	if len(rt.vns) == 0 {
 		return nil
@@ -103,16 +105,17 @@ func buildDnodeConn(nid string) (net.Conn, error) {
 	return net.DialTCP("tcp", nil, addr)
 }
 
-func DnodeMsgSender(dnid string, msg []byte) error {
-	if dnconn, err := getDnodeConn(dnid); err != nil {
+func dnodeMsgSender(dnid string, msg []byte) error {
+	dnconn, err := getDnodeConn(dnid)
+	if err != nil {
 		return err
-	} else {
-		// TODO: error handling. e.g. broken connection, write failed etc.
-		// FIXME benchmark shows great latency using channel way: dnconn.sender <- msg
-		go func() {
-			dnconn.conn.Write(msg)
-		}()
 	}
+	// TODO: error handling. e.g. broken connection, write failed etc.
+	// FIXME benchmark shows great latency using channel way: dnconn.sender <- msg
+	go func() {
+		dnconn.conn.Write(msg)
+	}()
+
 	return nil
 }
 
@@ -131,7 +134,7 @@ func getDnodeConn(nid string) (*DnodeConn, error) {
 			receiver: make(chan *Response),
 		}
 		DnConns[nid] = dnconn
-		dnconn.LifeCycle()
+		dnconn.lifeCycle()
 	}
 	return dnconn, nil
 }
@@ -147,7 +150,7 @@ func (dnconn *DnodeConn) heartbeat() {
 	dnconn.sender <- bmsg
 }
 
-func (dnconn *DnodeConn) HeartbeatRoutine(interval int) {
+func (dnconn *DnodeConn) heartbeatRoutine(interval int) {
 	ticker := time.NewTicker(time.Second * time.Duration(interval))
 	for {
 		<-ticker.C
@@ -155,8 +158,8 @@ func (dnconn *DnodeConn) HeartbeatRoutine(interval int) {
 	}
 }
 
-func (dnconn *DnodeConn) LifeCycle() {
-	go dnconn.HeartbeatRoutine(HbIntervalToDN)
+func (dnconn *DnodeConn) lifeCycle() {
+	go dnconn.heartbeatRoutine(hbIntervalToDN)
 
 	go func() {
 		for {
@@ -171,9 +174,8 @@ func (dnconn *DnodeConn) LifeCycle() {
 					dnconn.conn.Close()
 					delete(DnConns, dnconn.dnid)
 					return
-				} else {
-					log.Debug("receive msg: '%s' from dnconn %s", resp.msg, dnconn.dnid)
 				}
+				log.Debug("receive msg: '%s' from dnconn %s", resp.msg, dnconn.dnid)
 			}
 		}
 	}()

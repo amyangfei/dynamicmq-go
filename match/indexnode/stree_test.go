@@ -11,7 +11,7 @@ func TreeEqual(tree Tree, segs []*SquareSegment) bool {
 		return false
 	}
 	for i := 0; i < len(segments); i++ {
-		if (*segments[i]).CompareTo(segs[i]) != EQUAL {
+		if (*segments[i]).CompareTo(segs[i]) != Equal {
 			return false
 		}
 	}
@@ -87,7 +87,7 @@ func TestNewTree(t *testing.T) {
 }
 
 func clearMap(m *map[int64]*Interval) {
-	for k, _ := range *m {
+	for k := range *m {
 		delete(*m, k)
 	}
 }
@@ -117,7 +117,7 @@ func TestPushAndQuery(t *testing.T) {
 		t.Errorf("error query count result %d for (0.5, 0.5), expected %d", count, len(expected))
 	}
 	for _, interval := range intervals {
-		if expect, ok := expected[interval.Id]; !ok {
+		if expect, ok := expected[interval.ID]; !ok {
 			t.Errorf("error query result %s, not expected", interval.ToString())
 		} else if !interval.SegmentEqual(expect) {
 			t.Errorf("error query result %s, wrong segment", interval.ToString())
@@ -138,7 +138,7 @@ func TestPushAndQuery(t *testing.T) {
 		t.Errorf("error query count result %d for (1, 1), expected %d", count, len(expected))
 	}
 	for _, interval := range intervals {
-		if expect, ok := expected[interval.Id]; !ok {
+		if expect, ok := expected[interval.ID]; !ok {
 			t.Errorf("error query result %s, not expected", interval.ToString())
 		} else if !interval.SegmentEqual(expect) {
 			t.Errorf("error query result %s, wrong segment", interval.ToString())
@@ -157,7 +157,7 @@ func TestPushAndQuery(t *testing.T) {
 		t.Errorf("error query count result %d for (2.5, 2.5), expected %d", count, len(expected))
 	}
 	for _, interval := range intervals {
-		if expect, ok := expected[interval.Id]; !ok {
+		if expect, ok := expected[interval.ID]; !ok {
 			t.Errorf("error query result %s, not expected", interval.ToString())
 		} else if !interval.SegmentEqual(expect) {
 			t.Errorf("error query result %s, wrong segment", interval.ToString())
@@ -176,7 +176,7 @@ func TestPushAndQuery(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	tree := NewTree(0, 4, 0, 4)
-	intervals := make([]*Interval, 0)
+	var intervals []*Interval
 	intervals = append(intervals, tree.Push(0, 1, 0, 1, nil))
 	intervals = append(intervals, tree.Push(1, 2, 1, 2, nil))
 	intervals = append(intervals, tree.Push(1, 3, 1, 3, nil))
@@ -216,7 +216,7 @@ func TestDelete(t *testing.T) {
 		t.Errorf("error query count result %d for (0.5, 0.5), expected %d", count, len(expected))
 	}
 	for _, interval := range intervals {
-		if expect, ok := expected[interval.Id]; !ok {
+		if expect, ok := expected[interval.ID]; !ok {
 			t.Errorf("error query result %s, not expected", interval.ToString())
 		} else if !interval.SegmentEqual(expect) {
 			t.Errorf("error query result %s, wrong segment", interval.ToString())
