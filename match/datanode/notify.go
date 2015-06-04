@@ -129,17 +129,16 @@ func processAttrCreateOrUpdate(data redis.PMessage, attrRCPool *dmq.RedisCliPool
 			return fmt.Errorf("invalid data type %v stored in SubCliInfo map",
 				reflect.TypeOf(v))
 		}
+		scInfo.lock.Lock()
+		defer scInfo.lock.Unlock()
 		if oldAttr, ok := scInfo.AttrMap[attr.name]; !ok {
 			// create new attribute
-			scInfo.lock.Lock()
-			defer scInfo.lock.Unlock()
+			log.Debug("create %s's new attr %s", cliIDHexStr, attr.name)
 			scInfo.Attrs = append(scInfo.Attrs, attr)
 			scInfo.AttrMap[attr.name] = attr
 		} else {
 			// update attribute
 			log.Debug("update %s's attr %s", cliIDHexStr, attr.name)
-			scInfo.lock.Lock()
-			defer scInfo.lock.Unlock()
 			if oldAttr.low != attr.low {
 				oldAttr.low = attr.low
 			}
@@ -184,6 +183,7 @@ func processAttrDelete(data redis.PMessage, attrRCPool *dmq.RedisCliPool) error 
 			reflect.TypeOf(v))
 	}
 	scInfo.lock.Lock()
+	defer scInfo.lock.Unlock()
 	attrNum := len(scInfo.Attrs)
 	for i := 0; i < attrNum; i++ {
 		if scInfo.Attrs[i].name == attrName {
@@ -193,7 +193,6 @@ func processAttrDelete(data redis.PMessage, attrRCPool *dmq.RedisCliPool) error 
 			break
 		}
 	}
-	scInfo.lock.Unlock()
 
 	if len(scInfo.Attrs) == 0 {
 		// TODO: memory check http://stackoverflow.com/a/23231539/1115857
