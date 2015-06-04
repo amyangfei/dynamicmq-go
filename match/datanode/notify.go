@@ -6,6 +6,7 @@ import (
 	"fmt"
 	dmq "github.com/amyangfei/dynamicmq-go/dynamicmq"
 	"github.com/garyburd/redigo/redis"
+	"reflect"
 	"sync"
 )
 
@@ -103,13 +104,13 @@ func processAttrCreateOrUpdate(data redis.PMessage, attrRCPool *dmq.RedisCliPool
 	}
 
 	cidstr := string(cid)
-	if scInfo, ok := ClisInfo[cidstr]; !ok {
+	if v := ClisInfo.Get(cidstr); v == nil {
 		// create new sub client
 		connID, err := dmq.GetSubConnID(MetaRCPool, cliIDHexStr)
 		if err != nil {
 			return err
 		}
-		ClisInfo[cidstr] = &SubCliInfo{
+		newScInfo := &SubCliInfo{
 			lock:    new(sync.RWMutex),
 			Cid:     cid,
 			CidHash: cidHash,
@@ -117,9 +118,17 @@ func processAttrCreateOrUpdate(data redis.PMessage, attrRCPool *dmq.RedisCliPool
 			Attrs:   make([]*Attribute, 0),
 			AttrMap: make(map[string]*Attribute),
 		}
-		ClisInfo[cidstr].Attrs = append(ClisInfo[cidstr].Attrs, attr)
-		ClisInfo[cidstr].AttrMap[attr.name] = attr
+		ClisInfo.Set(cidstr, newScInfo)
+		newScInfo.lock.Lock()
+		defer newScInfo.lock.Unlock()
+		newScInfo.Attrs = append(newScInfo.Attrs, attr)
+		newScInfo.AttrMap[attr.name] = attr
 	} else {
+		scInfo, ok := v.(*SubCliInfo)
+		if !ok {
+			return fmt.Errorf("invalid data type %v stored in SubCliInfo map",
+				reflect.TypeOf(v))
+		}
 		if oldAttr, ok := scInfo.AttrMap[attr.name]; !ok {
 			// create new attribute
 			scInfo.lock.Lock()
@@ -165,9 +174,14 @@ func processAttrDelete(data redis.PMessage, attrRCPool *dmq.RedisCliPool) error 
 		return nil
 	}
 
-	scInfo, ok := ClisInfo[cidstr]
-	if !ok {
+	v := ClisInfo.Get(cidstr)
+	if v == nil {
 		return fmt.Errorf("client not exists: %s", cliID)
+	}
+	scInfo, ok := v.(*SubCliInfo)
+	if !ok {
+		return fmt.Errorf("invalid data type %v stored in SubCliInfo map",
+			reflect.TypeOf(v))
 	}
 	scInfo.lock.Lock()
 	attrNum := len(scInfo.Attrs)
@@ -184,7 +198,7 @@ func processAttrDelete(data redis.PMessage, attrRCPool *dmq.RedisCliPool) error 
 	if len(scInfo.Attrs) == 0 {
 		// TODO: memory check http://stackoverflow.com/a/23231539/1115857
 		// FIXME: ClisInfo[cidstr] = nil
-		delete(ClisInfo, cidstr)
+		ClisInfo.Delete(cidstr)
 	}
 
 	return nil

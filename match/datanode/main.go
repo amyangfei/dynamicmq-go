@@ -37,7 +37,7 @@ var ChordNode *chord.Node
 
 // Mapping from subclient's id to subclient information
 // The subclient's id is in BSON format, not hex string
-var ClisInfo map[string]*SubCliInfo
+var ClisInfo = dmq.NewConcurrentMap()
 
 // mapping from dispatcher's id(disp name) to a DispConn struct with it
 var DispConns map[string]*DispConn
@@ -222,7 +222,6 @@ func initLog(logFile, serfLogFile, logLevel string) error {
 
 func initServer() error {
 	log.Info("Datanode server is starting...")
-	ClisInfo = make(map[string]*SubCliInfo)
 	EtcdCliPool = dmq.NewEtcdClientPool(
 		Config.EtcdMachines, Config.EtcdPoolSize, Config.EtcdPoolMaxSize)
 

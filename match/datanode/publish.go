@@ -10,6 +10,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"net"
+	"reflect"
 	"sync"
 	"time"
 )
@@ -269,12 +270,19 @@ func validatePushMsg(msg *DecodedMsg) error {
 
 // cliID is in BSON format, not hex string
 func checkSubCliMatchingMsg(pattrs []*PubAttr, cliID string) bool {
-	scInfo, ok := ClisInfo[cliID]
-	if !ok {
+	v := ClisInfo.Get(cliID)
+	if v == nil {
 		log.Warning("subclient %s not found in ClisInfo",
 			hex.EncodeToString([]byte(cliID)))
 		return false
 	}
+	scInfo, ok := v.(*SubCliInfo)
+	if !ok {
+		log.Error("invalid data type %v stored in SubCliInfo map",
+			reflect.TypeOf(v))
+		return false
+	}
+
 	scInfo.lock.RLock()
 	defer scInfo.lock.RUnlock()
 	for _, pattr := range pattrs {
@@ -367,15 +375,19 @@ func processPushMsg(msg *DecodedMsg, cli *IdxNodeClient) error {
 		var cliIDList []byte
 		for i := idx; i < end; i++ {
 			cliID := candClis[i]
-			scInfo, ok := ClisInfo[string(cliID)]
-			if !ok {
+			if v := ClisInfo.Get(string(cliID)); v != nil {
+				if scInfo, ok := v.(*SubCliInfo); !ok {
+					log.Error("invalid data stored in ClisInfo")
+				} else {
+					scInfo.lock.RLock()
+					cliIDList = append(cliIDList, cliID...)
+					cliIDList = append(cliIDList, []byte(scInfo.ConnID)...)
+					scInfo.lock.RUnlock()
+				}
+			} else {
 				log.Error("subclient %s not in ClisInfo", hex.EncodeToString(cliID))
 				continue
 			}
-			scInfo.lock.RLock()
-			cliIDList = append(cliIDList, cliID...)
-			cliIDList = append(cliIDList, []byte(scInfo.ConnID)...)
-			scInfo.lock.RUnlock()
 		}
 
 		sendmsg := &BasicMsg{
