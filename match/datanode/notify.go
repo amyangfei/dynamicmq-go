@@ -93,6 +93,7 @@ func processAttrCreateOrUpdate(data redis.PMessage, attrRCPool *dmq.RedisCliPool
 		return fmt.Errorf("invalid client id: %s", cliIDHexStr)
 	}
 
+	// TODO: use outer notification proxy to prevent noise notify.
 	// check whether is stored on this datanode
 	cidHash := dmq.GenHash(cid, Config.HashFunc)
 	candvn := ChordNode.Rtable.Search(cidHash)
@@ -121,8 +122,10 @@ func processAttrCreateOrUpdate(data redis.PMessage, attrRCPool *dmq.RedisCliPool
 	} else {
 		if oldAttr, ok := scInfo.AttrMap[attr.name]; !ok {
 			// create new attribute
-			ClisInfo[cidstr].Attrs = append(ClisInfo[cidstr].Attrs, attr)
-			ClisInfo[cidstr].AttrMap[attr.name] = attr
+			scInfo.lock.Lock()
+			defer scInfo.lock.Unlock()
+			scInfo.Attrs = append(scInfo.Attrs, attr)
+			scInfo.AttrMap[attr.name] = attr
 		} else {
 			// update attribute
 			log.Debug("update %s's attr %s", cliIDHexStr, attr.name)
@@ -152,6 +155,15 @@ func processAttrDelete(data redis.PMessage, attrRCPool *dmq.RedisCliPool) error 
 		return fmt.Errorf("invalid client id: %s", cliID)
 	}
 	cidstr := string(cid)
+
+	// TODO: use outer notification proxy to prevent noise notify.
+	// check whether is stored on this datanode
+	cidHash := dmq.GenHash(cid, Config.HashFunc)
+	candvn := ChordNode.Rtable.Search(cidHash)
+	if candvn.Pnode.Hostname != ChordNode.Config.Hostname {
+		// ignore
+		return nil
+	}
 
 	scInfo, ok := ClisInfo[cidstr]
 	if !ok {
